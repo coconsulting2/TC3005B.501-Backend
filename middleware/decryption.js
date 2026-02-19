@@ -18,4 +18,4 @@ export const decrypt = (encryptedData) => {
     console.error('Decryption error:', error);
     return encryptedData; 
   }
-}
+};
