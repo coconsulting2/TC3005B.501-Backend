@@ -16,11 +16,11 @@ const encrypt = (data) => {
   let encrypted = cipher.update(data, 'utf8', 'base64');
   encrypted += cipher.final('base64');
   return IV.toString('hex') + encrypted;
-}
+};
 
 const hash = async (data) => {
   return await bcrypt.hash(data, 10);
-}
+};
 
 /*
  * Create a new user (admin functionality)

@@ -1,12 +1,19 @@
-/*
-Applicant Controller
-*/
+/**
+ * @module applicantController
+ * @description Handles HTTP requests for travel request applicant operations.
+ */
 import Applicant from "../models/applicantModel.js";
-import { cancelTravelRequestValidation, createExpenseValidationBatch, sendReceiptsForValidation } from '../services/applicantService.js';
-import { decrypt } from '../middleware/decryption.js';
+import { cancelTravelRequestValidation, createExpenseValidationBatch, sendReceiptsForValidation } from "../services/applicantService.js";
+import { decrypt } from "../middleware/decryption.js";
 import { Mail } from "../services/email/mail.cjs";
 import mailData from "../services/email/mailData.js";
 
+/**
+ * Retrieves an applicant by their user ID.
+ * @param {import('express').Request} req - Express request (params: id)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} JSON with { user_id, user_name } or 404/500 error
+ */
 export const getApplicantById = async (req, res) => {
   const id = req.params.id;
   try {
@@ -19,11 +26,17 @@ export const getApplicantById = async (req, res) => {
       user_name: applicant.user_name,
     };
     res.json(applicantWithId);
-  } catch (err) {
-    res.status(500).json({ error: "Controller: Internal Server Error" });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
+/**
+ * Lists all travel requests for a given applicant.
+ * @param {import('express').Request} req - Express request (params: user_id)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} JSON array of requests with formatted dates, or 404/500 error
+ */
 export const getApplicantRequests = async (req, res) => {
   const userId = req.params.user_id;
   try {
@@ -42,12 +55,19 @@ export const getApplicantRequests = async (req, res) => {
     }));
 
     res.json(formattedRequests);
-  } catch (err) {
-    console.error("Error in getApplicantRequests controller:", err);
+  } catch (error) {
+    console.error("Error in getApplicantRequests controller:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
 
+/**
+ * Retrieves a single travel request with full details (user info, routes).
+ * Decrypts sensitive fields (email, phone) before responding.
+ * @param {import('express').Request} req - Express request (params: user_id)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} JSON with request details, user info, and routes array
+ */
 export const getApplicantRequest = async (req, res) => {
   const userId = req.params.user_id;
   try {
@@ -89,28 +109,40 @@ export const getApplicantRequest = async (req, res) => {
     };
 
     res.json(response);
-  } catch (err) {
-    console.error("Error in getApplicantRequest controller:", err);
+  } catch (error) {
+    console.error("Error in getApplicantRequest controller:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };
 
+/**
+ * Retrieves the cost center associated with a user.
+ * @param {import('express').Request} req - Express request (params: user_id)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} JSON with cost center data or 404/500 error
+ */
 export const getCostCenterByUserId = async (req, res) => {
-  const user_id = req.params.user_id;
+  const userId = req.params.user_id;
   try {
-    const costCenter = await Applicant.findCostCenterByUserId(user_id);
+    const costCenter = await Applicant.findCostCenterByUserId(userId);
     if (!costCenter) {
       return res.status(404).json({
-        error: `Cost center not found for user_id ${user_id}`,
-        user_id,
+        error: `Cost center not found for user_id ${userId}`,
+        user_id: userId,
       });
     }
     res.json(costCenter);
-  } catch (err) {
-    res.status(500).json({ error: "Controller: Internal Server Error" });
+  } catch (error) {
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
+/**
+ * Creates a new travel request and sends email notification.
+ * @param {import('express').Request} req - Express request (params: user_id, body: travel details)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} 201 JSON with created request data
+ */
 export const createTravelRequest = async (req, res) => {
   const applicantId = Number(req.params.user_id);
   const travelDetails = req.body;
@@ -122,12 +154,18 @@ export const createTravelRequest = async (req, res) => {
     const { user_email, user_name, requestId, status } = await mailData(travelRequest.requestId);
     await Mail(user_email, user_name, travelRequest.requestId, status);
     res.status(201).json(travelRequest);
-  } catch (err) {
-    console.error("Controller error:", err);
-    res.status(500).json({ error: "Controller: Internal Server Error" });
+  } catch (error) {
+    console.error("Error in createTravelRequest controller:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
+/**
+ * Edits an existing travel request (replaces routes).
+ * @param {import('express').Request} req - Express request (params: user_id as request ID, body: travel details)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} JSON with updated request data
+ */
 export const editTravelRequest = async (req, res) => {
   const travelRequestId = Number(req.params.user_id);
   const travelDetails = req.body;
@@ -137,12 +175,18 @@ export const editTravelRequest = async (req, res) => {
       travelDetails,
     );
     res.status(200).json(updatedTravelRequest);
-  } catch (err) {
-    console.error("Controller error:", err);
-    res.status(500).json({ error: "Controller: Internal Server Error" });
+  } catch (error) {
+    console.error("Error in editTravelRequest controller:", error);
+    res.status(500).json({ error: "Internal server error" });
   }
 };
 
+/**
+ * Cancels a travel request after validation and sends email notification.
+ * @param {import('express').Request} req - Express request (params: request_id)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} JSON with cancellation result or error
+ */
 export const cancelTravelRequest = async (req, res) => {
   const { request_id } = req.params;
 
@@ -151,31 +195,43 @@ export const cancelTravelRequest = async (req, res) => {
     const { user_email, user_name, requestId, status } = await mailData(request_id);
     await Mail(user_email, user_name, request_id, status);
     return res.status(200).json(result);
-  } catch (err) {
-    if (err.status) {
-      return res.status(err.status).json({ error: err.message });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ error: error.message });
     }
-    console.error("Unexpected error in cancelTravelRequest controller:", err);
-    return res.status(500).json({ error: "Unexpected error while cancelling request" });
+    console.error("Unexpected error in cancelTravelRequest controller:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 
-export async function createExpenseValidationHandler(req, res) {
+/**
+ * Creates expense validation receipts in batch.
+ * @param {import('express').Request} req - Express request (body: { receipts: Array })
+ * @param {import('express').Response} res - Express response
+ * @returns {void} 201 JSON with count and success message, or 400/500 error
+ */
+export const createExpenseValidationHandler = async (req, res) => {
   try {
     const count = await createExpenseValidationBatch(req.body.receipts);
     return res.status(201).json({
       count,
       message: "Expense receipts created successfully",
     });
-  } catch (err) {
-    if (err.code === "BAD_REQUEST") {
-      return res.status(400).json({ error: err.message });
+  } catch (error) {
+    if (error.code === "BAD_REQUEST") {
+      return res.status(400).json({ error: error.message });
     }
-    console.error("Error in createExpenseValidationHandler:", err);
+    console.error("Error in createExpenseValidationHandler:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
-}
+};
 
+/**
+ * Lists completed travel requests for a user (status = completed).
+ * @param {import('express').Request} req - Express request (params: user_id)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} JSON array of completed requests with formatted dates
+ */
 export const getCompletedRequests = async (req, res) => {
   const userId = parseInt(req.params.user_id, 10);
   if (!Number.isInteger(userId)) {
@@ -196,12 +252,18 @@ export const getCompletedRequests = async (req, res) => {
       status: request.status
     }));
     res.json(formattedRequests);
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error("Error in getCompletedRequests controller:", error);
     res.status(500).json({ error: "Internal server error" });
   }
-}
+};
 
+/**
+ * Creates a draft travel request (not yet submitted for approval).
+ * @param {import('express').Request} req - Express request (params: user_id, body: travel details)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} 201 JSON with draft request data
+ */
 export const createDraftTravelRequest = async (req, res) => {
   const applicantId = Number(req.params.user_id);
   const travelDetails = req.body;
@@ -211,21 +273,28 @@ export const createDraftTravelRequest = async (req, res) => {
       travelDetails,
     );
     res.status(201).json(travelRequest);
-
   } catch (error) {
     console.error("Error in createDraftTravelRequest controller:", error);
     res.status(500).json({ error: "Internal server error" });
-
   }
+};
 
-}
-
+/**
+ * Formats a date to ISO string (YYYY-MM-DD).
+ * @param {Date|string} date - Date to format
+ * @returns {string} Formatted date string
+ */
 const formatDate = (date) => {
   return new Date(date).toISOString().split("T")[0];
 };
 
+/**
+ * Confirms a draft request, changing its status to submitted, and sends email notification.
+ * @param {import('express').Request} req - Express request (params: user_id, request_id)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} JSON with confirmation result
+ */
 export const confirmDraftTravelRequest = async (req, res) => {
-
   const userId = Number(req.params.user_id);
   const requestId = Number(req.params.request_id);
 
@@ -234,15 +303,21 @@ export const confirmDraftTravelRequest = async (req, res) => {
     const { user_email, user_name, request_id, status } = await mailData(requestId);
     await Mail(user_email, user_name, requestId, status);
     return res.status(200).json(result);
-  } catch (err) {
-    if (err.status) {
-      return res.status(err.status).json({ error: err.message });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ error: error.message });
     }
-    console.error("Unexpected error in confirmDraftTravelRequest controller:", err);
-    return res.status(500).json({ error: "Unexpected error while confirming draft request" });
+    console.error("Unexpected error in confirmDraftTravelRequest controller:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 
+/**
+ * Submits expense receipts for validation and sends email notification.
+ * @param {import('express').Request} req - Express request (params: request_id)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} JSON with submission result
+ */
 export const sendExpenseValidation = async (req, res) => {
   const requestId = req.params.request_id;
 
@@ -251,42 +326,41 @@ export const sendExpenseValidation = async (req, res) => {
     const { user_email, user_name, request_id, status } = await mailData(requestId);
     await Mail(user_email, user_name, requestId, status);
     return res.status(200).json(result);
-  } catch (err) {
-    if (err.status) {
-      return res.status(err.status).json({ error: err.message });
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ error: error.message });
     }
-    console.error("Unexpected error in sendExpenseValidation controller:", err);
+    console.error("Unexpected error in sendExpenseValidation controller:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
 
-
+/**
+ * Deletes a receipt and its associated files from MongoDB.
+ * @param {import('express').Request} req - Express request (params: receipt_id)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} JSON with deletion confirmation or 404/500 error
+ */
 export const deleteReceipt = async (req, res) => {
   const { receipt_id } = req.params;
-  
+
   try {
-    // Import the service to delete files from MongoDB
-    const { deleteReceiptFiles } = await import('../services/receiptFileService.js');
-    
-    // First delete the files from MongoDB
+    const { deleteReceiptFiles } = await import("../services/receiptFileService.js");
     await deleteReceiptFiles(Number(receipt_id));
-    
-    // Then delete the receipt record from the database
     await Applicant.deleteReceipt(Number(receipt_id));
-    
+
     return res.status(200).json({
       message: "Receipt deleted successfully",
       receipt_id: Number(receipt_id)
     });
-  } catch (err) {
-    if (err.message === 'Receipt not found') {
+  } catch (error) {
+    if (error.message === "Receipt not found") {
       return res.status(404).json({ error: "Receipt not found" });
     }
-    console.error("Error in deleteReceipt controller:", err);
+    console.error("Error in deleteReceipt controller:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
-
 
 export default {
   getApplicantById,
