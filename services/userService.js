@@ -52,7 +52,7 @@ export async function authenticateUser(username, password, req) {
     }
 
     if (!user.active) {
-      throw new Error("User acccount is inactive")
+      throw new Error("User acccount is inactive");
     }
 
     const token = jwt.sign(
