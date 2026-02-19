@@ -125,9 +125,9 @@ export async function createExpenseValidationBatch(receipts) {
 export const getCountryId = async (conn, countryName) => {
     console.log("Checking country:", countryName);
     const countryQuery = `SELECT country_id FROM Country WHERE country_name = ?`;
-    const [CountryRows] = await conn.query(countryQuery, [countryName]);
+    const [countryRows] = await conn.query(countryQuery, [countryName]);
     //If country does not exist, insert it
-    if (CountryRows === undefined) {
+    if (countryRows === undefined) {
         console.log("Country not found, inserting:", countryName);
         const insertCountryQuery = `INSERT INTO Country (country_name) VALUES (?)`;
         const insertedCountry = await conn.execute(insertCountryQuery, [
@@ -136,22 +136,22 @@ export const getCountryId = async (conn, countryName) => {
         return insertedCountry.insertId;
     } else {
         //If country exists, return the id
-        return CountryRows.country_id;
+        return countryRows.country_id;
     }
 };
 
 export const getCityId = async (conn, cityName) => {
     console.log("Checking city:", cityName);
     const cityQuery = `SELECT city_id FROM City WHERE city_name = ?`;
-    const [CityRows] = await conn.query(cityQuery, [cityName]);
+    const [cityRows] = await conn.query(cityQuery, [cityName]);
     //If city does not exist, insert it
-    if (CityRows === undefined) {
+    if (cityRows === undefined) {
         const insertCityQuery = `INSERT INTO City (city_name) VALUES (?)`;
         const insertedCity = await conn.execute(insertCityQuery, [cityName]);
         return insertedCity.insertId;
     } else {
         //If city exists, return the id
-        return CityRows.city_id;
+        return cityRows.city_id;
     }
 };
 
