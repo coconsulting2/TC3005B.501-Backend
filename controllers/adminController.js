@@ -68,8 +68,8 @@ export const createUser = async (req, res) => {
         await adminService.createUser(userData);
         return res.status(201).json({ message: "User created succesfully" });
     } catch (error) {
-        console.error("Error creating user:", error.message);
-        return res.status(500).json({ error: "Internal server error" });
+        console.error("Error creating user:", error.status);
+        return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
     }
 };
 
