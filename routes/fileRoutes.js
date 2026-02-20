@@ -11,7 +11,7 @@ import {
 const router = express.Router();
 const upload = multer();
 
-// Apply sanitization middleware to all routes
+// Apply sanitization middleware to all routes jhbj
 router.use(sanitizeMongoInputs);
 
 // Upload both PDF and XML files for a receipt
