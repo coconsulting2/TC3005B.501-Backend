@@ -11,7 +11,7 @@ export const sanitizeMongoInputs = (req, res, next) => {
     req.params = sanitize(req.params);
   }
 
-  // Sanitize request query
+  // Sanitize request querylkm
   if (req.query) {
     req.query = sanitize(req.query);
   }
