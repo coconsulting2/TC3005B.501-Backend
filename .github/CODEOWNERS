@@ -1,0 +1,37 @@
+# Code Owners - Frontend TC3005B.501
+
+# Default owners (admins generales)
+*       @MVRer @edeytai @hector-lg @JezraelMoreno
+
+# Frontend team - responsable de todo el código frontend
+*       @coconsulting2/Frontend
+
+# Source code - componentes y páginas
+/src/               @coconsulting2/Frontend
+
+# Public assets - imágenes, favicons, etc.
+/public/            @coconsulting2/Frontend
+
+# Cypress - tests e2e
+/cypress/           @coconsulting2/Frontend @coconsulting2/QA-y-Documentación
+cypress.config.ts   @coconsulting2/Frontend @coconsulting2/QA-y-Documentación
+
+# Configuración de Astro
+astro.config.mjs    @MVRer @edeytai @hector-lg @JezraelMoreno
+
+# Archivos críticos de configuración (solo admins)
+package.json        @MVRer @edeytai @hector-lg @JezraelMoreno
+pnpm-lock.yaml      @MVRer @edeytai @hector-lg @JezraelMoreno
+tsconfig.json       @MVRer @edeytai @hector-lg @JezraelMoreno
+.env                @MVRer @JezraelMoreno
+.env.example        @coconsulting2/Frontend
+.gitignore          @MVRer @JezraelMoreno
+
+# Documentación
+README.md           @MVRer @JezraelMoreno
+ASTRO.md            @coconsulting2/Frontend @coconsulting2/QA-y-Documentación
+CHANGELOG.md        @coconsulting2/Frontend @coconsulting2/QA-y-Documentación
+CONTRIBUTING.md     @coconsulting2/Frontend @coconsulting2/QA-y-Documentación
+
+# GitHub workflows y configuración
+/.github/           @MVRer @edeytai @hector-lg @JezraelMoreno
