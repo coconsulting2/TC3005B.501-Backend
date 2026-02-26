@@ -1,3 +1,8 @@
+/**
+ * @module adminService
+ * @description Handles user management operations for admin functionality,
+ * including single-user creation, CSV bulk import, user data retrieval and updates.
+ */
 import Admin from "../models/adminModel.js";
 import User from "../models/userModel.js";
 import crypto from "crypto";
@@ -22,10 +27,19 @@ const hash = async (data) => {
   return await bcrypt.hash(data, 10);
 };
 
-/*
- * Create a new user (admin functionality)
+/**
+ * Creates a new user, hashing the password and encrypting PII fields.
+ * Throws if the email is already registered.
+ *
  * @param {Object} userData - User data
- * @returns {Promise<Object>} Created user data
+ * @param {number} userData.role_id - Role ID
+ * @param {number} userData.department_id - Department ID
+ * @param {string} userData.user_name - Username
+ * @param {string} userData.password - Plain-text password (will be hashed)
+ * @param {string} userData.workstation - Workstation identifier
+ * @param {string} userData.email - Email address (will be encrypted)
+ * @param {string} userData.phone_number - Phone number (will be encrypted)
+ * @returns {Promise<Object>} The created user record
  */
 /**
  *
@@ -62,8 +76,6 @@ export async function createUser(userData) {
       email: encryptedEmail,
       phone_number: encryptedPhone
     };
-    console.log(newUser);
-
     return await Admin.createUser(newUser);
   } catch (error) {
     throw new Error(`Error creating user: ${error.message}`);
@@ -155,6 +167,14 @@ const getForeignKeyValues = async (rowData, rowNumber) => {
   return userData;
 };
 
+/**
+ * Parses a CSV file to bulk-create users, validating each row for required
+ * fields, duplicate emails/usernames, and valid foreign-key values.
+ *
+ * @param {string} filePath - Absolute path to the uploaded CSV file
+ * @param {boolean} dummy - When true, the file is NOT deleted after processing (used in tests)
+ * @returns {Promise<Object>} Summary with total_records, created, failed counts and an errors array
+ */
 export const parseCSV = async (filePath, dummy) => {
   const results = {
     total_records: 0,
@@ -237,10 +257,10 @@ export const parseCSV = async (filePath, dummy) => {
     if (!dummy) {
       try {
         await fs.promises.unlink(filePath);
-      } catch (unlinkError) {
+      } catch (error) {
           results.errors.push({
           row_number: "N/A",
-          error: `Error unlinking CSV file: ${unlinkError.message}`
+          error: `Error unlinking CSV file: ${error.message}`
         });
       }
     }
@@ -250,8 +270,9 @@ export const parseCSV = async (filePath, dummy) => {
 };
 
 /**
- * Get list of all users (admin functionality)
- * @returns {Promise<Array>} List of users
+ * Retrieves all users, decrypting their email and phone number fields.
+ *
+ * @returns {Promise<Array<Object>>} Array of user objects with decrypted PII fields
  */
 export async function getUserList() {
   try {
@@ -268,6 +289,14 @@ export async function getUserList() {
   }
 };
 
+/**
+ * Updates a user's fields, encrypting PII and resolving foreign-key names
+ * before persisting. Only fields that actually changed are written.
+ *
+ * @param {number} userId - ID of the user to update
+ * @param {Object} newUserData - Partial user object containing only the fields to update
+ * @returns {Promise<Object>} Result message and, when changes occurred, an updated_fields array
+ */
 export const updateUserData = async (userId, newUserData) => {
     const userData = await User.getUserData(userId);
     if (!userData) {
