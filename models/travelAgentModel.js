@@ -1,3 +1,15 @@
+/**
+ * @module travelAgentModel
+ * @description Data access layer for travel agent database operations.
+ */
+import pool from "../database/config/db.js";
+
+const TravelAgent = {
+    /**
+     * Mark a travel request as being attended (status 6).
+     * @param {number} requestId - Request ID.
+     * @returns {Promise<boolean>} True if at least one row was updated.
+     */
 /*
 Travel Agent Model
 Miguel Soria 26/04/25
@@ -27,7 +39,11 @@ const TravelAgent = {
         }
     },
 
-    // Check if request exists in the DB, will be used in the model before the update
+    /**
+     * Check whether a request exists in the database.
+     * @param {number} requestId - Request ID.
+     * @returns {Promise<boolean>} True if the request exists.
+     */
     async requestExists(requestId) {
         let conn;
         try {
