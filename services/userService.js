@@ -1,12 +1,18 @@
+/**
+ * @module userService
+ * @description Handles user authentication and user data retrieval,
+ * including JWT generation and PII decryption.
+ */
 import userModel from "../models/userModel.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import { decrypt } from "../middleware/decryption.js";
 
 /**
- * Get user by ID
+ * Retrieves a user by ID, decrypting PII fields before returning.
+ *
  * @param {number} userId - User ID
- * @returns {Promise<Object>} User data
+ * @returns {Promise<Object>} User data with decrypted email and phone number
  */
 export async function getUserById(userId) {
   try {
@@ -33,11 +39,13 @@ export async function getUserById(userId) {
 }
 
 /**
- * Authenticate user and generate JWT
+ * Authenticates a user by username and password, then generates a JWT
+ * containing the user ID, role and client IP.
+ *
  * @param {string} username - Username
- * @param {string} password - Password
- * @param req
- * @returns {Promise<Object>} - Authenticated user data and token
+ * @param {string} password - Plain-text password to verify
+ * @param {Object} req - Express request object (used to embed client IP in the token)
+ * @returns {Promise<Object>} Authenticated user data and signed JWT
  */
 export async function authenticateUser(username, password, req) {
   try {
@@ -74,7 +82,6 @@ export async function authenticateUser(username, password, req) {
   }
 }
 
-// Export default object with all service functions
 export default {
   getUserById
 };
