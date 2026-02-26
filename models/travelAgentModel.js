@@ -1,4 +1,4 @@
-/* 
+/*
 Travel Agent Model
 Miguel Soria 26/04/25
 Queries to the DB related to travel agent actions
@@ -6,7 +6,7 @@ Queries to the DB related to travel agent actions
 import pool from "../database/config/db.js";
 
 const TravelAgent = {
-    // Update request status to 6 
+    // Update request status to 6
     async attendTravelRequest(requestId) {
         let conn;
         try {
