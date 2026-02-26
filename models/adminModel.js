@@ -1,9 +1,8 @@
-/**
- * Admin model for user management operations.
- *
- * @module models/adminModel
- */
-import pool from '../database/config/db.js';
+/*
+Admin Model
+*/
+import db from "../database/config/db.js";
+import pool from "../database/config/db.js";
 
 const Admin = {
   /**
@@ -19,14 +18,14 @@ const Admin = {
       const rows = await conn.query(`SELECT * FROM UserFullInfo 
         WHERE active = 1 ORDER BY department_id`);
       return rows;
-      
+
     } catch (error) {
-      console.error('Error finding applicant by ID:', error);
+      console.error("Error finding applicant by ID:", error);
       throw error;
     } finally {
       if (conn){
         conn.release();
-      } 
+      }
     }
   },
   /**
@@ -56,12 +55,12 @@ const Admin = {
           const result = await conn.batch(query, values);
           return result.affectedRows;
       } catch (error) {
-          console.error('Error getting completed requests:', error);
+          console.error("Error getting completed requests:", error);
           throw error;
       } finally {
           if (conn){
               conn.release();
-          } 
+          }
       }
   },
 
@@ -76,13 +75,13 @@ const Admin = {
       let conn;
       try {
           conn = await pool.getConnection();
-          const name = await conn.query('SELECT role_id FROM Role WHERE role_name = ?', [roleName]);
+          const name = await conn.query("SELECT role_id FROM Role WHERE role_name = ?", [role_name]);
           if (name && name.length > 0) {
               return name[0].role_id;
           }
           return null;
       } catch (error) {
-            console.error('Error finding role ID for %s:', roleName, error);
+            console.error("Error finding role ID for %s:", role_name, error);
           throw error;
       } finally {
           if (conn) conn.release();
@@ -100,14 +99,14 @@ const Admin = {
       let conn;
       try {
           conn = await pool.getConnection();
-          const name = await conn.query('SELECT department_id FROM Department WHERE department_name = ?', [departmentName]);
+          const name = await conn.query("SELECT department_id FROM Department WHERE department_name = ?", [department_name]);
 
           if (name && name.length > 0) {
               return name[0].department_id;
           }
           return null;
       } catch (error) {
-            console.error('Error finding department ID for %s:', departmentName, error);
+            console.error("Error finding department ID for %s:", department_name, error);
           throw error;
       } finally {
           if (conn) conn.release();
@@ -125,7 +124,7 @@ const Admin = {
       let conn;
       try {
           conn = await pool.getConnection();
-          const rows = await conn.execute('SELECT user_id FROM User WHERE email = ?', [email]);
+          const rows = await conn.execute("SELECT user_id FROM User WHERE email = ?", [email]);
 
           if (rows && rows.length > 0) {
               return true;
@@ -135,7 +134,7 @@ const Admin = {
 
           return false;
       } catch (error) {
-          console.error('Database Error in findUserByEmail:', error);
+          console.error("Database Error in findUserByEmail:", error);
           throw error;
       } finally {
           if (conn) conn.release();
@@ -169,7 +168,7 @@ const Admin = {
       );
 
       if (existingUser.length > 0) {
-          throw new Error('User with this email or username already exists');
+          throw new Error("User with this email or username already exists");
       }
 
       await connection.query(
@@ -213,7 +212,7 @@ const Admin = {
 
     try {
       conn = await pool.getConnection();
-      
+
       const allEmails = conn.query(query);
       return allEmails;
     } catch (error) {
@@ -246,7 +245,7 @@ const Admin = {
 
     const query = `
         UPDATE User
-        SET ${setClauses.join(', ')}
+        SET ${setClauses.join(", ")}
         WHERE user_id = ?
       `;
     try {
@@ -277,7 +276,7 @@ const Admin = {
       );
       return result.affectedRows > 0;
     } catch (error) {
-      console.error('Error deactivating user:', error);
+      console.error("Error deactivating user:", error);
       throw error;
     } finally {
       if (conn) {

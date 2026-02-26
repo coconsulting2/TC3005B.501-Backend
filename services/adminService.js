@@ -41,6 +41,10 @@ const hash = async (data) => {
  * @param {string} userData.phone_number - Phone number (will be encrypted)
  * @returns {Promise<Object>} The created user record
  */
+/**
+ *
+ * @param userData
+ */
 export async function createUser(userData) {
   try {
     const hashedPassword = await hash(userData.password);

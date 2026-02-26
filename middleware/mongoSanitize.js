@@ -2,7 +2,7 @@
  * Miguel Soria 10/06/25
  * middleware to sanitize mongoDB inputs
  */
-import sanitize from 'mongo-sanitize';
+import sanitize from "mongo-sanitize";
 
 // Middleware to sanitize request parameters, query, and body
 export const sanitizeMongoInputs = (req, res, next) => {
