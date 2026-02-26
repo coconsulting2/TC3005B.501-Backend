@@ -48,7 +48,7 @@ const AccountsPayable = {
             }
         }
     },
-  
+
     async getReceiptStatusesForRequest(requestId) {
         let conn;
         const query = `
@@ -61,7 +61,7 @@ const AccountsPayable = {
             const rows = await conn.query(query, [requestId]);
             return rows.map(r => r.validation);
         } catch (error) {
-            console.error('Error fetching receipt statuses:', error);
+            console.error("Error fetching receipt statuses:", error);
             throw error;
         } finally {
             if (conn) conn.release();
@@ -80,7 +80,7 @@ const AccountsPayable = {
             conn = await pool.getConnection();
             await conn.query(query, [statusId, requestId]);
         } catch (error) {
-            console.error('Error updating request status:', error);
+            console.error("Error updating request status:", error);
             throw error;
         } finally {
             if (conn) conn.release();
@@ -165,8 +165,8 @@ const AccountsPayable = {
             }
 
             // Check if any of the rows have validation 'Pendiente'
-            const hasPendingValidation = rows.some(row => row.validation === 'Pendiente');
-            const expense_status = hasPendingValidation ? 'Pendiente' : 'Sin Pendientes';
+            const hasPendingValidation = rows.some(row => row.validation === "Pendiente");
+            const expense_status = hasPendingValidation ? "Pendiente" : "Sin Pendientes";
 
             // Sort the rows based on the validation status
             rows.sort((a, b) => {

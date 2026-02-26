@@ -187,7 +187,7 @@ const Applicant = {
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     `;
 
-                    let routeTableResult = await conn.query(insertRouteTable, [
+                    const routeTableResult = await conn.query(insertRouteTable, [
                         id_origin_country,
                         id_origin_city,
                         id_destination_country,
@@ -374,7 +374,7 @@ const Applicant = {
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     `;
 
-                    let routeTableResult = await conn.query(insertRouteTable, [
+                    const routeTableResult = await conn.query(insertRouteTable, [
                         id_origin_country,
                         id_origin_city,
                         id_destination_country,
@@ -430,7 +430,7 @@ const Applicant = {
             const rows = await conn.query(query, [request_id]);
             return rows.length > 0 ? rows[0].request_status_id : null;
         } catch (error) {
-            console.error('Error getting request status:', error);
+            console.error("Error getting request status:", error);
             throw error;
         } finally {
             if (conn) conn.release();
@@ -449,7 +449,7 @@ const Applicant = {
             await conn.query(query, [request_id]);
             return true;
         } catch (error) {
-            console.error('Error cancelling request:', error);
+            console.error("Error cancelling request:", error);
             throw error;
         } finally {
             if (conn) conn.release();
@@ -475,7 +475,7 @@ const Applicant = {
             const rows = await conn.query(query, [userId]);
             return rows;
         } catch (error) {
-            console.error('Error getting completed requests:', error);
+            console.error("Error getting completed requests:", error);
             throw error;
         } finally {
             if (conn) {
@@ -614,17 +614,17 @@ const Applicant = {
 
             const {
                 router_index = 0,                               // Default value 0
-                notes = '',                                     // Default value empty string
+                notes = "",                                     // Default value empty string
                 requested_fee = 0,                              // Default value 0
                 imposed_fee = 0,                                // Default value 0
-                origin_country_name = 'notSelected',            // Default value 'notSelected'
-                origin_city_name = 'notSelected',               // Default value 'notSelected'
-                destination_country_name = 'notSelected',       // Default value 'notSelected'
-                destination_city_name = 'notSelected',          // Default value 'notSelected'
-                beginning_date = '0000-01-01',                  // Default value '0000-01-01'
-                beginning_time = '00:00:00',                    // Default value '00:00:00'
-                ending_date = '0000-01-01',                     // Default value '0000-01-01'
-                ending_time = '00:00:00',                       // Default value '00:00:00'
+                origin_country_name = "notSelected",            // Default value 'notSelected'
+                origin_city_name = "notSelected",               // Default value 'notSelected'
+                destination_country_name = "notSelected",       // Default value 'notSelected'
+                destination_city_name = "notSelected",          // Default value 'notSelected'
+                beginning_date = "0000-01-01",                  // Default value '0000-01-01'
+                beginning_time = "00:00:00",                    // Default value '00:00:00'
+                ending_date = "0000-01-01",                     // Default value '0000-01-01'
+                ending_time = "00:00:00",                       // Default value '00:00:00'
                 plane_needed = false,                           // Default value false
                 hotel_needed = false,                           // Default value false
                 additionalRoutes = [],                          // Default value empty array
@@ -707,7 +707,7 @@ const Applicant = {
                     `;
 
                     // Execute the query to insert into Route table
-                    let routeTableResult = await conn.query(insertRouteTable, [
+                    const routeTableResult = await conn.query(insertRouteTable, [
                         id_origin_country,
                         id_origin_city,
                         id_destination_country,
@@ -840,38 +840,39 @@ const Applicant = {
 
     /**
      * Deletes a receipt by ID
+     * @param receiptId
      */
     async deleteReceipt(receiptId) {
         let conn;
         try {
             conn = await pool.getConnection();
             await conn.beginTransaction();
-            
+
             // First check if the receipt exists
             const [receipt] = await conn.query(
                 `SELECT * FROM Receipt WHERE receipt_id = ?`,
                 [receiptId]
             );
-            
+
             if (!receipt) {
-                throw new Error('Receipt not found');
+                throw new Error("Receipt not found");
             }
-            
+
             // Delete the receipt
             const result = await conn.query(
                 `DELETE FROM Receipt WHERE receipt_id = ?`,
                 [receiptId]
             );
-            
+
             if (result.affectedRows === 0) {
-                throw new Error('Failed to delete receipt');
+                throw new Error("Failed to delete receipt");
             }
-            
+
             await conn.commit();
             return true;
         } catch (error) {
             if (conn) await conn.rollback();
-            console.error('Error deleting receipt:', error);
+            console.error("Error deleting receipt:", error);
             throw error;
         } finally {
             if (conn) conn.release();
