@@ -1,7 +1,11 @@
 import pool from "../database/config/db.js";
 
 const User = {
-  // Get all user data by ID
+  /**
+   * Get all user data by ID.
+   * @param {string|number} userId - User ID.
+   * @returns {Promise<Object|undefined>} User row or undefined.
+   */
   async getUserData(userId) {
     let conn;
     try {
@@ -30,7 +34,12 @@ const User = {
     }
   },
 
-  async getTravelRequestById(request_id) {
+  /**
+   * Get a travel request by ID with route and location details.
+   * @param {string|number} requestId - Request ID.
+   * @returns {Promise<Array>} Request rows (ordered by router_index).
+   */
+  async getTravelRequestById(requestId) {
     let conn;
     const query = `
       SELECT 
@@ -73,7 +82,7 @@ const User = {
 
     try {
       conn = await pool.getConnection();
-      const rows = await conn.query(query, [request_id]);
+      const rows = await conn.query(query, [requestId]);
       return rows;
     } catch (error) {
       console.error("Error in getTravelRequestById:", error);
@@ -83,10 +92,17 @@ const User = {
     }
   },
 
+  /**
+   * Get travel requests by department and status, optionally limited.
+   * @param {string|number} deptId - Department ID.
+   * @param {string|number} statusId - Request status ID.
+   * @param {number} [n] - Optional limit.
+   * @returns {Promise<Array>} Request rows.
+   */
   async getTravelRequestsByDeptStatus(deptId, statusId, n) {
-  const conn = await pool.getConnection();
-  try {
-    const baseQuery = `
+    const conn = await pool.getConnection();
+    try {
+      const baseQuery = `
       SELECT
         r.request_id,
         u.user_id,
@@ -107,19 +123,19 @@ const User = {
       ${n ? "LIMIT ?" : ""}
     `;
 
-    const params = n ? [deptId, statusId, Number(n)] : [deptId, statusId];
-    const rows = await conn.query(baseQuery, params);
-    return rows;
-  } finally {
-    conn.release();
-  }
-},
+      const params = n ? [deptId, statusId, Number(n)] : [deptId, statusId];
+      const rows = await conn.query(baseQuery, params);
+      return rows;
+    } finally {
+      conn.release();
+    }
+  },
 
-/*
- * Get user by username
- * @param {string} username - Username
- * @returns {Promise<Object>} - User data
- */
+  /**
+   * Get user by username (for auth).
+   * @param {string} username - Username.
+   * @returns {Promise<Object|undefined>} User row or undefined.
+   */
   async getUserUsername(username) {
     const connection = await pool.getConnection();
     try {
@@ -138,13 +154,17 @@ const User = {
       );
 
       return rows[0];
-
     } finally {
       connection.release();
     }
   },
 
-async getUserWallet(user_id) {
+  /**
+   * Get user wallet by user ID.
+   * @param {string|number} userId - User ID.
+   * @returns {Promise<Object|undefined>} User row with wallet or undefined.
+   */
+  async getUserWallet(userId) {
     let conn;
     try {
       conn = await pool.getConnection();
@@ -155,7 +175,7 @@ async getUserWallet(user_id) {
           wallet
           FROM User
           WHERE user_id = ?`,
-        [user_id]
+        [userId]
       );
 
       return rows[0];
@@ -163,7 +183,6 @@ async getUserWallet(user_id) {
       if (conn) conn.release();
     }
   },
-
 };
 
 export default User;
