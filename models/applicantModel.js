@@ -1,20 +1,24 @@
-/*
-Applicant Model
-*/
+/**
+ * @module applicantModel
+ * Model for applicant-related database operations including travel requests, drafts, and expenses.
+ */
 import pool from "../database/config/db.js";
 import { formatRoutes, getRequestDays, getCountryId, getCityId } from "../services/applicantService.js";
 
 const Applicant = {
-    // Find applicant by ID
+    /**
+     * Finds an applicant user by their ID.
+     *
+     * @param {number} id - The user ID to search for
+     * @returns {Promise<Object>} The user record
+     */
     async findById(id) {
         let conn;
-        console.log(`Searching for user with id: ${id}`);
         try {
             conn = await pool.getConnection();
             const rows = await conn.query("SELECT * FROM User WHERE user_id = ?", [
                 id,
             ]);
-            console.log(`User found: ${rows[0].name}`);
             return rows[0];
         } catch (error) {
             console.error("Error finding applicant by ID:", error);
@@ -26,11 +30,13 @@ const Applicant = {
         }
     },
 
-    // =========================================
-    // Find cost center by user ID
-    // =========================================
-
-    async findCostCenterByUserId(user_id) {
+    /**
+     * Finds the cost center and department name for a given user.
+     *
+     * @param {number} userId - The user ID
+     * @returns {Promise<Object>} The department name and cost center
+     */
+    async findCostCenterByUserId(userId) {
         let conn;
 
         try {
@@ -42,9 +48,8 @@ const Applicant = {
                 ON u.department_id = d.department_id
                 WHERE u.user_id = ?;
             `,
-                [user_id],
+                [userId],
             );
-            console.log(rows[0]);
             return rows[0];
 
         } catch (error) {
@@ -57,17 +62,19 @@ const Applicant = {
         }
     },
 
-    // =========================================
-    // Create travel request
-    // =========================================
-
-    async createTravelRequest(user_id, travelDetails) {
+    /**
+     * Creates a new travel request with routes for a given user.
+     *
+     * @param {number} userId - The ID of the requesting user
+     * @param {Object} travelDetails - The travel request details including routes
+     * @returns {Promise<{requestId: number, message: string}>} The created request ID and confirmation message
+     */
+    async createTravelRequest(userId, travelDetails) {
         let conn;
         try {
             conn = await pool.getConnection();
             await conn.beginTransaction();
 
-            // Destructure travel details from request body
             const {
                 router_index,
                 notes,
@@ -86,7 +93,6 @@ const Applicant = {
                 additionalRoutes = [],
             } = travelDetails;
 
-            // Format the routes into a single array
             const allRoutes = formatRoutes(
                 {
                     router_index,
@@ -104,30 +110,24 @@ const Applicant = {
                 additionalRoutes,
             );
 
-            // =======================================
             // Step 1: Insert into Request table
-            // =======================================
             const request_days = getRequestDays(allRoutes);
 
-            // Get Status from role
             const role = await conn.query(
                 `SELECT role_id FROM User WHERE user_id = ?`,
-                [user_id],
+                [userId],
             );
 
-            console.log("Role ID:", role[0].role_id);
+            // Determine request status based on user role
             let request_status;
             if (role[0].role_id == 1) {
-                console.log("Role ID:", role[0].role_id);
-                request_status = 2; // 2 = First Revision
+                request_status = 2; // First Revision
             }
             else if (role[0].role_id == 4) {
-                console.log("Role ID:", role[0].role_id);
-                request_status = 3; // 3 = Second Revision
+                request_status = 3; // Second Revision
             }
             else if (role[0].role_id == 5) {
-                console.log("Role ID:", role[0].role_id);
-                request_status = 4; // 4 = Trip Quote
+                request_status = 4; // Trip Quote
             }
             else {
                 throw new Error("User role in not allowed to create a travel request");
@@ -140,7 +140,7 @@ const Applicant = {
             `;
 
             const requestTableResult = await conn.execute(insertIntoRequestTable, [
-                user_id,
+                userId,
                 request_status,
                 notes,
                 requested_fee,
@@ -150,32 +150,20 @@ const Applicant = {
 
             const requestId = requestTableResult.insertId;
 
-            // =======================================
-            // Step 2: Insert into Country & City table
-            // =======================================
-
+            // Step 2: Insert routes with country and city lookups
             for (const route of allRoutes) {
                 try {
-                    console.log("Processing route:", route);
-
                     let
                         id_origin_country,
                         id_destination_country,
                         id_origin_city,
                         id_destination_city;
 
-                    // Search if the country exists in the database
                     id_origin_country = await getCountryId(conn, route.origin_country_name);
                     id_destination_country = await getCountryId(conn, route.destination_country_name);
 
-                    console.log("Country IDs:", id_origin_country, id_destination_country);
-
-                    // Search if the city exists in the database
                     id_origin_city = await getCityId(conn, route.origin_city_name);
                     id_destination_city = await getCityId(conn, route.destination_city_name);
-
-                    console.log("City IDs:", id_origin_city, id_destination_city);
-                    // Insert into Route table
 
                     const insertRouteTable = `
                     INSERT INTO Route (
@@ -187,7 +175,7 @@ const Applicant = {
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     `;
 
-                    let routeTableResult = await conn.query(insertRouteTable, [
+                    const routeTableResult = await conn.query(insertRouteTable, [
                         id_origin_country,
                         id_origin_city,
                         id_destination_country,
@@ -203,10 +191,7 @@ const Applicant = {
 
                     const routeId = routeTableResult.insertId;
 
-                    // ======================================
-                    // Step 3: Insert into Route_Request table
-                    // ======================================
-
+                    // Step 3: Link route to request
                     const insertIntoRouteRequestTable = `
                     INSERT INTO Route_Request (request_id, route_id) VALUES (?, ?)
                     `;
@@ -219,7 +204,6 @@ const Applicant = {
 
             await conn.commit();
 
-            console.log(`Travel request created with ID: ${requestId}`);
             return {
                 requestId: Number(requestId),
                 message: "Travel request successfully created",
@@ -233,14 +217,19 @@ const Applicant = {
         }
     },
 
+    /**
+     * Edits an existing travel request by replacing its routes and updating details.
+     *
+     * @param {number} requestId - The ID of the request to edit
+     * @param {Object} travelChanges - The updated travel request details
+     * @returns {Promise<{requestId: number, message: string}>} The updated request ID and confirmation message
+     */
     async editTravelRequest(requestId, travelChanges) {
         let conn;
         try {
             conn = await pool.getConnection();
             await conn.beginTransaction();
-            console.log("Editing travel request with ID:", requestId);
 
-            // Destructure travel details from request body
             const {
                 router_index,
                 notes,
@@ -259,7 +248,6 @@ const Applicant = {
                 additionalRoutes = [],
             } = travelChanges;
 
-            // Format the routes into a single array
             const allRoutes = formatRoutes(
                 {
                     router_index,
@@ -277,17 +265,8 @@ const Applicant = {
                 additionalRoutes
             );
 
-            // =======================================
             // Step 1: Update Request table
-            // =======================================
             const request_days = getRequestDays(allRoutes);
-
-            // Log old data
-            const [oldData] = await conn.query(
-                `SELECT * FROM Request WHERE request_id = ?`,
-                [requestId]
-            );
-            console.log("Old data:", oldData);
 
             const updateRequestTable = `
                 UPDATE Request SET
@@ -301,35 +280,23 @@ const Applicant = {
 
             await conn.execute(updateRequestTable, [
                 notes,
-                requested_fee, // Allow null values for requested_fee
-                imposed_fee, // Allow null values for imposed_fee
-                request_days, // Allow null values for request_days
-                requestId, // Use the provided requestId to update the correct record
+                requested_fee,
+                imposed_fee,
+                request_days,
+                requestId,
             ]);
 
-            // Log new data
-            const [newData] = await conn.query(
-                `SELECT * FROM Request WHERE request_id = ?`,
-                [requestId]
-            );
-            console.log("New data:", newData);
-
-            // =======================================
             // Step 2: Delete old routes
-            // =======================================
-
             const oldRoutesIds = await conn.query(
                 `SELECT route_id FROM Route_Request WHERE request_id = ?`,
                 [requestId]
             );
 
-            // Delete old route request table data related to the request
             const deleteRouteRequest = `
                 DELETE FROM Route_Request WHERE request_id = ?
             `;
             await conn.execute(deleteRouteRequest, [requestId]);
 
-            // Delete old routes from Route_Request table
             for (const route_id of oldRoutesIds) {
                 const deleteRoute = `
                 DELETE FROM Route WHERE route_id = ?
@@ -337,32 +304,20 @@ const Applicant = {
                 await conn.execute(deleteRoute, [route_id.route_id]);
             }
 
-
-            // =======================================
-            // Step 3: Edit Route & Route_Request table
-            // =======================================
-
+            // Step 3: Insert new routes
             for (const route of allRoutes) {
                 try {
-
-                    console.log("Processing route:", route);
-
                     let
                         id_origin_country,
                         id_destination_country,
                         id_origin_city,
                         id_destination_city;
 
-                    // Search if the country exists in the database
                     id_origin_country = await getCountryId(conn, route.origin_country_name);
                     id_destination_country = await getCountryId(conn, route.destination_country_name);
 
-                    // Search if the city exists in the database
                     id_origin_city = await getCityId(conn, route.origin_city_name);
                     id_destination_city = await getCityId(conn, route.destination_city_name);
-
-
-                    // Insert into Route table
 
                     const insertRouteTable = `
                     INSERT INTO Route (
@@ -374,7 +329,7 @@ const Applicant = {
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     `;
 
-                    let routeTableResult = await conn.query(insertRouteTable, [
+                    const routeTableResult = await conn.query(insertRouteTable, [
                         id_origin_country,
                         id_origin_city,
                         id_destination_country,
@@ -390,10 +345,6 @@ const Applicant = {
 
                     const routeId = routeTableResult.insertId;
 
-                    // ======================================
-                    // Step 3: Insert into Route_Request table
-                    // ======================================
-
                     const insertIntoRouteRequestTable = `
                     INSERT INTO Route_Request (request_id, route_id) VALUES (?, ?)
                     `;
@@ -404,16 +355,13 @@ const Applicant = {
                 }
             }
 
-            // Commit the transaction
             await conn.commit();
-            console.log(`Travel request ${requestId} updated successfully.`);
             return {
                 requestId: Number(requestId),
                 message: "Travel request successfully updated",
             };
 
         } catch (error) {
-            // Rollback the transaction if something fails
             if (conn) await conn.rollback();
             console.error("Error editing travel request:", error);
             throw new Error("Database Error: Unable to edit travel request");
@@ -422,22 +370,34 @@ const Applicant = {
         }
     },
 
-    async getRequestStatus(request_id) {
+    /**
+     * Gets the current status ID of a request.
+     *
+     * @param {number} requestId - The request ID
+     * @returns {Promise<number|null>} The request status ID or null if not found
+     */
+    async getRequestStatus(requestId) {
         let conn;
         const query = `SELECT request_status_id FROM Request WHERE request_id = ?`;
         try {
             conn = await pool.getConnection();
-            const rows = await conn.query(query, [request_id]);
+            const rows = await conn.query(query, [requestId]);
             return rows.length > 0 ? rows[0].request_status_id : null;
         } catch (error) {
-            console.error('Error getting request status:', error);
+            console.error("Error getting request status:", error);
             throw error;
         } finally {
             if (conn) conn.release();
         }
     },
 
-    async cancelTravelRequest(request_id) {
+    /**
+     * Cancels a travel request by setting its status to 9 (Cancelado).
+     *
+     * @param {number} requestId - The request ID to cancel
+     * @returns {Promise<boolean>} True if cancelled successfully
+     */
+    async cancelTravelRequest(requestId) {
         let conn;
         const query = `
         UPDATE Request
@@ -446,16 +406,22 @@ const Applicant = {
         `;
         try {
             conn = await pool.getConnection();
-            await conn.query(query, [request_id]);
+            await conn.query(query, [requestId]);
             return true;
         } catch (error) {
-            console.error('Error cancelling request:', error);
+            console.error("Error cancelling request:", error);
             throw error;
         } finally {
             if (conn) conn.release();
         }
     },
 
+    /**
+     * Gets all completed, cancelled, or rejected requests for a user.
+     *
+     * @param {number} userId - The user ID
+     * @returns {Promise<Array<Object>>} List of completed request records
+     */
     async getCompletedRequests(userId) {
         let conn;
         const query = `
@@ -475,7 +441,7 @@ const Applicant = {
             const rows = await conn.query(query, [userId]);
             return rows;
         } catch (error) {
-            console.error('Error getting completed requests:', error);
+            console.error("Error getting completed requests:", error);
             throw error;
         } finally {
             if (conn) {
@@ -484,6 +450,12 @@ const Applicant = {
         }
     },
 
+    /**
+     * Gets all active (non-finalized) travel requests for a user.
+     *
+     * @param {number} userId - The user ID
+     * @returns {Promise<Array<Object>>} List of active request summaries
+     */
     async getApplicantRequests(userId) {
         let conn;
         const query = `
@@ -514,6 +486,12 @@ const Applicant = {
         }
     },
 
+    /**
+     * Gets detailed information for a single travel request including all routes.
+     *
+     * @param {number} userId - The request ID to look up
+     * @returns {Promise<Array<Object>>} The request details with route information
+     */
     async getApplicantRequest(userId) {
         let conn;
         const query = `
@@ -569,9 +547,10 @@ const Applicant = {
     },
 
     /**
-     * Inserts multiple receipts using receipt_type_id and amount.
-     * @param {Array<{receipt_type_id: number, request_id: number, amount: number}>} receipts
-     * @returns {number} number of inserted rows
+     * Inserts multiple receipts in a single transaction.
+     *
+     * @param {Array<{receipt_type_id: number, request_id: number, amount: number}>} receipts - Array of receipt objects
+     * @returns {Promise<number>} Number of inserted rows
      */
     async createExpenseBatch(receipts) {
         const conn = await pool.getConnection();
@@ -591,43 +570,43 @@ const Applicant = {
 
             await conn.commit();
             return insertedRows.length;
-        } catch (err) {
+        } catch (error) {
             await conn.rollback();
-            throw err;
+            throw error;
         } finally {
             conn.release();
         }
     },
 
-    // =========================================
-    // Create Draft Travel Request
-    // =========================================
-
-    async createDraftTravelRequest(user_id, savedDetails) {
+    /**
+     * Creates a draft travel request with status "Abierto" (1).
+     *
+     * @param {number} userId - The ID of the requesting user
+     * @param {Object} savedDetails - The draft travel request details with default values
+     * @returns {Promise<{requestId: number, message: string}>} The created draft ID and confirmation message
+     */
+    async createDraftTravelRequest(userId, savedDetails) {
         let conn;
         try {
             conn = await pool.getConnection();
             await conn.beginTransaction();
 
-            // Destructure travel details from request body
-            // adding default values
-
             const {
-                router_index = 0,                               // Default value 0
-                notes = '',                                     // Default value empty string
-                requested_fee = 0,                              // Default value 0
-                imposed_fee = 0,                                // Default value 0
-                origin_country_name = 'notSelected',            // Default value 'notSelected'
-                origin_city_name = 'notSelected',               // Default value 'notSelected'
-                destination_country_name = 'notSelected',       // Default value 'notSelected'
-                destination_city_name = 'notSelected',          // Default value 'notSelected'
-                beginning_date = '0000-01-01',                  // Default value '0000-01-01'
-                beginning_time = '00:00:00',                    // Default value '00:00:00'
-                ending_date = '0000-01-01',                     // Default value '0000-01-01'
-                ending_time = '00:00:00',                       // Default value '00:00:00'
-                plane_needed = false,                           // Default value false
-                hotel_needed = false,                           // Default value false
-                additionalRoutes = [],                          // Default value empty array
+                router_index = 0,
+                notes = "",
+                requested_fee = 0,
+                imposed_fee = 0,
+                origin_country_name = "notSelected",
+                origin_city_name = "notSelected",
+                destination_country_name = "notSelected",
+                destination_city_name = "notSelected",
+                beginning_date = "0000-01-01",
+                beginning_time = "00:00:00",
+                ending_date = "0000-01-01",
+                ending_time = "00:00:00",
+                plane_needed = false,
+                hotel_needed = false,
+                additionalRoutes = [],
             } = savedDetails;
 
             const allRoutes = formatRoutes(
@@ -647,22 +626,18 @@ const Applicant = {
                 additionalRoutes
             );
 
-            // =======================================
             // Step 1: Insert into Request table
-            // =======================================
             const request_days = getRequestDays(allRoutes);
 
-            // Set query to insert into Request table
             const insertIntoRequestTable = `
             INSERT INTO Request (
                 user_id, request_status_id, notes, requested_fee, imposed_fee, request_days
                 ) VALUES (?, ?, ?, ?, ?, ?)
                 `;
 
-            // Set status to 1 ('Abierto')
             const requestTableResult = await conn.execute(insertIntoRequestTable, [
-                user_id,
-                1, // Set status to 1 ('Abierto')
+                userId,
+                1, // Status 1 = "Abierto"
                 notes,
                 requested_fee,
                 imposed_fee,
@@ -671,31 +646,21 @@ const Applicant = {
 
             const requestId = requestTableResult.insertId;
 
-            // =======================================
-            // Step 2: Insert into Country & City table
-            // =======================================
-
+            // Step 2: Insert routes with country and city lookups
             for (const route of allRoutes) {
                 try {
-
-                    console.log("Processing route:", route);
                     let
                         id_origin_country,
                         id_destination_country,
                         id_origin_city,
                         id_destination_city;
 
-                    // Search if the country exists in the database
                     id_origin_country = await getCountryId(conn, route.origin_country_name);
                     id_destination_country = await getCountryId(conn, route.destination_country_name);
-                    console.log("Country IDs:", id_origin_country, id_destination_country);
 
-                    // Search if the city exists in the database
                     id_origin_city = await getCityId(conn, route.origin_city_name);
                     id_destination_city = await getCityId(conn, route.destination_city_name);
-                    console.log("City IDs:", id_origin_city, id_destination_city);
 
-                    // Insert into Route table query
                     const insertRouteTable = `
                     INSERT INTO Route (
                         id_origin_country, id_origin_city,
@@ -706,8 +671,7 @@ const Applicant = {
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     `;
 
-                    // Execute the query to insert into Route table
-                    let routeTableResult = await conn.query(insertRouteTable, [
+                    const routeTableResult = await conn.query(insertRouteTable, [
                         id_origin_country,
                         id_origin_city,
                         id_destination_country,
@@ -723,10 +687,7 @@ const Applicant = {
 
                     const routeId = routeTableResult.insertId;
 
-                    // ======================================
-                    // Step 3: Insert into Route_Request table
-                    // ======================================
-
+                    // Step 3: Link route to request
                     const insertIntoRouteRequestTable = `
                     INSERT INTO Route_Request (request_id, route_id) VALUES (?, ?)
                     `;
@@ -738,9 +699,7 @@ const Applicant = {
 
                 }
             }
-            // Commit the transaction
             await conn.commit();
-            console.log(`Draft travel request created with ID: ${requestId}`);
             return {
                 requestId: Number(requestId),
                 message: "Draft travel request successfully created",
@@ -752,39 +711,38 @@ const Applicant = {
         }
     },
 
-    // =========================================
-    // Confirm Draft Travel Request
-    // =========================================
-
+    /**
+     * Confirms a draft travel request by updating its status based on the user role.
+     *
+     * @param {number} userId - The ID of the user confirming the draft
+     * @param {number} requestId - The ID of the draft request to confirm
+     * @returns {Promise<{requestId: number, message: string}>} The confirmed request ID and message
+     */
     async confirmDraftTravelRequest(userId, requestId) {
         let conn;
         try {
             conn = await pool.getConnection();
             await conn.beginTransaction();
 
-            // Get the role from the userId
+            // Determine request status based on user role
             const role = await conn.query(
                 `SELECT role_id FROM User WHERE user_id = ?`,
                 [userId],
             );
             let request_status;
             if (role[0].role_id == 1) {
-                console.log("Role ID:", role[0].role_id);
-                request_status = 2; // 2 = First Revision
+                request_status = 2; // First Revision
             }
             else if (role[0].role_id == 4) {
-                console.log("Role ID:", role[0].role_id);
-                request_status = 3; // 3 = Second Revision
+                request_status = 3; // Second Revision
             }
             else if (role[0].role_id == 5) {
-                console.log("Role ID:", role[0].role_id);
-                request_status = 4; // 4 = Trip Quote
+                request_status = 4; // Trip Quote
             }
             else {
                 throw new Error("User role in not allowed to create a travel request");
             }
 
-            // Update the request status
             const updateRequestStatus = `
                 UPDATE Request
                 SET request_status_id = ?, last_mod_date = CURRENT_TIMESTAMP
@@ -796,10 +754,7 @@ const Applicant = {
                 requestId,
             ]);
 
-
-            // Commit the transaction
             await conn.commit();
-            console.log(`Draft travel request ${requestId} confirmed successfully.`);
             return {
                 requestId: Number(requestId),
                 message: "Draft travel request successfully confirmed",
@@ -811,6 +766,12 @@ const Applicant = {
         }
     },
 
+    /**
+     * Gets the current status ID of a request (overrides earlier definition).
+     *
+     * @param {number} requestId - The request ID
+     * @returns {Promise<number|null>} The request status ID or null if not found
+     */
     async getRequestStatus(requestId) {
         let conn;
         try {
@@ -825,6 +786,12 @@ const Applicant = {
         }
     },
 
+    /**
+     * Updates a request status to the validation stage (status 7).
+     *
+     * @param {number} requestId - The request ID to update
+     * @returns {Promise<void>}
+     */
     async updateRequestStatusToValidationStage(requestId) {
         let conn;
         try {
@@ -839,39 +806,40 @@ const Applicant = {
     },
 
     /**
-     * Deletes a receipt by ID
+     * Deletes a receipt by its ID.
+     *
+     * @param {number} receiptId - The ID of the receipt to delete
+     * @returns {Promise<boolean>} True if deleted successfully
      */
     async deleteReceipt(receiptId) {
         let conn;
         try {
             conn = await pool.getConnection();
             await conn.beginTransaction();
-            
-            // First check if the receipt exists
+
             const [receipt] = await conn.query(
                 `SELECT * FROM Receipt WHERE receipt_id = ?`,
                 [receiptId]
             );
-            
+
             if (!receipt) {
-                throw new Error('Receipt not found');
+                throw new Error("Receipt not found");
             }
-            
-            // Delete the receipt
+
             const result = await conn.query(
                 `DELETE FROM Receipt WHERE receipt_id = ?`,
                 [receiptId]
             );
-            
+
             if (result.affectedRows === 0) {
-                throw new Error('Failed to delete receipt');
+                throw new Error("Failed to delete receipt");
             }
-            
+
             await conn.commit();
             return true;
         } catch (error) {
             if (conn) await conn.rollback();
-            console.error('Error deleting receipt:', error);
+            console.error("Error deleting receipt:", error);
             throw error;
         } finally {
             if (conn) conn.release();
