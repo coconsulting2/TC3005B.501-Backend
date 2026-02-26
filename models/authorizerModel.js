@@ -1,7 +1,7 @@
 /*
 Authorizer Model
 */
-import pool from '../database/config/db.js';
+import pool from "../database/config/db.js";
 
 const Authorizer = {
   async getAlerts(id, status_id, n) {
@@ -14,7 +14,7 @@ const query =  `
         INNER JOIN Request_status ON Request.request_status_id = Request_status.request_status_id
         INNER JOIN AlertMessage ON Alert.message_id = AlertMessage.message_id
         WHERE User.department_id = ? AND Request_status.request_status_id = ?
-        ${n == 0 ? 'ORDER BY alert_date DESC;' : 'ORDER BY alert_date DESC LIMIT ?;'}`;
+        ${n == 0 ? "ORDER BY alert_date DESC;" : "ORDER BY alert_date DESC LIMIT ?;"}`;
       try {
         conn = await pool.getConnection();
         const rows = await conn.query(query, [id, status_id, n]);
@@ -28,7 +28,7 @@ const query =  `
         }
       }
     },
-    
+
     async getUserRole(user_id) {
       let conn;
       const query = `
@@ -43,7 +43,7 @@ const query =  `
         return null;
       }
     } catch (error) {
-      console.error('Error getting user role:', error);
+      console.error("Error getting user role:", error);
       throw error;
     } finally {
       if (conn) conn.release();
@@ -62,7 +62,7 @@ const query =  `
       const rows = await conn.query(query, [status_id, request_id]);
       return rows;
     } catch (error) {
-      console.error('Error getting completed requests:', error);
+      console.error("Error getting completed requests:", error);
       throw error;
     } finally {
       if (conn) {
@@ -85,7 +85,7 @@ const query =  `
 
       return true;
     } catch (error) {
-      console.error('Error getting completed requests:', error);
+      console.error("Error getting completed requests:", error);
       throw error;
     } finally {
       if (conn) {
