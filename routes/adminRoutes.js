@@ -18,23 +18,23 @@ router.use((req, res, next) => {
 });
 
 router.route("/get-user-list")
-    .get(generalRateLimiter, authenticateToken, authorizeRole(['Administrador']), adminController.getUserList);
+    .get(generalRateLimiter, authenticateToken, authorizeRole(["Administrador"]), adminController.getUserList);
 
-router.route('/create-user')
-    .post(generalRateLimiter, authenticateToken, authorizeRole(['Administrador']), validateCreateUser, validateInputs, adminController.createUser);
+router.route("/create-user")
+    .post(generalRateLimiter, authenticateToken, authorizeRole(["Administrador"]), validateCreateUser, validateInputs, adminController.createUser);
 
 router.route("/create-multiple-users")
     .post(
         generalRateLimiter,
-        authenticateToken, authorizeRole(['Administrador']),
+        authenticateToken, authorizeRole(["Administrador"]),
         upload.single("file"),
         adminController.createMultipleUsers
     );
 
-router.route('/update-user/:user_id')
-    .put(generalRateLimiter, authenticateToken, authorizeRole(['Administrador']), adminController.updateUser);
+router.route("/update-user/:user_id")
+    .put(generalRateLimiter, authenticateToken, authorizeRole(["Administrador"]), adminController.updateUser);
 
 router.route("/delete-user/:user_id")
-    .put(generalRateLimiter, authenticateToken, authorizeRole(['Administrador']), adminController.deactivateUser);
+    .put(generalRateLimiter, authenticateToken, authorizeRole(["Administrador"]), adminController.deactivateUser);
 
 export default router;

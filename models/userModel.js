@@ -1,7 +1,3 @@
-/**
- * @module userModel
- * User model: DB access for user data, travel requests, and wallet.
- */
 import pool from "../database/config/db.js";
 
 const User = {

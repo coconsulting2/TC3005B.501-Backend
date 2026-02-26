@@ -1,24 +1,38 @@
-require('dotenv').config();
+/**
+ * @module mail
+ * @description Email notification service using Nodemailer and Gmail SMTP.
+ * Sends a styled HTML email to the applicant whenever their travel request status changes.
+ */
+require("dotenv").config();
 const nodemailer = require("nodemailer");
 
-let currentDate = new Date().toJSON().slice(0, 10);
+const currentDate = new Date().toJSON().slice(0, 10);
 
 const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASSWORD,
-    },
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.MAIL_USER,
+    pass: process.env.MAIL_PASSWORD,
+  },
 });
 
+/**
+ * Sends an HTML email notifying the applicant of a travel request status change.
+ * @param {string} email - Recipient email address (decrypted before calling)
+ * @param {string} username - Recipient's display name
+ * @param {string|number} request_id - ID of the travel request
+ * @param {string} status - New status label to display in the email
+ * @returns {Promise<void>}
+ * @throws {Error} If Nodemailer fails to send the email
+ */
 const Mail = async (email, username, request_id, status) => {
-    const mailOptions = {
-        from: 'Portal de Viajes" <tu-correo@gmail.com>',
-        to: email,
-        subject: "Actualización de Solicitud de Viaje",
-        html: `
+  const mailOptions = {
+    from: 'Portal de Viajes" <tu-correo@gmail.com>',
+    to: email,
+    subject: "Actualización de Solicitud de Viaje",
+    html: `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -54,14 +68,13 @@ const Mail = async (email, username, request_id, status) => {
 </body>
 </html>
     `,
-    };
-    try {
-        const info = await transporter.sendMail(mailOptions);
-        console.log("Email Sent Succesfully: " + info.response);
-    } catch (error) {
-        console.error("Error sending email: ", error, email);
-        throw new Error("Error sending email");
-    }
+  };
+  try {
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error("Error sending email: ", error, email);
+    throw new Error("Error sending email");
+  }
 };
 
 exports.Mail = Mail;
