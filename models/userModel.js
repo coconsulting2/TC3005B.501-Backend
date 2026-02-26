@@ -1,4 +1,4 @@
-import pool from '../database/config/db.js';
+import pool from "../database/config/db.js";
 
 const User = {
   // Get all user data by ID
@@ -76,7 +76,7 @@ const User = {
       const rows = await conn.query(query, [request_id]);
       return rows;
     } catch (error) {
-      console.error('Error in getTravelRequestById:', error);
+      console.error("Error in getTravelRequestById:", error);
       throw error;
     } finally {
       if (conn) conn.release();
@@ -104,7 +104,7 @@ const User = {
         AND r.request_status_id = ?
       GROUP BY r.request_id
       ORDER BY r.creation_date DESC
-      ${n ? 'LIMIT ?' : ''}
+      ${n ? "LIMIT ?" : ""}
     `;
 
     const params = n ? [deptId, statusId, Number(n)] : [deptId, statusId];
