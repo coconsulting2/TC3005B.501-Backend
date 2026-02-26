@@ -1,6 +1,21 @@
+/**
+ * @module accountsPayableService
+ * @description Handles business logic for the Accounts Payable workflow,
+ * including receipt validation and automatic request-status transitions.
+ */
 import AccountsPayable from "../models/accountsPayableModel.js";
 
 const AccountsPayableService = {
+    /**
+     * Checks the receipt statuses for a given request and advances (or rolls back)
+     * the request status accordingly:
+     * - Any rejected receipt → status 6 (returned to previous step)
+     * - All receipts approved → status 8 (Finalizado)
+     * - Receipts still pending → no status change
+     *
+     * @param {number} requestId - ID of the travel request to evaluate
+     * @returns {Promise<Object>} Object with updatedStatus (number|null) and a message string
+     */
     async validateReceiptsAndUpdateStatus(requestId) {
         const statuses = await AccountsPayable.getReceiptStatusesForRequest(requestId);
 

@@ -1,0 +1,51 @@
+# Code Owners - Backend TC3005B.501
+
+# Default owners (admins generales)
+*       @MVRer @edeytai @hector-lg @JezraelMoreno
+
+# Backend team - responsable de todo el código backend
+*       @coconsulting2/Backend
+
+# Controllers - lógica de negocio
+/controllers/       @coconsulting2/Backend
+
+# Models - esquemas y modelos de datos
+/models/            @coconsulting2/Backend
+
+# Database - configuración y migraciones de BD
+/database/          @coconsulting2/Backend
+mongodb_installation.md  @coconsulting2/Backend
+
+# Routes - definición de endpoints
+/routes/            @coconsulting2/Backend
+
+# Services - lógica de servicios
+/services/          @coconsulting2/Backend
+
+# Middleware - autenticación, validación, etc.
+/middleware/        @coconsulting2/Backend
+
+# Scripts de respaldo
+/backup_scripts/    @coconsulting2/Backend
+
+# Certificados SSL/TLS
+/certs/             @MVRer @JezraelMoreno
+
+# Archivos críticos de configuración (solo admins)
+package.json        @MVRer @edeytai @hector-lg @JezraelMoreno
+package-lock.json   @MVRer @edeytai @hector-lg @JezraelMoreno
+pnpm-lock.yaml      @MVRer @edeytai @hector-lg @JezraelMoreno
+.env                @MVRer @JezraelMoreno
+.env.example        @coconsulting2/Backend
+index.js            @MVRer @edeytai @hector-lg @JezraelMoreno
+eslint.config.js    @MVRer @JezraelMoreno
+.gitignore          @MVRer @JezraelMoreno
+
+# Documentación
+CHANGELOG.md        @coconsulting2/Backend @coconsulting2/QA-y-Documentacion
+CONTRIBUTING.md     @coconsulting2/Backend @coconsulting2/QA-y-Documentacion
+README.md           @MVRer @JezraelMoreno
+API.md              @coconsulting2/Backend
+
+# GitHub workflows y configuración
+/.github/           @MVRer @edeytai @hector-lg @JezraelMoreno
