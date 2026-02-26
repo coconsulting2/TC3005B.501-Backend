@@ -18,14 +18,14 @@ export const formatRoutes = (mainRoute, additionalRoutes = []) => {
         },
         ...additionalRoutes.map((route) => ({
             router_index: route.router_index,
-            origin_country_name: route.origin_country_name || 'notSelected',
-            origin_city_name: route.origin_city_name || 'notSelected',
-            destination_country_name: route.destination_country_name || 'notSelected',
-            destination_city_name: route.destination_city_name || 'notSelected',
-            beginning_date: route.beginning_date || '0000-01-01',
-            beginning_time: route.beginning_time || '00:00:00',
-            ending_date: route.ending_date || '0000-01-01',
-            ending_time: route.ending_time || '00:00:00',
+            origin_country_name: route.origin_country_name || "notSelected",
+            origin_city_name: route.origin_city_name || "notSelected",
+            destination_country_name: route.destination_country_name || "notSelected",
+            destination_city_name: route.destination_city_name || "notSelected",
+            beginning_date: route.beginning_date || "0000-01-01",
+            beginning_time: route.beginning_time || "00:00:00",
+            ending_date: route.ending_date || "0000-01-01",
+            ending_time: route.ending_time || "00:00:00",
             plane_needed: route.plane_needed || false,
             hotel_needed: route.hotel_needed || false,
         })),
@@ -96,6 +96,10 @@ export const cancelTravelRequestValidation = async (request_id) => {
     }
 };
 
+/**
+ *
+ * @param receipts
+ */
 export async function createExpenseValidationBatch(receipts) {
     if (!Array.isArray(receipts) || receipts.length === 0) {
         const err = new Error('The "receipts" field must be a non-empty array');
@@ -155,6 +159,10 @@ export const getCityId = async (conn, cityName) => {
     }
 };
 
+/**
+ *
+ * @param requestId
+ */
 export async function sendReceiptsForValidation(requestId) {
   const currentStatus = await Applicant.getRequestStatus(requestId);
 

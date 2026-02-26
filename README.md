@@ -90,7 +90,7 @@ In order to properly setup MariaDB, the following steps are required:
 
 1. Go to the [/database/Scheme](/database/Scheme) directory.
     ```sh
-    cd database/Scheme
+    cd databas/Scheme
     ```
 2. [Run the `mariadb` client in batch mode](https://mariadb.com/kb/en/mariadb-command-line-client/). With `DB_USER` and `DB_USER_PASSWORD` being your created `mariadb` user and its password.
     i. Load database scheme [/database/Scheme/Scheme.sql](/database/Scheme/Scheme.sql).

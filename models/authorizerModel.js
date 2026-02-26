@@ -2,6 +2,9 @@
  * @module authorizerModel
  * @description Data access layer for authorizer-related database operations.
  */
+/*
+Authorizer Model
+*/
 import pool from "../database/config/db.js";
 
 const Authorizer = {
@@ -46,6 +49,24 @@ const Authorizer = {
   async getUserRole(userId) {
     let conn;
     const query = `
+        ${n == 0 ? "ORDER BY alert_date DESC;" : "ORDER BY alert_date DESC LIMIT ?;"}`;
+      try {
+        conn = await pool.getConnection();
+        const rows = await conn.query(query, [id, status_id, n]);
+        return rows;
+      } catch (error) {
+        console.error("Error getting completed requests:", error);
+        throw error;
+      } finally {
+        if (conn) {
+          conn.release();
+        }
+      }
+    },
+
+    async getUserRole(user_id) {
+      let conn;
+      const query = `
         SELECT role_id FROM User WHERE user_id = ?
       `;
     try {
