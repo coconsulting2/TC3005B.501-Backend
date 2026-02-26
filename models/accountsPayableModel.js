@@ -1,20 +1,29 @@
-/*
-CPP Model
-Miguel Soria 09/05/25
-Queries to the DB related to CPP actions
-*/
+/**
+ * CPP model with queries related to accounts payable actions.
+ * Author: Miguel Soria (09/05/25)
+ *
+ * @module models/accountsPayableModel
+ */
 import pool from "../database/config/db.js";
 
 const AccountsPayable = {
-    // Update request status to 5 (Atención Agencia de Viajes)
-    async attendTravelRequest(requestId, imposedFee, new_status) {
+    /**
+     * Update a travel request status and imposed fee.
+     *
+     * @async
+     * @param {number} requestId - Identifier of the travel request.
+     * @param {number} imposedFee - Imposed fee for the request.
+     * @param {number} newStatus - New status identifier to set.
+     * @returns {Promise<boolean>} True if the update affected at least one row.
+     */
+    async attendTravelRequest(requestId, imposedFee, newStatus) {
         let conn;
         try {
             conn = await pool.getConnection();
             const result = await conn.query(
                 `UPDATE Request SET request_status_id = ?, imposed_fee = ? 
                 WHERE request_id = ?`,
-                [new_status, imposedFee, requestId],
+                [newStatus, imposedFee, requestId],
             );
 
             return result.affectedRows > 0;
@@ -28,7 +37,13 @@ const AccountsPayable = {
         }
     },
 
-    // Check if request exists in the DB, will be used in the model before the update
+    /**
+     * Check if a request exists in the database.
+     *
+     * @async
+     * @param {number} requestId - Identifier of the request to check.
+     * @returns {Promise<Object|undefined>} Request record if found, otherwise undefined.
+     */
     async requestExists(requestId) {
         let conn;
         try {
@@ -49,6 +64,13 @@ const AccountsPayable = {
         }
     },
   
+    /**
+     * Get the validation statuses of receipts for a request.
+     *
+     * @async
+     * @param {number} requestId - Identifier of the request.
+     * @returns {Promise<Array<string>>} List of validation statuses.
+     */
     async getReceiptStatusesForRequest(requestId) {
         let conn;
         const query = `
@@ -61,13 +83,21 @@ const AccountsPayable = {
             const rows = await conn.query(query, [requestId]);
             return rows.map(r => r.validation);
         } catch (error) {
-            console.error('Error fetching receipt statuses:', error);
+            console.error("Error fetching receipt statuses:", error);
             throw error;
         } finally {
             if (conn) conn.release();
         }
     },
 
+    /**
+     * Update the status of a request.
+     *
+     * @async
+     * @param {number} requestId - Identifier of the request to update.
+     * @param {number} statusId - New status identifier to set.
+     * @returns {Promise<void>} Resolves when the update is complete.
+     */
     async updateRequestStatus(requestId, statusId) {
         let conn;
         const query = `
@@ -80,13 +110,20 @@ const AccountsPayable = {
             conn = await pool.getConnection();
             await conn.query(query, [statusId, requestId]);
         } catch (error) {
-            console.error('Error updating request status:', error);
+            console.error("Error updating request status:", error);
             throw error;
         } finally {
             if (conn) conn.release();
         }
     },
 
+    /**
+     * Check if a receipt exists in the database.
+     *
+     * @async
+     * @param {number} receiptId - Identifier of the receipt to check.
+     * @returns {Promise<Object|undefined>} Receipt record if found, otherwise undefined.
+     */
     async receiptExists(receiptId) {
         let conn;
         try {
@@ -106,7 +143,14 @@ const AccountsPayable = {
         }
     },
 
-    //Accept or Reject a Travel Request
+    /**
+     * Validate (approve or reject) a receipt.
+     *
+     * @async
+     * @param {number} requestId - Identifier of the receipt to validate.
+     * @param {string} approval - Validation status to set.
+     * @returns {Promise<boolean>} True if the update affected at least one row.
+     */
     async validateReceipt(requestId, approval) {
         let conn;
         try {
@@ -128,6 +172,13 @@ const AccountsPayable = {
         }
     },
 
+    /**
+     * Get expense validations for a given request.
+     *
+     * @async
+     * @param {number} requestId - Identifier of the request.
+     * @returns {Promise<Object>} Structured expense validation summary.
+     */
     async getExpenseValidations(requestId) {
         let conn;
         try {
@@ -165,8 +216,8 @@ const AccountsPayable = {
             }
 
             // Check if any of the rows have validation 'Pendiente'
-            const hasPendingValidation = rows.some(row => row.validation === 'Pendiente');
-            const expense_status = hasPendingValidation ? 'Pendiente' : 'Sin Pendientes';
+            const hasPendingValidation = rows.some(row => row.validation === "Pendiente");
+            const expense_status = hasPendingValidation ? "Pendiente" : "Sin Pendientes";
 
             // Sort the rows based on the validation status
             rows.sort((a, b) => {

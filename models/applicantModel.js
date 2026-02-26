@@ -607,6 +607,21 @@ const Applicant = {
                 plane_needed = false,
                 hotel_needed = false,
                 additionalRoutes = [],
+                router_index = 0,                               // Default value 0
+                notes = "",                                     // Default value empty string
+                requested_fee = 0,                              // Default value 0
+                imposed_fee = 0,                                // Default value 0
+                origin_country_name = "notSelected",            // Default value 'notSelected'
+                origin_city_name = "notSelected",               // Default value 'notSelected'
+                destination_country_name = "notSelected",       // Default value 'notSelected'
+                destination_city_name = "notSelected",          // Default value 'notSelected'
+                beginning_date = "0000-01-01",                  // Default value '0000-01-01'
+                beginning_time = "00:00:00",                    // Default value '00:00:00'
+                ending_date = "0000-01-01",                     // Default value '0000-01-01'
+                ending_time = "00:00:00",                       // Default value '00:00:00'
+                plane_needed = false,                           // Default value false
+                hotel_needed = false,                           // Default value false
+                additionalRoutes = [],                          // Default value empty array
             } = savedDetails;
 
             const allRoutes = formatRoutes(
@@ -671,6 +686,7 @@ const Applicant = {
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     `;
 
+                    // Execute the query to insert into Route table
                     const routeTableResult = await conn.query(insertRouteTable, [
                         id_origin_country,
                         id_origin_city,
@@ -806,10 +822,8 @@ const Applicant = {
     },
 
     /**
-     * Deletes a receipt by its ID.
-     *
-     * @param {number} receiptId - The ID of the receipt to delete
-     * @returns {Promise<boolean>} True if deleted successfully
+     * Deletes a receipt by ID
+     * @param receiptId
      */
     async deleteReceipt(receiptId) {
         let conn;
@@ -817,6 +831,7 @@ const Applicant = {
             conn = await pool.getConnection();
             await conn.beginTransaction();
 
+            // First check if the receipt exists
             const [receipt] = await conn.query(
                 `SELECT * FROM Receipt WHERE receipt_id = ?`,
                 [receiptId]
@@ -826,6 +841,7 @@ const Applicant = {
                 throw new Error("Receipt not found");
             }
 
+            // Delete the receipt
             const result = await conn.query(
                 `DELETE FROM Receipt WHERE receipt_id = ?`,
                 [receiptId]
