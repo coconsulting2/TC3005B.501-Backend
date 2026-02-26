@@ -10,6 +10,15 @@ const TravelAgent = {
      * @param {number} requestId - Request ID.
      * @returns {Promise<boolean>} True if at least one row was updated.
      */
+/*
+Travel Agent Model
+Miguel Soria 26/04/25
+Queries to the DB related to travel agent actions
+*/
+import pool from "../database/config/db.js";
+
+const TravelAgent = {
+    // Update request status to 6
     async attendTravelRequest(requestId) {
         let conn;
         try {
