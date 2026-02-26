@@ -13,8 +13,8 @@
 /public/            @coconsulting2/Frontend
 
 # Cypress - tests e2e
-/cypress/           @coconsulting2/Frontend @coconsulting2/QA-y-Documentación
-cypress.config.ts   @coconsulting2/Frontend @coconsulting2/QA-y-Documentación
+/cypress/           @coconsulting2/Frontend @coconsulting2/QA-y-Documentacion
+cypress.config.ts   @coconsulting2/Frontend @coconsulting2/QA-y-Documentacion
 
 # Configuración de Astro
 astro.config.mjs    @MVRer @edeytai @hector-lg @JezraelMoreno
@@ -29,9 +29,9 @@ tsconfig.json       @MVRer @edeytai @hector-lg @JezraelMoreno
 
 # Documentación
 README.md           @MVRer @JezraelMoreno
-ASTRO.md            @coconsulting2/Frontend @coconsulting2/QA-y-Documentación
-CHANGELOG.md        @coconsulting2/Frontend @coconsulting2/QA-y-Documentación
-CONTRIBUTING.md     @coconsulting2/Frontend @coconsulting2/QA-y-Documentación
+ASTRO.md            @coconsulting2/Frontend @coconsulting2/QA-y-Documentacion
+CHANGELOG.md        @coconsulting2/Frontend @coconsulting2/QA-y-Documentacion
+CONTRIBUTING.md     @coconsulting2/Frontend @coconsulting2/QA-y-Documentacion
 
 # GitHub workflows y configuración
 /.github/           @MVRer @edeytai @hector-lg @JezraelMoreno
