@@ -1,6 +1,16 @@
+/**
+ * @module applicantService
+ * @description Service layer for applicant-related operations: route formatting,
+ * travel request cancellation, expense validation, and country/city resolution.
+ */
+
 import Applicant from "../models/applicantModel.js";
 
-// Join the two arrays into one object
+/**
+ * @param {Object} mainRoute - Primary route with origin/destination and schedule fields
+ * @param {Object[]} [additionalRoutes=[]] - Extra route legs with the same shape
+ * @returns {Object[]} Merged array of route objects with default fallbacks for additional routes
+ */
 export const formatRoutes = (mainRoute, additionalRoutes = []) => {
     return [
         {
@@ -32,17 +42,20 @@ export const formatRoutes = (mainRoute, additionalRoutes = []) => {
     ];
 };
 
-// Function to calculate the total number of days from the routes
+/**
+ * Calculates total trip days from the first route's start to the last route's end.
+ *
+ * @param {Object[]} routes - Array of route objects with beginning_date/time and ending_date/time
+ * @returns {number} Number of days (rounded up) spanning the entire trip, or 0 if empty
+ */
 export const getRequestDays = (routes) => {
     if (!routes || routes.length === 0) return 0;
 
-    // Sort routes by router_index
     const sortedRoutes = routes.sort((a, b) => a.router_index - b.router_index);
 
     const firstRoute = sortedRoutes[0];
     const lastRoute = sortedRoutes[sortedRoutes.length - 1];
 
-    // Combine date and time strings to create full datetime objects
     const startDate = new Date(
         `${firstRoute.beginning_date}T${firstRoute.beginning_time}`,
     );
@@ -50,18 +63,19 @@ export const getRequestDays = (routes) => {
         `${lastRoute.ending_date}T${lastRoute.ending_time}`,
     );
 
-    // Calculate the difference in milliseconds
     const diffInMs = endDate - startDate;
-
-    // Convert milliseconds to days (with decimal)
     const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
 
-    // Use ceil to always round up if there's any partial day
-    const dayDiff = Math.ceil(diffInDays);
-
-    return dayDiff;
+    return Math.ceil(diffInDays);
 };
 
+/**
+ * Validates that a travel request can be cancelled, then cancels it.
+ *
+ * @param {number} request_id - ID of the travel request to cancel
+ * @returns {Promise<Object>} Confirmation with request_id, status 9, and active: false
+ * @throws {{ status: number, message: string }} If request is not found or not in a cancellable state
+ */
 export const cancelTravelRequestValidation = async (request_id) => {
     try {
         const status_id = await Applicant.getRequestStatus(request_id);
@@ -97,10 +111,16 @@ export const cancelTravelRequestValidation = async (request_id) => {
 };
 
 /**
+ * Validates and inserts a batch of expense receipts.
  *
- * @param receipts
+ * @param {Object[]} receipts - Array of receipt objects
+ * @param {number} receipts[].receipt_type_id - Type identifier for the receipt
+ * @param {number} receipts[].request_id - Associated travel request ID
+ * @param {number} receipts[].amount - Receipt amount
+ * @returns {Promise<number>} Number of successfully inserted receipts
+ * @throws {Error} If receipts is not a non-empty array or items lack required numeric fields
  */
-export async function createExpenseValidationBatch(receipts) {
+export const createExpenseValidationBatch = async (receipts) => {
     if (!Array.isArray(receipts) || receipts.length === 0) {
         const err = new Error('The "receipts" field must be a non-empty array');
         err.code = "BAD_REQUEST";
@@ -123,69 +143,79 @@ export async function createExpenseValidationBatch(receipts) {
 
     const insertedCount = await Applicant.createExpenseBatch(receipts);
     return insertedCount;
-}
+};
 
-// Check if the country exists in the database If not, insert it
+/**
+ * Looks up a country by name; inserts it if it does not exist.
+ *
+ * @param {Object} conn - MariaDB connection or pool instance
+ * @param {string} countryName - Name of the country to find or create
+ * @returns {Promise<number>} The country_id (existing or newly inserted)
+ */
 export const getCountryId = async (conn, countryName) => {
-    console.log("Checking country:", countryName);
     const countryQuery = `SELECT country_id FROM Country WHERE country_name = ?`;
     const [countryRows] = await conn.query(countryQuery, [countryName]);
-    //If country does not exist, insert it
+
     if (countryRows === undefined) {
-        console.log("Country not found, inserting:", countryName);
         const insertCountryQuery = `INSERT INTO Country (country_name) VALUES (?)`;
         const insertedCountry = await conn.execute(insertCountryQuery, [
             countryName,
         ]);
         return insertedCountry.insertId;
     } else {
-        //If country exists, return the id
         return countryRows.country_id;
     }
 };
 
+/**
+ * Looks up a city by name; inserts it if it does not exist.
+ *
+ * @param {Object} conn - MariaDB connection or pool instance
+ * @param {string} cityName - Name of the city to find or create
+ * @returns {Promise<number>} The city_id (existing or newly inserted)
+ */
 export const getCityId = async (conn, cityName) => {
-    console.log("Checking city:", cityName);
     const cityQuery = `SELECT city_id FROM City WHERE city_name = ?`;
     const [cityRows] = await conn.query(cityQuery, [cityName]);
-    //If city does not exist, insert it
+
     if (cityRows === undefined) {
         const insertCityQuery = `INSERT INTO City (city_name) VALUES (?)`;
         const insertedCity = await conn.execute(insertCityQuery, [cityName]);
         return insertedCity.insertId;
     } else {
-        //If city exists, return the id
         return cityRows.city_id;
     }
 };
 
 /**
+ * Advances a request from status 6 (expense proof) to status 7 (receipt validation).
  *
- * @param requestId
+ * @param {number} requestId - ID of the travel request
+ * @returns {Promise<Object>} Confirmation with request_id, updated_status 7, and a message
+ * @throws {Error} If request is not found (404) or not in status 6 (400)
  */
-export async function sendReceiptsForValidation(requestId) {
-  const currentStatus = await Applicant.getRequestStatus(requestId);
+export const sendReceiptsForValidation = async (requestId) => {
+    const currentStatus = await Applicant.getRequestStatus(requestId);
 
-  if (currentStatus === null) {
-    const err = new Error(`No request found with id ${requestId}`);
-    err.status = 404;
-    throw err;
-  }
+    if (currentStatus === null) {
+        const err = new Error(`No request found with id ${requestId}`);
+        err.status = 404;
+        throw err;
+    }
 
-  if (currentStatus !== 6) {
-    const err = new Error(
-      "Request must be in status 6 (Comprobación gastos del viaje) to send for validation"
-    );
-    err.status = 400;
-    throw err;
-  }
+    if (currentStatus !== 6) {
+        const err = new Error(
+            "Request must be in status 6 (Comprobación gastos del viaje) to send for validation"
+        );
+        err.status = 400;
+        throw err;
+    }
 
-  await Applicant.updateRequestStatusToValidationStage(requestId);
+    await Applicant.updateRequestStatusToValidationStage(requestId);
 
-  return {
-    request_id: Number(requestId),
-    updated_status: 7,
-    message: "Request status updated to 'Validación de comprobantes'",
-  };
-}
-
+    return {
+        request_id: Number(requestId),
+        updated_status: 7,
+        message: "Request status updated to 'Validación de comprobantes'",
+    };
+};
