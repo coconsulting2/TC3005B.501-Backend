@@ -5,7 +5,12 @@ import db from "../database/config/db.js";
 import pool from "../database/config/db.js";
 
 const Admin = {
-  // Find applicant by ID
+  /**
+   * Retrieve the list of active users ordered by department.
+   *
+   * @async
+   * @returns {Promise<Array<Object>>} List of active users.
+   */
   async getUserList() {
     let conn;
     try {
@@ -23,6 +28,13 @@ const Admin = {
       }
     }
   },
+  /**
+   * Create multiple users in bulk.
+   *
+   * @async
+   * @param {Array<Object>} users - Array of user objects to create.
+   * @returns {Promise<number>} Number of affected rows.
+   */
   async createMultipleUsers(users) {
       let conn;
 
@@ -52,7 +64,14 @@ const Admin = {
       }
   },
 
-  async findRoleID(role_name) {
+  /**
+   * Find the role ID for a given role name.
+   *
+   * @async
+   * @param {string} roleName - Name of the role.
+   * @returns {Promise<number|null>} Role ID if found, otherwise null.
+   */
+  async findRoleId(roleName) {
       let conn;
       try {
           conn = await pool.getConnection();
@@ -69,7 +88,14 @@ const Admin = {
       }
   },
 
-  async findDepartmentID(department_name) {
+  /**
+   * Find the department ID for a given department name.
+   *
+   * @async
+   * @param {string} departmentName - Name of the department.
+   * @returns {Promise<number|null>} Department ID if found, otherwise null.
+   */
+  async findDepartmentId(departmentName) {
       let conn;
       try {
           conn = await pool.getConnection();
@@ -87,6 +113,13 @@ const Admin = {
       }
   },
 
+  /**
+   * Check if a user with the given email exists.
+   *
+   * @async
+   * @param {string} email - Email address to search for.
+   * @returns {Promise<boolean>} True if the user exists, otherwise false.
+   */
   async findUserByEmail(email) {
       let conn;
       try {
@@ -108,8 +141,23 @@ const Admin = {
       }
   },
 
+  /**
+   * Create a single user, ensuring there is no existing user with the same
+   * email or username.
+   *
+   * @async
+   * @param {Object} userData - Data for the user to create.
+   * @param {number} userData.role_id - Role identifier.
+   * @param {number} userData.department_id - Department identifier.
+   * @param {string} userData.user_name - Username.
+   * @param {string} userData.password - User password (already processed if needed).
+   * @param {string} userData.workstation - User workstation.
+   * @param {string} userData.email - User email.
+   * @param {string} userData.phone_number - User phone number.
+   * @returns {Promise<void>} Resolves when the user has been created.
+   */
   async createUser(userData) {
-    const connection = await db.getConnection();
+    const connection = await pool.getConnection();
     try{
       const existingUser = await connection.query(
         `SELECT
@@ -149,6 +197,12 @@ const Admin = {
     }
   },
 
+  /**
+   * Retrieve all user emails.
+   *
+   * @async
+   * @returns {Promise<Array<Object>>} List of user email records.
+   */
   async getAllEmails() {
     let conn;
 
@@ -168,7 +222,15 @@ const Admin = {
     }
   },
 
-  async updateUser(user_id, fieldsToUpdate) {
+  /**
+   * Update a user with the specified fields.
+   *
+   * @async
+   * @param {number} userId - Identifier of the user to update.
+   * @param {Object} fieldsToUpdate - Key-value pairs of fields to update.
+   * @returns {Promise<Object>} Result of the update operation.
+   */
+  async updateUser(userId, fieldsToUpdate) {
     let conn;
 
     const setClauses = [];
@@ -179,7 +241,7 @@ const Admin = {
         values.push(fieldsToUpdate[field]);
       }
 
-    values.push(user_id);
+    values.push(userId);
 
     const query = `
         UPDATE User
@@ -198,9 +260,11 @@ const Admin = {
   },
 
   /**
-   * Deactivate a user (soft delete)
-   * @param {number} userId - User ID to deactivate
-   * @returns {Promise<boolean>} - True if successful
+   * Deactivate a user (soft delete).
+   *
+   * @async
+   * @param {number} userId - User ID to deactivate.
+   * @returns {Promise<boolean>} True if the operation affected at least one row.
    */
   async deactivateUserById(userId) {
     let conn;
