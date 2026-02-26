@@ -130,14 +130,14 @@ const getForeignKeyValues = async (rowData, rowNumber) => {
   const userData = {...rowData};
 
   try {
-    const roleId = await Admin.findRoleID(userData.role_name);
+    const roleId = await Admin.findRoleId(userData.role_name);
     if (roleId === null) {
       rowErrors.push(`Invalid role name: '${userData.role_name}'`);
     } else {
       userData.role_id = roleId;
     }
 
-    const departmentId = await Admin.findDepartmentID(userData.department_name);
+    const departmentId = await Admin.findDepartmentId(userData.department_name);
     if (departmentId === null) {
       rowErrors.push (`Invalid department name: '${userData.department_name}'`);
     } else {
