@@ -114,14 +114,14 @@ const getForeignKeyValues = async (rowData, rowNumber) => {
   let userData = {...rowData};
 
   try {
-    const roleId = await Admin.findRoleID(userData.role_name);
+    const roleId = await Admin.findRoleId(userData.role_name);
     if (roleId === null) {
       rowErrors.push(`Invalid role name: '${userData.role_name}'`);
     } else {
       userData.role_id = roleId;
     }
 
-    const departmentId = await Admin.findDepartmentID(userData.department_name);
+    const departmentId = await Admin.findDepartmentId(userData.department_name);
     if (departmentId === null) {
       rowErrors.push (`Invalid department name: '${userData.department_name}'`);
     } else {
@@ -320,7 +320,7 @@ export const updateUserData = async (userId, newUserData) => {
 
             if (newUserData[key] !== actualCurrentValue) {
                 if (key === 'role_name') {
-                    const roleID = await Admin.findRoleID(newUserData[key]);
+                    const roleID = await Admin.findRoleId(newUserData[key]);
                     if (roleID !== null) {
                         fieldsToUpdateInDb.role_id = roleID;
                         updatedFields.push(key);
@@ -328,7 +328,7 @@ export const updateUserData = async (userId, newUserData) => {
                         throw { status: 400, message: `Invalid role name provided: ${newUserData[key]}` };
                     }
                 } else if (key === 'department_name') {
-                    const deptId = await Admin.findDepartmentID(newUserData[key]);
+                    const deptId = await Admin.findDepartmentId(newUserData[key]);
                     if (deptId !== null) {
                         fieldsToUpdateInDb.department_id = deptId;
                         updatedFields.push(key);
