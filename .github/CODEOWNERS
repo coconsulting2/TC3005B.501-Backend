@@ -42,8 +42,8 @@ eslint.config.js    @MVRer @JezraelMoreno
 .gitignore          @MVRer @JezraelMoreno
 
 # Documentación
-CHANGELOG.md        @coconsulting2/Backend @coconsulting2/QA-y-Documentación
-CONTRIBUTING.md     @coconsulting2/Backend @coconsulting2/QA-y-Documentación
+CHANGELOG.md        @coconsulting2/Backend @coconsulting2/QA-y-Documentacion
+CONTRIBUTING.md     @coconsulting2/Backend @coconsulting2/QA-y-Documentacion
 README.md           @MVRer @JezraelMoreno
 API.md              @coconsulting2/Backend
 
