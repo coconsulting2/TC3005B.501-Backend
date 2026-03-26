@@ -6,6 +6,7 @@ import { ObjectId } from "mongodb";
 import sanitize from "mongo-sanitize";
 import { uploadReceiptFiles, getReceiptFile, getReceiptFilesMetadata } from "../services/receiptFileService.js";
 import { db } from "../services/fileStorage.js";
+import { upload, getPresignedUrl } from "../services/storageService.js";
 
 /**
  * Uploads PDF and XML files for a receipt. Both files are required.
@@ -97,6 +98,64 @@ export const getReceiptFilesMetadataController = async (req, res) => {
     if (error.message === "Receipt not found") {
       return res.status(404).json({ error: "Receipt not found" });
     }
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * Uploads a single file to S3.
+ * Authenticated and validated via middleware.
+ * @param {import('express').Request} req - Express request
+ * @param {import('express').Response} res - Express response
+ * @returns {Promise<void>}
+ */
+export const uploadFile = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "File is required." });
+    }
+
+    const orgId = req.body.orgId || req.user?.orgId || "defaultOrg";
+    const viajeId = req.body.viajeId || "defaultViaje";
+
+    const { key, bucket } = await upload({
+      body: req.file.buffer,
+      orgId,
+      viajeId,
+      fileName: req.file.originalname,
+      contentType: req.file.mimetype
+    });
+
+    res.status(201).json({
+      message: "File uploaded to S3 successfully",
+      key,
+      bucket
+    });
+
+  } catch (error) {
+    console.error("Error uploading to S3:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * Downloads a file from S3 using a pre-signed URL.
+ * Requires the file's ID (S3 key encoded).
+ * @param {import('express').Request} req - Express request
+ * @param {import('express').Response} res - Express response
+ * @returns {Promise<void>}
+ */
+export const downloadFile = async (req, res) => {
+  try {
+    // S3 keys may contain slashes, we expect the frontend to URL-encode the ID/key
+    const s3Key = decodeURIComponent(req.params.id);
+
+    // Si tuvieramos DB para mapear ID -> s3_key, se buscaria aqui.
+    // Por ahora, usamos el ID como el key de S3 codificado.
+    const url = await getPresignedUrl(s3Key);
+    res.json({ url });
+  } catch (error) {
+    console.error("Error generating presigned URL:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 };

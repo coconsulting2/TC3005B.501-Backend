@@ -5,8 +5,12 @@ import { sanitizeMongoInputs } from "../middleware/mongoSanitize.js";
 import {
   uploadReceiptFilesController,
   getReceiptFileController,
-  getReceiptFilesMetadataController
+  getReceiptFilesMetadataController,
+  uploadFile,
+  downloadFile
 } from "../controllers/fileController.js";
+import { authenticateToken } from "../middleware/auth.js";
+import { fileValidation, handleMulterErrors } from "../middleware/fileValidation.js";
 
 const router = express.Router();
 const upload = multer();
@@ -28,5 +32,19 @@ router.get("/receipt-file/:file_id", generalRateLimiter, getReceiptFileControlle
 
 // Get receipt files metadata (filenames and object ids)
 router.get("/receipt-files/:receipt_id", getReceiptFilesMetadataController);
+
+// ------------ S3 Upload Endpoints ------------
+
+// Upload a single file to S3
+router.post(
+  "/upload",
+  authenticateToken,
+  fileValidation.single("file"),
+  handleMulterErrors,
+  uploadFile
+);
+
+// Get presigned URL to download a file from S3
+router.get("/:id/download", authenticateToken, downloadFile);
 
 export default router;
