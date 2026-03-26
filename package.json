@@ -12,7 +12,7 @@
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "build": "eslint . --quiet && echo Build passed",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
     },
     "repository": {
         "type": "git",
@@ -48,7 +48,13 @@
         "@eslint/js": "^9.0.0",
         "eslint": "^9.0.0",
         "eslint-plugin-jsdoc": "^50.0.0",
-        "nodemon": "^3.0.1"
+        "jest": "^30.3.0",
+        "nodemon": "^3.0.1",
+        "supertest": "^7.2.2"
+    },
+    "jest": {
+        "testEnvironment": "node",
+        "transform": {}
     },
     "packageManager": "pnpm@10.10.0+sha512.d615db246fe70f25dcfea6d8d73dee782ce23e2245e3c4f6f888249fb568149318637dca73c2c5c8ef2a4ca0d5657fb9567188bfab47f566d1ee6ce987815c39"
 }
