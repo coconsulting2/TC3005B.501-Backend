@@ -63,7 +63,7 @@ const AccountsPayable = {
             }
         }
     },
-  
+
     /**
      * Get the validation statuses of receipts for a request.
      *
