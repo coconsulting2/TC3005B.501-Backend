@@ -1,7 +1,7 @@
 import express from "express";
-import multer from "multer";
 import { generalRateLimiter } from "../middleware/rateLimiters.js";
 import { sanitizeMongoInputs } from "../middleware/mongoSanitize.js";
+import { upload, handleMulterError } from "../middleware/fileUpload.js";
 import {
   uploadReceiptFilesController,
   getReceiptFileController,
@@ -13,9 +13,8 @@ import { authenticateToken } from "../middleware/auth.js";
 import { fileValidation, handleMulterErrors } from "../middleware/fileValidation.js";
 
 const router = express.Router();
-const upload = multer();
 
-// Apply sanitization middleware to all routes jhbj
+// Apply sanitization middleware to all routes
 router.use(sanitizeMongoInputs);
 
 // Upload both PDF and XML files for a receipt
@@ -46,5 +45,7 @@ router.post(
 
 // Get presigned URL to download a file from S3
 router.get("/:id/download", authenticateToken, downloadFile);
+// Centralized multer error handler for all file routes
+router.use(handleMulterError);
 
 export default router;
