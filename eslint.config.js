@@ -71,6 +71,29 @@ export default [
             },
         },
     },
+    // Test files — register Jest globals and relax JSDoc rules
+    {
+        files: ["tests/**/*.js", "**/*.test.js", "**/*.spec.js"],
+        languageOptions: {
+            globals: {
+                describe: "readonly",
+                test: "readonly",
+                expect: "readonly",
+                beforeAll: "readonly",
+                beforeEach: "readonly",
+                afterAll: "readonly",
+                afterEach: "readonly",
+            },
+        },
+        rules: {
+            "jsdoc/require-jsdoc": "off",
+            "jsdoc/require-param": "off",
+            "jsdoc/require-returns": "off",
+            "jsdoc/require-param-type": "off",
+            "jsdoc/require-returns-type": "off",
+            "no-constant-binary-expression": "off",
+        },
+    },
     {
         ignores: [
             "node_modules/**",
@@ -78,6 +101,7 @@ export default [
             "uploads/**",
             "backup_scripts/**",
             "certs/**",
+            "coverage/**",
         ],
     },
 ];
