@@ -1,4 +1,8 @@
-import pool from "../database/config/db.js";
+/**
+ * @module userModel
+ * @description Data access layer for user-related queries using Prisma.
+ */
+import prisma from "../database/config/prisma.js";
 
 const User = {
   /**
@@ -7,128 +11,156 @@ const User = {
    * @returns {Promise<Object|undefined>} User row or undefined.
    */
   async getUserData(userId) {
-    let conn;
-    try {
-      conn = await pool.getConnection();
-      const rows = await conn.query(
-        `SELECT 
-          u.user_id, 
-          u.user_name, 
-          u.email, 
-          u.phone_number,
-          u.workstation,
-          d.department_name,
-          d.costs_center,
-          u.creation_date, 
-          r.role_name
-        FROM User u
-        JOIN Role r ON u.role_id = r.role_id
-        JOIN Department d ON u.department_id = d.department_id
-        WHERE u.user_id = ?`,
-        [userId]
-      );
+    const user = await prisma.user.findUnique({
+      where: { userId: Number(userId) },
+      include: {
+        role: true,
+        department: true,
+      },
+    });
 
-      return rows[0];
-    } finally {
-      if (conn) conn.release();
-    }
+    if (!user) return undefined;
+
+    return {
+      user_id: user.userId,
+      user_name: user.userName,
+      email: user.email,
+      phone_number: user.phoneNumber,
+      workstation: user.workstation,
+      department_name: user.department?.departmentName,
+      costs_center: user.department?.costsCenter,
+      creation_date: user.creationDate,
+      role_name: user.role?.roleName,
+    };
   },
 
   /**
    * Get a travel request by ID with route and location details.
+   * Returns one row per route (same shape as the old SQL join).
    * @param {string|number} requestId - Request ID.
    * @returns {Promise<Array>} Request rows (ordered by router_index).
    */
   async getTravelRequestById(requestId) {
-    let conn;
-    const query = `
-      SELECT 
-        r.request_id,
-        rs.status AS request_status,
-        r.notes,
-        r.requested_fee,
-        r.imposed_fee,
-        r.request_days,
-        r.creation_date,
-        u.user_name,
-        u.email AS user_email,
-        u.phone_number AS user_phone_number,
+    const request = await prisma.request.findUnique({
+      where: { requestId: Number(requestId) },
+      include: {
+        user: true,
+        requestStatus: true,
+        routeRequests: {
+          include: {
+            route: {
+              include: {
+                originCountry: true,
+                originCity: true,
+                destinationCountry: true,
+                destinationCity: true,
+              },
+            },
+          },
+          orderBy: { route: { routerIndex: "asc" } },
+        },
+      },
+    });
 
-        ro.router_index,
-        co1.country_name AS origin_country,
-        ci1.city_name AS origin_city,
-        co2.country_name AS destination_country,
-        ci2.city_name AS destination_city,
+    if (!request) return [];
 
-        ro.beginning_date,
-        ro.beginning_time,
-        ro.ending_date,
-        ro.ending_time,
-        ro.hotel_needed,
-        ro.plane_needed
-
-      FROM Request r
-      JOIN User u ON r.user_id = u.user_id
-      JOIN Request_status rs ON r.request_status_id = rs.request_status_id
-      LEFT JOIN Route_Request rr ON r.request_id = rr.request_id
-      LEFT JOIN Route ro ON rr.route_id = ro.route_id
-      LEFT JOIN Country co1 ON ro.id_origin_country = co1.country_id
-      LEFT JOIN City ci1 ON ro.id_origin_city = ci1.city_id
-      LEFT JOIN Country co2 ON ro.id_destination_country = co2.country_id
-      LEFT JOIN City ci2 ON ro.id_destination_city = ci2.city_id
-      WHERE r.request_id = ?
-      ORDER BY ro.router_index ASC
-    `;
-
-    try {
-      conn = await pool.getConnection();
-      const rows = await conn.query(query, [requestId]);
-      return rows;
-    } catch (error) {
-      console.error("Error in getTravelRequestById:", error);
-      throw error;
-    } finally {
-      if (conn) conn.release();
+    // Flatten to one row per route to match old SQL output
+    if (request.routeRequests.length === 0) {
+      return [{
+        request_id: request.requestId,
+        request_status: request.requestStatus.status,
+        notes: request.notes,
+        requested_fee: request.requestedFee,
+        imposed_fee: request.imposedFee,
+        request_days: request.requestDays,
+        creation_date: request.creationDate,
+        user_name: request.user?.userName,
+        user_email: request.user?.email,
+        user_phone_number: request.user?.phoneNumber,
+        router_index: null,
+        origin_country: null,
+        origin_city: null,
+        destination_country: null,
+        destination_city: null,
+        beginning_date: null,
+        beginning_time: null,
+        ending_date: null,
+        ending_time: null,
+        hotel_needed: null,
+        plane_needed: null,
+      }];
     }
+
+    return request.routeRequests.map((rr) => {
+      const route = rr.route;
+      return {
+        request_id: request.requestId,
+        request_status: request.requestStatus.status,
+        notes: request.notes,
+        requested_fee: request.requestedFee,
+        imposed_fee: request.imposedFee,
+        request_days: request.requestDays,
+        creation_date: request.creationDate,
+        user_name: request.user?.userName,
+        user_email: request.user?.email,
+        user_phone_number: request.user?.phoneNumber,
+        router_index: route?.routerIndex,
+        origin_country: route?.originCountry?.countryName,
+        origin_city: route?.originCity?.cityName,
+        destination_country: route?.destinationCountry?.countryName,
+        destination_city: route?.destinationCity?.cityName,
+        beginning_date: route?.beginningDate,
+        beginning_time: route?.beginningTime,
+        ending_date: route?.endingDate,
+        ending_time: route?.endingTime,
+        hotel_needed: route?.hotelNeeded,
+        plane_needed: route?.planeNeeded,
+      };
+    });
   },
 
   /**
    * Get travel requests by department and status, optionally limited.
+   * Returns one row per request (picks the first route's destination country).
    * @param {string|number} deptId - Department ID.
    * @param {string|number} statusId - Request status ID.
    * @param {number} [n] - Optional limit.
    * @returns {Promise<Array>} Request rows.
    */
   async getTravelRequestsByDeptStatus(deptId, statusId, n) {
-    const conn = await pool.getConnection();
-    try {
-      const baseQuery = `
-      SELECT
-        r.request_id,
-        u.user_id,
-        c.country_name AS destination_country,
-        ro.beginning_date,
-        ro.ending_date,
-        rs.status AS request_status
-      FROM Request r
-      JOIN User u ON r.user_id = u.user_id
-      JOIN Request_status rs ON r.request_status_id = rs.request_status_id
-      JOIN Route_Request rr ON r.request_id = rr.request_id
-      JOIN Route ro ON rr.route_id = ro.route_id
-      JOIN Country c ON ro.id_destination_country = c.country_id
-      WHERE u.department_id = ?
-        AND r.request_status_id = ?
-      GROUP BY r.request_id
-      ORDER BY r.creation_date DESC
-      ${n ? "LIMIT ?" : ""}
-    `;
+    const requests = await prisma.request.findMany({
+      where: {
+        user: { departmentId: Number(deptId) },
+        requestStatusId: Number(statusId),
+      },
+      include: {
+        user: true,
+        requestStatus: true,
+        routeRequests: {
+          include: {
+            route: {
+              include: { destinationCountry: true },
+            },
+          },
+          orderBy: { route: { routerIndex: "asc" } },
+          take: 1,
+        },
+      },
+      orderBy: { creationDate: "desc" },
+      ...(n ? { take: Number(n) } : {}),
+    });
 
-      const params = n ? [deptId, statusId, Number(n)] : [deptId, statusId];
-      const rows = await conn.query(baseQuery, params);
-      return rows;
-    } finally {
-      conn.release();
-    }
+    return requests.map((r) => {
+      const firstRoute = r.routeRequests[0]?.route;
+      return {
+        request_id: r.requestId,
+        user_id: r.userId,
+        destination_country: firstRoute?.destinationCountry?.countryName || null,
+        beginning_date: firstRoute?.beginningDate || null,
+        ending_date: firstRoute?.endingDate || null,
+        request_status: r.requestStatus.status,
+      };
+    });
   },
 
   /**
@@ -137,26 +169,21 @@ const User = {
    * @returns {Promise<Object|undefined>} User row or undefined.
    */
   async getUserUsername(username) {
-    const connection = await pool.getConnection();
-    try {
-      const rows = await connection.query(
-        `SELECT 
-          u.user_name,
-          u.user_id,
-          u.department_id,
-          u.password,
-          u.active, 
-          r.role_name 
-        FROM User u
-        JOIN Role r ON u.role_id = r.role_id
-        WHERE u.user_name = ?`,
-        [username]
-      );
+    const user = await prisma.user.findUnique({
+      where: { userName: username },
+      include: { role: true },
+    });
 
-      return rows[0];
-    } finally {
-      connection.release();
-    }
+    if (!user) return undefined;
+
+    return {
+      user_name: user.userName,
+      user_id: user.userId,
+      department_id: user.departmentId,
+      password: user.password,
+      active: user.active,
+      role_name: user.role?.roleName,
+    };
   },
 
   /**
@@ -165,23 +192,22 @@ const User = {
    * @returns {Promise<Object|undefined>} User row with wallet or undefined.
    */
   async getUserWallet(userId) {
-    let conn;
-    try {
-      conn = await pool.getConnection();
-      const rows = await conn.query(
-        `SELECT 
-          user_id,
-          user_name,
-          wallet
-          FROM User
-          WHERE user_id = ?`,
-        [userId]
-      );
+    const user = await prisma.user.findUnique({
+      where: { userId: Number(userId) },
+      select: {
+        userId: true,
+        userName: true,
+        wallet: true,
+      },
+    });
 
-      return rows[0];
-    } finally {
-      if (conn) conn.release();
-    }
+    if (!user) return undefined;
+
+    return {
+      user_id: user.userId,
+      user_name: user.userName,
+      wallet: user.wallet,
+    };
   },
 };
 
