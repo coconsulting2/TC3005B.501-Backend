@@ -5,7 +5,7 @@ import express from "express";
 import multer from "multer";
 const router = express.Router();
 import * as adminController from "../controllers/adminController.js"; // Add .js extension for ES modules
-import { authenticateToken, authorizeRole } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/authMiddleware.js";
 import { validateCreateUser, validateInputs } from "../middleware/validation.js";
 import { generalRateLimiter } from "../middleware/rateLimiters.js";
 
@@ -18,23 +18,23 @@ router.use((req, res, next) => {
 });
 
 router.route("/get-user-list")
-    .get(generalRateLimiter, authenticateToken, authorizeRole(["Administrador"]), adminController.getUserList);
+    .get(generalRateLimiter, ...requireAuth(["Administrador"]), adminController.getUserList);
 
 router.route("/create-user")
-    .post(generalRateLimiter, authenticateToken, authorizeRole(["Administrador"]), validateCreateUser, validateInputs, adminController.createUser);
+    .post(generalRateLimiter, ...requireAuth(["Administrador"]), validateCreateUser, validateInputs, adminController.createUser);
 
 router.route("/create-multiple-users")
     .post(
         generalRateLimiter,
-        authenticateToken, authorizeRole(["Administrador"]),
+        ...requireAuth(["Administrador"]),
         upload.single("file"),
         adminController.createMultipleUsers
     );
 
 router.route("/update-user/:user_id")
-    .put(generalRateLimiter, authenticateToken, authorizeRole(["Administrador"]), adminController.updateUser);
+    .put(generalRateLimiter, ...requireAuth(["Administrador"]), adminController.updateUser);
 
 router.route("/delete-user/:user_id")
-    .put(generalRateLimiter, authenticateToken, authorizeRole(["Administrador"]), adminController.deactivateUser);
+    .put(generalRateLimiter, ...requireAuth(["Administrador"]), adminController.deactivateUser);
 
 export default router;
