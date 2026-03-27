@@ -16,6 +16,7 @@ import accountsPayableRoutes from "./routes/accountsPayableRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js";
 
 import { connectMongo } from "./services/fileStorage.js";
+import { handleAuthError } from "./middleware/authErrors.js";
 
 import fs from "fs";
 import https from "https";
@@ -44,6 +45,9 @@ app.use("/api/accounts-payable", accountsPayableRoutes);
 app.use("/api/files", fileRoutes);
 
 connectMongo().catch(error => console.error("Failed to connect to MongoDB:", error));
+
+// Centralized auth error handler — must be registered after all routes
+app.use(handleAuthError);
 
 app.get("/", (req, res) => {
   res.json({
