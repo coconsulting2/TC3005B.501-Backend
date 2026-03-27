@@ -148,43 +148,33 @@ export const createExpenseValidationBatch = async (receipts) => {
 /**
  * Looks up a country by name; inserts it if it does not exist.
  *
- * @param {Object} conn - MariaDB connection or pool instance
+ * @param {Object} tx - Prisma client or transaction instance
  * @param {string} countryName - Name of the country to find or create
  * @returns {Promise<number>} The country_id (existing or newly inserted)
  */
-export const getCountryId = async (conn, countryName) => {
-    const countryQuery = `SELECT country_id FROM Country WHERE country_name = ?`;
-    const [countryRows] = await conn.query(countryQuery, [countryName]);
-
-    if (countryRows === undefined) {
-        const insertCountryQuery = `INSERT INTO Country (country_name) VALUES (?)`;
-        const insertedCountry = await conn.execute(insertCountryQuery, [
-            countryName,
-        ]);
-        return insertedCountry.insertId;
-    } else {
-        return countryRows.country_id;
-    }
+export const getCountryId = async (tx, countryName) => {
+    const country = await tx.country.upsert({
+        where: { countryName },
+        create: { countryName },
+        update: {},
+    });
+    return country.countryId;
 };
 
 /**
  * Looks up a city by name; inserts it if it does not exist.
  *
- * @param {Object} conn - MariaDB connection or pool instance
+ * @param {Object} tx - Prisma client or transaction instance
  * @param {string} cityName - Name of the city to find or create
  * @returns {Promise<number>} The city_id (existing or newly inserted)
  */
-export const getCityId = async (conn, cityName) => {
-    const cityQuery = `SELECT city_id FROM City WHERE city_name = ?`;
-    const [cityRows] = await conn.query(cityQuery, [cityName]);
-
-    if (cityRows === undefined) {
-        const insertCityQuery = `INSERT INTO City (city_name) VALUES (?)`;
-        const insertedCity = await conn.execute(insertCityQuery, [cityName]);
-        return insertedCity.insertId;
-    } else {
-        return cityRows.city_id;
-    }
+export const getCityId = async (tx, cityName) => {
+    const city = await tx.city.upsert({
+        where: { cityName },
+        create: { cityName },
+        update: {},
+    });
+    return city.cityId;
 };
 
 /**
