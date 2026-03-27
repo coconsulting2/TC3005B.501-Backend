@@ -1,68 +1,35 @@
 /**
  * @module travelAgentModel
- * @description Data access layer for travel agent database operations.
+ * @description Data access layer for travel agent queries using Prisma.
  */
-import pool from "../database/config/db.js";
+import prisma from "../database/config/prisma.js";
 
 const TravelAgent = {
-    /**
-     * Mark a travel request as being attended (status 6).
-     * @param {number} requestId - Request ID.
-     * @returns {Promise<boolean>} True if at least one row was updated.
-     */
-/*
-Travel Agent Model
-Miguel Soria 26/04/25
-Queries to the DB related to travel agent actions
-*/
-import pool from "../database/config/db.js";
+  /**
+   * Mark a travel request as being attended (status 6).
+   * @param {number} requestId - Request ID.
+   * @returns {Promise<boolean>} True if updated successfully.
+   */
+  async attendTravelRequest(requestId) {
+    await prisma.request.update({
+      where: { requestId: Number(requestId) },
+      data: { requestStatusId: 6 },
+    });
+    return true;
+  },
 
-const TravelAgent = {
-    // Update request status to 6
-    async attendTravelRequest(requestId) {
-        let conn;
-        try {
-            conn = await pool.getConnection();
-            const result = await conn.query(
-                "UPDATE `Request` SET request_status_id = 6 WHERE request_id = ?",
-                [requestId],
-            );
-
-            return result.affectedRows > 0;
-        } catch (error) {
-            console.error("Error updating travel request status:", error);
-            throw error;
-        } finally {
-            if (conn) {
-                conn.release();
-            }
-        }
-    },
-
-    /**
-     * Check whether a request exists in the database.
-     * @param {number} requestId - Request ID.
-     * @returns {Promise<boolean>} True if the request exists.
-     */
-    async requestExists(requestId) {
-        let conn;
-        try {
-            conn = await pool.getConnection();
-            const rows = await conn.query(
-                "SELECT request_id FROM `Request` WHERE request_id = ?",
-                [requestId],
-            );
-
-            return rows.length > 0;
-        } catch (error) {
-            console.error("Error checking if request exists:", error);
-            throw error;
-        } finally {
-            if (conn) {
-                conn.release();
-            }
-        }
-    },
+  /**
+   * Check whether a request exists in the database.
+   * @param {number} requestId - Request ID.
+   * @returns {Promise<boolean>} True if the request exists.
+   */
+  async requestExists(requestId) {
+    const request = await prisma.request.findUnique({
+      where: { requestId: Number(requestId) },
+      select: { requestId: true },
+    });
+    return !!request;
+  },
 };
 
 export default TravelAgent;

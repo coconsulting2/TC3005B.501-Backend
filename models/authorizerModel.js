@@ -1,11 +1,8 @@
 /**
  * @module authorizerModel
- * @description Data access layer for authorizer-related database operations.
+ * @description Data access layer for authorizer-related queries using Prisma.
  */
-/*
-Authorizer Model
-*/
-import pool from "../database/config/db.js";
+import prisma from "../database/config/prisma.js";
 
 const Authorizer = {
   /**
@@ -16,29 +13,31 @@ const Authorizer = {
    * @returns {Promise<Array<Object>>} Alert rows.
    */
   async getAlerts(id, statusId, n) {
-    let conn;
-    // When n is 0, return all rows; otherwise apply LIMIT
-    const query = `
-        SELECT Alert.alert_id, User.user_name, Alert.request_id, AlertMessage.message_text, DATE(Alert.alert_date) AS alert_date, TIME(Alert.alert_date) AS alert_time
-        FROM Alert
-        INNER JOIN Request ON Alert.request_id = Request.request_id
-        INNER JOIN User ON Request.user_id = User.user_id
-        INNER JOIN Request_status ON Request.request_status_id = Request_status.request_status_id
-        INNER JOIN AlertMessage ON Alert.message_id = AlertMessage.message_id
-        WHERE User.department_id = ? AND Request_status.request_status_id = ?
-        ${n === 0 ? "ORDER BY alert_date DESC;" : "ORDER BY alert_date DESC LIMIT ?;"}`;
-    try {
-      conn = await pool.getConnection();
-      const rows = await conn.query(query, [id, statusId, n]);
-      return rows;
-    } catch (error) {
-      console.error("Error getting completed requests:", error);
-      throw error;
-    } finally {
-      if (conn) {
-        conn.release();
-      }
-    }
+    const alerts = await prisma.alert.findMany({
+      where: {
+        request: {
+          user: { departmentId: Number(id) },
+          requestStatusId: Number(statusId),
+        },
+      },
+      include: {
+        request: {
+          include: { user: true },
+        },
+        alertMessage: true,
+      },
+      orderBy: { alertDate: "desc" },
+      ...(n !== 0 ? { take: Number(n) } : {}),
+    });
+
+    return alerts.map((a) => ({
+      alert_id: a.alertId,
+      user_name: a.request?.user?.userName,
+      request_id: a.requestId,
+      message_text: a.alertMessage?.messageText,
+      alert_date: a.alertDate.toISOString().split("T")[0],
+      alert_time: a.alertDate.toISOString().split("T")[1].split(".")[0],
+    }));
   },
 
   /**
@@ -47,69 +46,24 @@ const Authorizer = {
    * @returns {Promise<number|null>} Role ID or null if not found.
    */
   async getUserRole(userId) {
-    let conn;
-    const query = `
-        ${n == 0 ? "ORDER BY alert_date DESC;" : "ORDER BY alert_date DESC LIMIT ?;"}`;
-      try {
-        conn = await pool.getConnection();
-        const rows = await conn.query(query, [id, status_id, n]);
-        return rows;
-      } catch (error) {
-        console.error("Error getting completed requests:", error);
-        throw error;
-      } finally {
-        if (conn) {
-          conn.release();
-        }
-      }
-    },
-
-    async getUserRole(user_id) {
-      let conn;
-      const query = `
-        SELECT role_id FROM User WHERE user_id = ?
-      `;
-    try {
-      conn = await pool.getConnection();
-      const rows = await conn.query(query, [userId]);
-      if (rows.length > 0) {
-        return rows[0].role_id;
-      } else {
-        return null;
-      }
-    } catch (error) {
-      console.error("Error getting user role:", error);
-      throw error;
-    } finally {
-      if (conn) conn.release();
-    }
+    const user = await prisma.user.findUnique({
+      where: { userId: Number(userId) },
+      select: { roleId: true },
+    });
+    return user ? user.roleId : null;
   },
 
   /**
    * Update a travel request status (approve flow).
    * @param {number} requestId - Request ID.
    * @param {number} statusId - New status ID to set.
-   * @returns {Promise<Object>} Query result.
+   * @returns {Promise<Object>} Updated request.
    */
   async authorizeTravelRequest(requestId, statusId) {
-    let conn;
-    const query = `
-            UPDATE Request
-            SET request_status_id = ?
-            WHERE request_id = ?
-        `;
-    try {
-      conn = await pool.getConnection();
-      const rows = await conn.query(query, [statusId, requestId]);
-      return rows;
-    } catch (error) {
-      console.error("Error getting completed requests:", error);
-      throw error;
-    } finally {
-      if (conn) {
-        conn.release();
-      }
-    }
+    return await prisma.request.update({
+      where: { requestId: Number(requestId) },
+      data: { requestStatusId: Number(statusId) },
+    });
   },
 
   /**
@@ -118,26 +72,11 @@ const Authorizer = {
    * @returns {Promise<boolean>} True if the query executed successfully.
    */
   async declineTravelRequest(requestId) {
-    let conn;
-    const query = `
-            UPDATE Request
-            SET request_status_id = 10
-            WHERE request_id = ?
-        `;
-    try {
-      conn = await pool.getConnection();
-
-      await conn.query(query, [requestId]);
-
-      return true;
-    } catch (error) {
-      console.error("Error getting completed requests:", error);
-      throw error;
-    } finally {
-      if (conn) {
-        conn.release();
-      }
-    }
+    await prisma.request.update({
+      where: { requestId: Number(requestId) },
+      data: { requestStatusId: 10 },
+    });
+    return true;
   },
 };
 
