@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Role {
+  roleId   Int    @id @default(autoincrement()) @map("role_id")
+  roleName String @unique @map("role_name") @db.VarChar(20)
+  users    User[]
+
+  @@map("Role")
+}
+
+model Department {
+  departmentId   Int     @id @default(autoincrement()) @map("department_id")
+  departmentName String  @unique @map("department_name") @db.VarChar(20)
+  costsCenter    String? @map("costs_center") @db.VarChar(20)
+  active         Boolean @default(true)
+  users          User[]
+
+  @@map("Department")
+}
+
+model AlertMessage {
+  messageId   Int    @id @default(autoincrement()) @map("message_id")
+  messageText String @map("message_text") @db.VarChar(60)
+  alerts      Alert[]
+
+  @@map("AlertMessage")
+}
+
+model User {
+  userId       Int        @id @default(autoincrement()) @map("user_id")
+  roleId       Int?       @map("role_id")
+  departmentId Int?       @map("department_id")
+  userName     String     @unique @map("user_name") @db.VarChar(60)
+  password     String     @db.VarChar(60)
+  workstation  String     @db.VarChar(20)
+  email        String     @unique @db.VarChar(254)
+  phoneNumber  String?    @map("phone_number") @db.VarChar(254)
+  wallet       Float      @default(0.00)
+  creationDate DateTime   @default(now()) @map("creation_date")
+  lastModDate  DateTime   @default(now()) @updatedAt @map("last_mod_date")
+  active       Boolean    @default(true)
+  role         Role?      @relation(fields: [roleId], references: [roleId])
+  department   Department? @relation(fields: [departmentId], references: [departmentId])
+  requests     Request[]
+
+  @@map("User")
+}
+
+model RequestStatus {
+  requestStatusId Int       @id @default(autoincrement()) @map("request_status_id")
+  status          String    @unique @db.VarChar(30)
+  requests        Request[]
+
+  @@map("Request_status")
+}
+
+model Request {
+  requestId       Int           @id @default(autoincrement()) @map("request_id")
+  userId          Int?          @map("user_id")
+  requestStatusId Int           @default(1) @map("request_status_id")
+  notes           String?       @db.Text
+  requestedFee    Float?        @map("requested_fee")
+  imposedFee      Float?        @map("imposed_fee")
+  requestDays     Float?        @map("request_days")
+  creationDate    DateTime      @default(now()) @map("creation_date")
+  lastModDate     DateTime      @default(now()) @updatedAt @map("last_mod_date")
+  active          Boolean       @default(true)
+  user            User?         @relation(fields: [userId], references: [userId])
+  requestStatus   RequestStatus @relation(fields: [requestStatusId], references: [requestStatusId])
+  alerts          Alert[]
+  routeRequests   RouteRequest[]
+  receipts        Receipt[]
+
+  @@map("Request")
+}
+
+model Alert {
+  alertId      Int           @id @default(autoincrement()) @map("alert_id")
+  requestId    Int?          @map("request_id")
+  messageId    Int?          @map("message_id")
+  alertDate    DateTime      @default(now()) @map("alert_date")
+  request      Request?      @relation(fields: [requestId], references: [requestId])
+  alertMessage AlertMessage? @relation(fields: [messageId], references: [messageId])
+
+  @@map("Alert")
+}
+
+model Country {
+  countryId         Int     @id @default(autoincrement()) @map("country_id")
+  countryName       String  @unique @map("country_name") @db.VarChar(60)
+  originRoutes      Route[] @relation("OriginCountry")
+  destinationRoutes Route[] @relation("DestinationCountry")
+
+  @@map("Country")
+}
+
+model City {
+  cityId            Int     @id @default(autoincrement()) @map("city_id")
+  cityName          String  @unique @map("city_name") @db.VarChar(200)
+  originRoutes      Route[] @relation("OriginCity")
+  destinationRoutes Route[] @relation("DestinationCity")
+
+  @@map("City")
+}
+
+model Route {
+  routeId              Int       @id @default(autoincrement()) @map("route_id")
+  idOriginCountry      Int?      @map("id_origin_country")
+  idOriginCity         Int?      @map("id_origin_city")
+  idDestinationCountry Int?      @map("id_destination_country")
+  idDestinationCity    Int?      @map("id_destination_city")
+  routerIndex          Int?      @map("router_index")
+  planeNeeded          Boolean   @default(false) @map("plane_needed")
+  hotelNeeded          Boolean   @default(false) @map("hotel_needed")
+  beginningDate        DateTime? @map("beginning_date") @db.Date
+  beginningTime        DateTime? @map("beginning_time") @db.Time(6)
+  endingDate           DateTime? @map("ending_date") @db.Date
+  endingTime           DateTime? @map("ending_time") @db.Time(6)
+  originCountry        Country?  @relation("OriginCountry", fields: [idOriginCountry], references: [countryId])
+  originCity           City?     @relation("OriginCity", fields: [idOriginCity], references: [cityId])
+  destinationCountry   Country?  @relation("DestinationCountry", fields: [idDestinationCountry], references: [countryId])
+  destinationCity      City?     @relation("DestinationCity", fields: [idDestinationCity], references: [cityId])
+  routeRequests        RouteRequest[]
+
+  @@map("Route")
+}
+
+model RouteRequest {
+  routeRequestId Int      @id @default(autoincrement()) @map("route_request_id")
+  requestId      Int?     @map("request_id")
+  routeId        Int?     @map("route_id")
+  request        Request? @relation(fields: [requestId], references: [requestId])
+  route          Route?   @relation(fields: [routeId], references: [routeId])
+
+  @@map("Route_Request")
+}
+
+model ReceiptType {
+  receiptTypeId   Int       @id @default(autoincrement()) @map("receipt_type_id")
+  receiptTypeName String    @unique @map("receipt_type_name") @db.VarChar(20)
+  receipts        Receipt[]
+
+  @@map("Receipt_Type")
+}
+
+enum ValidationStatus {
+  Pendiente
+  Aprobado
+  Rechazado
+}
+
+model Receipt {
+  receiptId      Int              @id @default(autoincrement()) @map("receipt_id")
+  receiptTypeId  Int?             @map("receipt_type_id")
+  requestId      Int?             @map("request_id")
+  validation     ValidationStatus @default(Pendiente)
+  amount         Float
+  refund         Boolean          @default(true)
+  submissionDate DateTime         @default(now()) @map("submission_date")
+  validationDate DateTime?        @map("validation_date")
+  pdfFileId      String?          @map("pdf_file_id") @db.VarChar(24)
+  pdfFileName    String?          @map("pdf_file_name") @db.VarChar(255)
+  xmlFileId      String?          @map("xml_file_id") @db.VarChar(24)
+  xmlFileName    String?          @map("xml_file_name") @db.VarChar(255)
+  receiptType    ReceiptType?     @relation(fields: [receiptTypeId], references: [receiptTypeId])
+  request        Request?         @relation(fields: [requestId], references: [requestId])
+
+  @@map("Receipt")
+}

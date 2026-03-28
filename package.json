@@ -7,8 +7,11 @@
     "scripts": {
         "start": "nodemon index.js",
         "dev": "nodemon index.js",
-        "dummy_db": "node ./database/config/dev_db.js dev",
-        "empty_db": "node ./database/config/dev_db.js prod",
+        "dummy_db": "npx prisma db push --force-reset && node prisma/seed.js dev",
+        "empty_db": "npx prisma db push --force-reset && node prisma/seed.js",
+        "migrate": "npx prisma migrate dev",
+        "generate": "npx prisma generate",
+        "studio": "npx prisma studio",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
         "build": "eslint . --quiet && echo Build passed",
@@ -30,6 +33,7 @@
     "dependencies": {
         "@aws-sdk/client-s3": "^3.1017.0",
         "@aws-sdk/s3-request-presigner": "^3.1017.0",
+        "@prisma/client": "^7.6.0",
         "bcrypt": "^6.0.0",
         "cookie-parser": "^1.4.7",
         "cors": "^2.8.5",
@@ -39,7 +43,6 @@
         "express-rate-limit": "^7.5.0",
         "express-validator": "^7.2.1",
         "jsonwebtoken": "^9.0.2",
-        "mariadb": "^3.4.1",
         "mongo-sanitize": "^1.1.0",
         "mongodb": "^5.0.0",
         "multer": "^2.0.1",
@@ -47,6 +50,7 @@
     },
     "devDependencies": {
         "@eslint/js": "^9.0.0",
+        "prisma": "^7.6.0",
         "@jest/globals": "^30.3.0",
         "eslint": "^9.0.0",
         "eslint-plugin-jsdoc": "^50.0.0",
@@ -62,6 +66,9 @@
             "middleware/authMiddleware.js",
             "middleware/authErrors.js"
         ]
+    },
+    "prisma": {
+        "seed": "node prisma/seed.js"
     },
     "packageManager": "pnpm@10.10.0+sha512.d615db246fe70f25dcfea6d8d73dee782ce23e2245e3c4f6f888249fb568149318637dca73c2c5c8ef2a4ca0d5657fb9567188bfab47f566d1ee6ce987815c39"
 }
