@@ -29,22 +29,22 @@ mongodb_installation.md  @coconsulting2/Backend
 /backup_scripts/    @coconsulting2/Backend
 
 # Certificados SSL/TLS
-/certs/             @MVRer @JezraelMoreno
+/certs/             @MVRer @hector-lg @JezraelMoreno
 
 # Archivos críticos de configuración (solo admins)
 package.json        @MVRer @edeytai @hector-lg @JezraelMoreno
 package-lock.json   @MVRer @edeytai @hector-lg @JezraelMoreno
 pnpm-lock.yaml      @MVRer @edeytai @hector-lg @JezraelMoreno
-.env                @MVRer @JezraelMoreno
+.env                @MVRer @hector-lg @JezraelMoreno
 .env.example        @coconsulting2/Backend
 index.js            @MVRer @edeytai @hector-lg @JezraelMoreno
-eslint.config.js    @MVRer @JezraelMoreno
-.gitignore          @MVRer @JezraelMoreno
+eslint.config.js    @MVRer @hector-lg @JezraelMoreno
+.gitignore          @MVRer @hector-lg @JezraelMoreno
 
 # Documentación
 CHANGELOG.md        @coconsulting2/Backend @coconsulting2/QA-y-Documentacion
 CONTRIBUTING.md     @coconsulting2/Backend @coconsulting2/QA-y-Documentacion
-README.md           @MVRer @JezraelMoreno
+README.md           @MVRer @hector-lg @JezraelMoreno
 API.md              @coconsulting2/Backend
 
 # GitHub workflows y configuración
