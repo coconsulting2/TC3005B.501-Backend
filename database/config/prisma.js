@@ -1,12 +1,11 @@
 /**
  * @file database/config/prisma.js
- * @description Prisma client singleton with trigger middleware.
+ * @description Prisma client singleton with the trigger extension applied.
  * Replaces the old MariaDB connection pool (db.js).
  */
 import { PrismaClient } from "@prisma/client";
-import { registerMiddleware } from "../../prisma/middleware.js";
+import { triggerExtension } from "../../prisma/middleware.js";
 
-const prisma = new PrismaClient();
-registerMiddleware(prisma);
+const prisma = new PrismaClient().$extends(triggerExtension);
 
 export default prisma;
