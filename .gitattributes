@@ -1,0 +1,7 @@
+# Force LF on shell scripts and docker assets so Windows clones with
+# core.autocrlf=true don't poison the image with CRLF line endings,
+# which silently breaks /opt/create_certs.sh and the entrypoint.
+*.sh         text eol=lf
+*.template   text eol=lf
+Dockerfile   text eol=lf
+docker/*     text eol=lf
