@@ -24,19 +24,13 @@ gh repo clone 101-Coconsulting/TC3005B.501-Backend
 
 ### Dependencies
 
-The dependencies for this project are managed using [the pnpm package manager](https://pnpm.io/), so it is recommended to use this. However, [npm](https://www.npmjs.com/) can also be used. The dependencies are automatically managed by `pnpm` in the `package.json` file, so they are installed automatically when issuing the install command.
-
-#### Using `pnpm`
+This project uses [Bun](https://bun.com/) as its package manager and script runner. Install dependencies from the root of the repository:
 
 ```sh
-pnpm install
+bun install
 ```
 
-#### Using `npm`
-
-```sh
-npm install
-```
+> Bun is used for installs and tooling (`bunx prisma`, `bun run`). The long-running server itself is started with Node — see [Running](#running) below.
 
 ### Create HTTPS certificates
 
@@ -74,45 +68,20 @@ Now you should have 6 new files in the [`/certs`](/certs) directory and should b
 
 ### Configuring the Database
 
-For the database to be operational, some initial configuration is required.
+The relational store is **PostgreSQL**, accessed through [Prisma](https://www.prisma.io/). Schema lives in [`prisma/schema.prisma`](/prisma/schema.prisma).
 
-#### Setup MariaDB
+#### Setup PostgreSQL
 
-In order to properly setup MariaDB, the following steps are required:
-
-1. [Download `mariadb`](https://mariadb.com/kb/en/where-to-download-mariadb/).
-2. It is recommended that you [secure your MariaDB installation](https://mariadb.com/kb/en/mysql_secure_installation/).
-3. [Start the `mariadb` server](https://mariadb.com/kb/en/starting-and-stopping-mariadb-automatically/).
-4. To setup the database with dummy data, run `pnpm dummy_db` or `node database/config/dev_db.js`from the root of the repository.
-5. To setup only the database, run `pnpm empty_db` or `node database/config/init_db.js` from the root of the repository.
-
-#### Manual MariaDB Setup
-
-1. Go to the [/database/Scheme](/database/Scheme) directory.
-    ```sh
-    cd databas/Scheme
+1. Install Postgres 14+ for your platform (or use the Docker stack — see [Running with Docker](#running-with-docker)).
+2. Create a database and user, then set `DATABASE_URL` in your `.env` (see [`.env.example`](/.env.example)):
+    ```ini
+    DATABASE_URL=postgresql://USER:PASSWORD@localhost:5432/CocoScheme?schema=public
     ```
-2. [Run the `mariadb` client in batch mode](https://mariadb.com/kb/en/mariadb-command-line-client/). With `DB_USER` and `DB_USER_PASSWORD` being your created `mariadb` user and its password.
-    i. Load database scheme [/database/Scheme/Scheme.sql](/database/Scheme/Scheme.sql).
-        ```sh
-        mariadb -u DB_USER -p DB_USER_PASSWORD < Scheme.sql
-        ```
-    ii. Load database initial prepopulation [/database/Scheme/Prepopulate.sql](/database/Scheme/Prepopulate.sql).
-        ```sh
-        mariadb -u DB_USER -p DB_USER_PASSWORD < Prepopulate.sql
-        ```
-    iii. Load database triggers [/database/Scheme/Triggers.sql](/database/Scheme/Triggers.sql).
-        ```sh
-        mariadb -u DB_USER -p DB_USER_PASSWORD < Triggers.sql
-        ```
-    iv. Load database views [/database/Scheme/Views.sql](/database/Scheme/Views.sql).
-        ```sh
-        mariadb -u DB_USER -p DB_USER_PASSWORD < Views.sql
-        ```
-    v. Load database dummy data [/database/Scheme/Dummy.sql](/database/Scheme/Dummy.sql).
-        ```sh
-        mariadb -u DB_USER -p DB_USER_PASSWORD < Dummy.sql
-        ```
+3. Apply the schema and seed reference + dummy data:
+    ```sh
+    bun run dummy_db   # schema + reference data + dummy data (development)
+    bun run empty_db   # schema + reference data only
+    ```
 
 ### Setup MongoDB
 1. [Download `mongodb`](https://www.mongodb.com/docs/manual/installation/) using your preferred method or package manager.
@@ -122,53 +91,73 @@ In order to properly setup MariaDB, the following steps are required:
 5. If the status appears as inactive, use the command ` systemctl start mongod `
 ### Environment Variables
 
-Finally, it is crucial that a local `.env` file is created. Based off of the [`.env.example`](/.env.example) file provided, which includes all necessary environment variables to be set in order for the server to be able to connect to the `mariadb` database, as well as the required JSON Web Token(JWT) information required for verifying authorized requests and encryption.
+Copy [`.env.example`](/.env.example) to `.env` and fill in the values:
 
-1. Go to the [root directory](/) of your local repository.
-2. Create your `.env` file based off of the [`.env.example`](/.env.example) file.
-    ```sh
-    cp .env.example .env
-    ```
-3. Edit the newly created `.env` file, and edit the required variables based on your previous [`mariadb` configuration](#configuring-the-database) and `mongodb` configuration:
-    ```sh
-    # Server Configuration
-    PORT=3000
-    NODE_ENV=development
+```sh
+cp .env.example .env
+```
 
-    # Database Configuration
-    DB_HOST=localhost
-    DB_PORT=27017
-    DB_NAME=travel_management  # Change this
-    DB_USER=username  # Change this
-    DB_PASSWORD=password  # Change this
-
-    # JWT Configuration
-    JWT_SECRET=your_jwt_secret_key  # Change this
-    JWT_EXPIRES_IN=1d
-
-    # API Keys (if needed)
-    # API_KEY=your_api_key
-
-    # Other Configuration
-    # CORS_ORIGIN=http://localhost:3000
-
-    MONGO_URI=mongodb://localhost:27017
-    ```
+The required variables are: `PORT`, `NODE_ENV`, `DATABASE_URL`, `MONGO_URI`, `CORS_ORIGIN`, `AES_SECRET_KEY` (exactly 32 characters), `JWT_SECRET`, `MAIL_USER`, `MAIL_PASSWORD`.
 
 ### Running
 
-To run the Backend, ensure the `mariadb` and `mongodb` servers are running, and utilize whichever package manager you used for dependencies to run the project.
-
-#### Using `pnpm`
+With Postgres and MongoDB running and your `.env` populated:
 
 ```sh
-pnpm run dev
+bun run dev    # node --watch index.js
 ```
 
-#### Using `npm`
+You should see the ASCII banner and `🚀 Server running on port 3000 with HTTPS`.
+
+---
+
+## Running with Docker
+
+The repository ships a multi-target Dockerfile (`deps` for dev, `production` for GHCR) plus two compose files.
+
+### Local development with hot-reload
 
 ```sh
-npm run dev
+bun run docker:dev          # foreground, streams logs
+bun run docker:dev:build    # rebuild image first
+bun run docker:dev:down     # stop containers
+bun run docker:dev:clean    # stop AND wipe volumes (full reset)
 ```
 
-And you're good to go! `nodemon` should start and you should be able to start sending requests to your specified `PORT` on `localhost` as well as a confirmation message of connection to the file database!
+`docker-compose.dev.yml` brings up Postgres 16 + Mongo 7 + a one-shot `migrate` service (installs deps, applies the Prisma schema, seeds reference + dummy data) + the backend with the source bind-mounted and `node --watch` running. Edits on the host hot-reload the server inside the container. HTTPS certs are auto-generated into a named volume on first start.
+
+### Quickstart for end-users (uses the published image from GHCR)
+
+```sh
+curl -O https://raw.githubusercontent.com/coconsulting2/TC3005B.501-Backend/main/docker-compose.yml
+docker compose up -d
+```
+
+The first start auto-generates self-signed HTTPS certs, applies the Prisma schema, and seeds dummy data. Subsequent starts reuse the certs and skip the seed.
+
+### Image tags
+
+| Tag | Description |
+|-----|-------------|
+| `ghcr.io/coconsulting2/tc3005b-501-backend:latest` | Latest commit on `main` |
+| `ghcr.io/coconsulting2/tc3005b-501-backend:sha-<short>` | Pinned to a specific commit |
+
+### Overriding secrets
+
+Place a `.env` file next to the compose file with overrides:
+
+```ini
+AES_SECRET_KEY=your_32_character_secret_key_here
+JWT_SECRET=your_real_jwt_secret
+MAIL_USER=...
+MAIL_PASSWORD=...
+```
+
+### Wiping persistent state
+
+```sh
+docker compose down
+docker volume rm cocoscheme_pgdata cocoscheme_mongodata cocoscheme_certs
+```
+
+> Wiping the `certs` volume regenerates the CA, so you may need to re-trust the new certificate in your browser/keychain after the next `docker compose up`.

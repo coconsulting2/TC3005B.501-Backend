@@ -1,99 +1,80 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
-name: Node.js CI
+name: Backend CI
 
 on:
   push:
-    branches: [ "main", "development" ]
+    branches: [main, development]
   pull_request:
-    branches: [ "main", "development" ]
-    types: [ "opened", "reopened", "synchronize" ]
+    branches: [main, development]
+    types: [opened, reopened, synchronize]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     services:
-      mariadb:
-        image: mariadb:10.6
+      postgres:
+        image: postgres:16
         env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: CocoScheme
-          MYSQL_USER: test_user
-          MYSQL_PASSWORD: test_password
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: cocoscheme_test
         ports:
-          - 3306:3306
+          - 5432:5432
         options: >-
-          --health-cmd="mysqladmin ping -uroot -proot"
+          --health-cmd="pg_isready -U test -d cocoscheme_test"
           --health-interval=10s
-          --health-timeout=10s
+          --health-timeout=5s
           --health-retries=10
-      
-      mongodb:
-        image: mongo:latest
+
+      mongo:
+        image: mongo:7
         ports:
           - 27017:27017
         options: >-
-          --health-cmd="mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-cmd="mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
           --health-interval=10s
           --health-timeout=5s
-          --health-retries=3
-
-    strategy:
-      matrix:
-        node-version: [22.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+          --health-retries=10
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    
-    - name: Install MySQL client
-      run: sudo apt-get update && sudo apt-get install -y default-mysql-client
-    
-    - name: Install Node dependencies
-      run: npm install
-    
-    - name: Create .env file
-      run: |
-        echo "PORT=3000" > .env
-        echo "NODE_ENV=test" >> .env
-        echo "DB_HOST=localhost" >> .env
-        echo "DB_PORT=3306" >> .env
-        echo "DB_NAME=CocoScheme" >> .env
-        echo "DB_USER=test_user" >> .env
-        echo "DB_PASSWORD=test_password" >> .env
-        echo "MONGO_URI=mongodb://localhost:27017" >> .env
-        echo "AES_SECRET_KEY=12345678901234567890123456789012" >> .env
-        echo "JWT_SECRET=test_jwt_secret_key_for_github_actions" >> .env
-        echo "MAIL_USER=test.mail@outlook.com" >> .env
-        echo "MAIL_PASSWORD=test_password" >> .env
-    
-    - name: Wait for MariaDB
-      run: |
-        timeout=60
-        counter=0
-        echo "Waiting for MariaDB to be ready..."
-        until mysql -h127.0.0.1 -P3306 -uroot -proot -e "SELECT 1" &> /dev/null
-        do
-          if [ $counter -gt $timeout ]; then
-            echo "Timed out waiting for MariaDB to start"
-            exit 1
-          fi
-          counter=$((counter+1))
-          echo "Waiting for MariaDB to be ready... ($counter/$timeout)"
-          sleep 1
-        done
-        echo "MariaDB is ready!"
-    
-    - name: Setup Database Schema
-      run: node database/config/dev_db.js dev
-    
-    - name: Run Unit Tests
-      run: npm test
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Set up Node (for jest + prisma seed)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Write .env
+        run: |
+          cat > .env <<'EOF'
+          PORT=3000
+          NODE_ENV=test
+          DATABASE_URL=postgresql://test:test@localhost:5432/cocoscheme_test?schema=public
+          MONGO_URI=mongodb://localhost:27017
+          AES_SECRET_KEY=12345678901234567890123456789012
+          JWT_SECRET=test_jwt_secret_key_for_github_actions
+          MAIL_USER=test.mail@outlook.com
+          MAIL_PASSWORD=test_password
+          CORS_ORIGIN=http://localhost:4321,https://localhost:4321
+          EOF
+
+      - name: Generate Prisma client
+        run: bunx prisma generate
+
+      - name: Apply schema
+        run: bunx prisma db push --force-reset
+
+      - name: Seed database
+        run: node prisma/seed.js dev
+
+      - name: Run unit tests
+        run: bun run test

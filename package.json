@@ -1,74 +1,83 @@
 {
-    "name": "tc3005b-501-backend",
-    "version": "0.1.0",
-    "type": "module",
-    "description": "API and Database for the conection and the functioning of the trip management system portal developed in course TC3005B by group 501.",
-    "main": "index.js",
-    "scripts": {
-        "start": "nodemon index.js",
-        "dev": "nodemon index.js",
-        "dummy_db": "npx prisma db push --force-reset && node prisma/seed.js dev",
-        "empty_db": "npx prisma db push --force-reset && node prisma/seed.js",
-        "migrate": "npx prisma migrate dev",
-        "generate": "npx prisma generate",
-        "studio": "npx prisma studio",
-        "lint": "eslint .",
-        "lint:fix": "eslint . --fix",
-        "build": "eslint . --quiet && echo Build passed",
-        "test": "NODE_OPTIONS='--experimental-vm-modules' npx jest --coverage",
-        "test:watch": "NODE_OPTIONS='--experimental-vm-modules' npx jest --watch"
-    },
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/yourusername/TC3005B.501-Backend.git"
-    },
-    "keywords": [
-        "travel",
-        "management",
-        "system",
-        "api"
-    ],
-    "author": "",
-    "license": "ISC",
-    "dependencies": {
-        "@aws-sdk/client-s3": "^3.1017.0",
-        "@aws-sdk/s3-request-presigner": "^3.1017.0",
-        "@prisma/client": "^7.6.0",
-        "bcrypt": "^6.0.0",
-        "cookie-parser": "^1.4.7",
-        "cors": "^2.8.5",
-        "csv-parse": "^5.6.0",
-        "dotenv": "^16.4.7",
-        "express": "^4.18.2",
-        "express-rate-limit": "^7.5.0",
-        "express-validator": "^7.2.1",
-        "jsonwebtoken": "^9.0.2",
-        "mongo-sanitize": "^1.1.0",
-        "mongodb": "^5.0.0",
-        "multer": "^2.0.1",
-        "nodemailer": "^7.0.3"
-    },
-    "devDependencies": {
-        "@eslint/js": "^9.0.0",
-        "prisma": "^7.6.0",
-        "@jest/globals": "^30.3.0",
-        "eslint": "^9.0.0",
-        "eslint-plugin-jsdoc": "^50.0.0",
-        "jest": "^30.3.0",
-        "nodemon": "^3.0.1",
-        "supertest": "^7.2.2"
-    },
-    "jest": {
-        "testEnvironment": "node",
-        "transform": {},
-        "coverageDirectory": "coverage",
-        "collectCoverageFrom": [
-            "middleware/authMiddleware.js",
-            "middleware/authErrors.js"
-        ]
-    },
-    "prisma": {
-        "seed": "node prisma/seed.js"
-    },
-    "packageManager": "pnpm@10.10.0+sha512.d615db246fe70f25dcfea6d8d73dee782ce23e2245e3c4f6f888249fb568149318637dca73c2c5c8ef2a4ca0d5657fb9567188bfab47f566d1ee6ce987815c39"
+  "name": "tc3005b-501-backend",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "API and Database for the conection and the functioning of the trip management system portal developed in course TC3005B by group 501.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js",
+    "dummy_db": "bunx prisma db push --force-reset && node prisma/seed.js dev",
+    "empty_db": "bunx prisma db push --force-reset && node prisma/seed.js",
+    "migrate": "bunx prisma migrate dev",
+    "generate": "bunx prisma generate",
+    "studio": "bunx prisma studio",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "build": "eslint . --quiet && echo Build passed",
+    "test": "NODE_OPTIONS='--experimental-vm-modules' bunx jest --coverage",
+    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' bunx jest --watch",
+    "docker:dev": "docker compose -f docker-compose.dev.yml up",
+    "docker:dev:build": "docker compose -f docker-compose.dev.yml up --build",
+    "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:dev:clean": "docker compose -f docker-compose.dev.yml down -v"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/TC3005B.501-Backend.git"
+  },
+  "keywords": [
+    "travel",
+    "management",
+    "system",
+    "api"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1017.0",
+    "@aws-sdk/s3-request-presigner": "^3.1017.0",
+    "@prisma/client": "^6.16.0",
+    "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "csv-parse": "^5.6.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.5.0",
+    "express-validator": "^7.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongo-sanitize": "^1.1.0",
+    "mongodb": "^5.0.0",
+    "multer": "^2.0.1",
+    "nodemailer": "^7.0.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "prisma": "^6.16.0",
+    "@jest/globals": "^30.3.0",
+    "eslint": "^9.0.0",
+    "eslint-plugin-jsdoc": "^50.0.0",
+    "jest": "^30.3.0",
+    "supertest": "^7.2.2"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "transform": {},
+    "coverageDirectory": "coverage",
+    "collectCoverageFrom": [
+      "middleware/authMiddleware.js",
+      "middleware/authErrors.js"
+    ]
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "trustedDependencies": [
+    "@prisma/client",
+    "@prisma/engines",
+    "bcrypt",
+    "prisma",
+    "unrs-resolver"
+  ]
 }
