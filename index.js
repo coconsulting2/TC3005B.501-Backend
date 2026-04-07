@@ -28,8 +28,12 @@ import cookieParser from "cookie-parser";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+const corsOrigins = process.env.CORS_ORIGIN
+  ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
+  : "https://localhost:4321";
+
 app.use(cors({
-  origin: "https://localhost:4321",
+  origin: corsOrigins,
   credentials: true,
   methods: ["GET", "POST", "PUT"],
 }));
