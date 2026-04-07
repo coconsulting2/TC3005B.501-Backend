@@ -6,6 +6,7 @@ import parseCSV from "../services/adminService.js";
 import * as adminService from "../services/adminService.js";
 import Admin from "../models/adminModel.js";
 import userModel from "../models/userModel.js";
+import logger from "../services/logger.js";
 
 /**
  * Retrieves the list of all active users with their roles and departments.
@@ -29,7 +30,7 @@ export const getUserList = async (req, res) => {
         }));
         res.status(200).json(formattedUsers);
     } catch (error) {
-        console.error("Error getting user list:", error.message);
+        logger.error("Error getting user list: %s", error.message);
         return res.status(500).json({ error: "Internal server error" });
     }
 };
@@ -51,7 +52,7 @@ export const createMultipleUsers = async (req, res) => {
         const result = await adminService.parseCSV(filePath, false);
         res.status(200).json(result);
     } catch (error) {
-        console.error("Error in createMultipleUsers:", error);
+        logger.error("Error in createMultipleUsers: %s", error.message);
         res.status(500).json({ error: "Internal server error" });
     }
 };
@@ -68,7 +69,7 @@ export const createUser = async (req, res) => {
         await adminService.createUser(userData);
         return res.status(201).json({ message: "User created succesfully" });
     } catch (error) {
-        console.error("Error creating user:", error.status);
+        logger.error("Error creating user: %s", error.message);
         return res.status(error.status || 500).json({ error: error.message || "Internal server error" });
     }
 };
@@ -85,7 +86,7 @@ export const updateUser = async (req, res) => {
         const result = await adminService.updateUserData(userId, req.body);
         return res.status(200).json(result);
     } catch (error) {
-        console.error("An error occurred updating the user:", error);
+        logger.error("An error occurred updating the user: %s", error.message);
         return res.status(error.status || 500).json({ error: "Internal server error" });
     }
 };
@@ -113,7 +114,7 @@ export const deactivateUser = async (req, res) => {
             active: false
         });
     } catch (error) {
-        console.error("Error in deactivateUser:", error);
+        logger.error("Error in deactivateUser: %s", error.message);
         return res.status(500).json({ error: "Internal server error" });
     }
 };

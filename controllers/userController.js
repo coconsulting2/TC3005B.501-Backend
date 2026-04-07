@@ -5,6 +5,7 @@
 import * as userService from "../services/userService.js";
 import User from "../models/userModel.js";
 import { decrypt } from "../middleware/decryption.js";
+import logger from "../services/logger.js";
 
 /**
  * Retrieves user profile data by ID.
@@ -28,7 +29,7 @@ export async function getUserData(req, res) {
 
     return res.status(200).json(userData);
   } catch (error) {
-    console.error("Error retrieving user data", error);
+    logger.error("Error retrieving user data: %s", error.message);
     return res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -109,7 +110,7 @@ export const getTravelRequestsByDeptStatus = async (req, res) => {
 
     return res.status(200).json(formatted);
   } catch (error) {
-    console.error("Error in getTravelRequestsByDeptStatus controller:", error);
+    logger.error("Error in getTravelRequestsByDeptStatus controller: %s", error.message);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -165,7 +166,7 @@ export const getTravelRequestById = async (req, res) => {
 
     return res.status(200).json(response);
   } catch (error) {
-    console.error("Error in getTravelRequestById controller:", error);
+    logger.error("Error in getTravelRequestById controller: %s", error.message);
     return res.status(500).json({ error: "Internal server error" });
   }
 };

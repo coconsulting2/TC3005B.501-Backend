@@ -9,7 +9,7 @@ import {
   uploadFile,
   downloadFile
 } from "../controllers/fileController.js";
-import { authenticateToken } from "../middleware/auth.js";
+import { authenticateToken } from "../middleware/authMiddleware.js";
 import { fileValidation, handleMulterErrors } from "../middleware/fileValidation.js";
 
 const router = express.Router();
@@ -19,6 +19,7 @@ router.use(sanitizeMongoInputs);
 
 // Upload both PDF and XML files for a receipt
 router.post("/upload-receipt-files/:receipt_id",
+  authenticateToken,
   upload.fields([
     { name: "pdf", maxCount: 1 },
     { name: "xml", maxCount: 1 }
@@ -27,10 +28,10 @@ router.post("/upload-receipt-files/:receipt_id",
 );
 
 // Get receipt file (PDF or XML)
-router.get("/receipt-file/:file_id", generalRateLimiter, getReceiptFileController);
+router.get("/receipt-file/:file_id", authenticateToken, generalRateLimiter, getReceiptFileController);
 
 // Get receipt files metadata (filenames and object ids)
-router.get("/receipt-files/:receipt_id", getReceiptFilesMetadataController);
+router.get("/receipt-files/:receipt_id", authenticateToken, getReceiptFilesMetadataController);
 
 // ------------ S3 Upload Endpoints ------------
 

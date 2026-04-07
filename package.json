@@ -46,16 +46,17 @@
         "mongo-sanitize": "^1.1.0",
         "mongodb": "^5.0.0",
         "multer": "^2.0.1",
-        "nodemailer": "^7.0.3"
+        "nodemailer": "^7.0.3",
+        "winston": "^3.19.0"
     },
     "devDependencies": {
         "@eslint/js": "^9.0.0",
-        "prisma": "^7.6.0",
         "@jest/globals": "^30.3.0",
         "eslint": "^9.0.0",
         "eslint-plugin-jsdoc": "^50.0.0",
         "jest": "^30.3.0",
         "nodemon": "^3.0.1",
+        "prisma": "^7.6.0",
         "supertest": "^7.2.2"
     },
     "jest": {
@@ -64,7 +65,8 @@
         "coverageDirectory": "coverage",
         "collectCoverageFrom": [
             "middleware/authMiddleware.js",
-            "middleware/authErrors.js"
+            "middleware/authErrors.js",
+            "services/travelAgentService.js"
         ]
     },
     "prisma": {

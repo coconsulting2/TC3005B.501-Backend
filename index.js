@@ -18,6 +18,7 @@ import fileRoutes from "./routes/fileRoutes.js";
 import { connectMongo } from "./services/fileStorage.js";
 import { handleAuthError } from "./middleware/authErrors.js";
 import prisma from "./database/config/prisma.js";
+import logger from "./services/logger.js";
 
 import fs from "fs";
 import https from "https";
@@ -31,7 +32,7 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({
   origin: "https://localhost:4321",
   credentials: true,
-  methods: ["GET", "POST", "PUT"],
+  methods: ["GET", "POST", "PUT", "DELETE"],
 }));
 
 app.use(express.json());
@@ -45,13 +46,23 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/accounts-payable", accountsPayableRoutes);
 app.use("/api/files", fileRoutes);
 
-connectMongo().catch(error => console.error("Failed to connect to MongoDB:", error));
+connectMongo().catch(error => logger.error("Failed to connect to MongoDB: %s", error.message));
 prisma.$connect()
-  .then(() => console.log("PostgreSQL connected via Prisma"))
-  .catch(error => console.error("Failed to connect to PostgreSQL:", error));
+  .then(() => logger.info("PostgreSQL connected via Prisma"))
+  .catch(error => logger.error("Failed to connect to PostgreSQL: %s", error.message));
 
 // Centralized auth error handler — must be registered after all routes
 app.use(handleAuthError);
+
+// 503 handler for database connectivity errors
+app.use((err, req, res, next) => {
+  const dbErrorCodes = ["P1001", "P1002", "P1008", "P1017"];
+  if (err?.code && dbErrorCodes.includes(err.code)) {
+    logger.error("Database unavailable: %s", err.message);
+    return res.status(503).json({ error: "Service temporarily unavailable. Please try again later." });
+  }
+  next(err);
+});
 
 app.get("/", (req, res) => {
   res.json({
@@ -67,7 +78,7 @@ const credentials = { key: privateKey, cert: certificate, ca: ca };
 console.clear();
 const httpsServer = https.createServer(credentials, app);
 httpsServer.listen(PORT, () =>
-  console.log(`
+  logger.info(`
          )         )            (   (
    (  ( /(   (  ( /(      (     )\\ ))\\ )
    )\\ )\\())  )\\ )\\())     )\\   (()/(()/( 
