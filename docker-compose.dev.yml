@@ -1,0 +1,150 @@
+# Local development stack with hot-reload.
+#
+#   bun run docker:dev          # foreground, streams logs
+#   bun run docker:dev:build    # rebuild base image first
+#   bun run docker:dev:down     # stop containers
+#   bun run docker:dev:clean    # stop AND wipe volumes (full reset)
+#
+# What this does:
+#  - Starts Postgres 16 + Mongo 7 with healthchecks.
+#  - One-shot `migrate` service: bun install → prisma generate → db push → seed.
+#    Runs to completion before the backend starts. Re-runs on every `up` but
+#    bun + prisma + the seed are all idempotent.
+#  - Backend service: bind-mounts the host source at /app, runs `node --watch
+#    index.js`. File changes on the host hot-reload the server.
+#  - Named volumes for: pgdata, mongodata, certs (auto-generated HTTPS),
+#    node_modules_dev (avoids overlaying the host's node_modules).
+name: cocoscheme-dev
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cocoscheme
+      POSTGRES_PASSWORD: cocoscheme_dev
+      POSTGRES_DB: CocoScheme
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cocoscheme -d CocoScheme"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cocoscheme
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cocoscheme
+
+  # One-shot: install deps into the shared volume, generate the Prisma client,
+  # apply the schema, and (only on first run) seed reference + dummy data.
+  #
+  # Seeding is gated on a sentinel file inside the node_modules_dev named volume
+  # so it persists across `up`/`down`/reboots. The seed inserts dummy Requests,
+  # Routes and Receipts via plain `create` (no idempotency check), so re-running
+  # it would duplicate them. To force a full re-seed run `bun run docker:dev:clean`
+  # which removes all volumes (including the sentinel and pgdata).
+  #
+  # IMPORTANT: env vars below are HARDCODED dev defaults. Compose's
+  # ${VAR:-default} substitution reads from the host .env file, which is
+  # gitignored and may contain placeholders. To override safely, edit this
+  # file directly or use a separate compose override file.
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deps
+    environment:
+      DATABASE_URL: postgresql://cocoscheme:cocoscheme_dev@postgres:5432/CocoScheme?schema=public
+      AES_SECRET_KEY: "12345678901234567890123456789012"
+      JWT_SECRET: dev_jwt_secret_change_me
+    volumes:
+      - ./:/app
+      - node_modules_dev:/app/node_modules
+    command: >
+      sh -c "bun install &&
+             bunx prisma generate &&
+             bunx prisma db push --accept-data-loss &&
+             if [ ! -f /app/node_modules/.seeded ]; then
+               echo '[migrate] First run — seeding dummy data...' &&
+               node prisma/seed.js dev &&
+               touch /app/node_modules/.seeded;
+             else
+               echo '[migrate] Seed sentinel found — skipping seed (use docker:dev:clean for a full reset).';
+             fi"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cocoscheme
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deps
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      DATABASE_URL: postgresql://cocoscheme:cocoscheme_dev@postgres:5432/CocoScheme?schema=public
+      MONGO_URI: mongodb://mongo:27017
+      CORS_ORIGIN: http://localhost:4321,https://localhost:4321
+      AES_SECRET_KEY: "12345678901234567890123456789012"
+      JWT_SECRET: dev_jwt_secret_change_me
+      MAIL_USER: test.mail@outlook.com
+      MAIL_PASSWORD: changeme
+    ports:
+      - "3000:3000"
+    volumes:
+      # Bind-mount source for hot reload (node --watch picks up file changes).
+      - ./:/app
+      # Override host node_modules with a clean linux build inside the container.
+      - node_modules_dev:/app/node_modules
+      # Persist auto-generated HTTPS certs across restarts.
+      - certs:/app/certs
+    # On first start /app/certs (named volume) is empty. Generate certs in place
+    # using the baked-in script + openssl.cnf template. create_certs.sh uses
+    # relative paths so we cd in first.
+    command: >
+      sh -c "if [ ! -f /app/certs/server.crt ]; then
+               cp /opt/openssl.cnf.template /app/certs/openssl.cnf &&
+               cp /opt/create_certs.sh /app/certs/create_certs.sh &&
+               chmod +x /app/certs/create_certs.sh &&
+               cd /app/certs && ./create_certs.sh && cd /app;
+             fi &&
+             node --watch index.js"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - cocoscheme
+
+volumes:
+  pgdata:
+  mongodata:
+  certs:
+  node_modules_dev:
+
+networks:
+  cocoscheme:
+    driver: bridge

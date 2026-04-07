@@ -1,0 +1,76 @@
+# Release stack: pulls the published backend image from GHCR and runs it
+# alongside Postgres + Mongo. End-users grab this file and run:
+#
+#   curl -O https://raw.githubusercontent.com/coconsulting2/TC3005B.501-Backend/main/docker-compose.yml
+#   docker compose up -d
+#
+# Override secrets via a sibling .env file (AES_SECRET_KEY, JWT_SECRET, mail creds).
+name: cocoscheme
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: cocoscheme
+      POSTGRES_PASSWORD: cocoscheme_dev
+      POSTGRES_DB: CocoScheme
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cocoscheme -d CocoScheme"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - cocoscheme
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - cocoscheme
+
+  backend:
+    image: ghcr.io/coconsulting2/tc3005b-501-backend:latest
+    pull_policy: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgresql://cocoscheme:cocoscheme_dev@postgres:5432/CocoScheme?schema=public
+      MONGO_URI: mongodb://mongo:27017
+      CORS_ORIGIN: http://localhost:4321,https://localhost:4321
+      AES_SECRET_KEY: ${AES_SECRET_KEY:-12345678901234567890123456789012}
+      JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_me}
+      MAIL_USER: ${MAIL_USER:-test.mail@outlook.com}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-changeme}
+      RUN_MIGRATIONS: "true"
+      SEED_DUMMY_DATA: "true"
+    volumes:
+      - certs:/app/certs
+    ports:
+      - "3000:3000"
+    networks:
+      - cocoscheme
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  mongodata:
+  certs:
+
+networks:
+  cocoscheme:
+    driver: bridge
