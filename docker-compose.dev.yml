@@ -39,6 +39,8 @@ services:
   mongo:
     image: mongo:7
     restart: unless-stopped
+    # GridFS-only — we don't tail mongo logs while developing the API.
+    command: ["mongod", "--quiet", "--logpath", "/dev/null"]
     ports:
       - "27017:27017"
     volumes:
@@ -48,6 +50,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    # Drop docker's log collection too so `docker compose logs -f` stays focused
+    # on the backend instead of being drowned in connection-open/close noise.
+    logging:
+      driver: none
     networks:
       - cocoscheme
 
@@ -121,8 +127,14 @@ services:
     # On first start /app/certs (named volume) is empty. Generate certs in place
     # using the baked-in script + openssl.cnf template. create_certs.sh uses
     # relative paths so we cd in first.
+    #
+    # Check for all three required cert files — a previous half-failed run can
+    # leave server.crt without server.key (or vice versa) and we want to
+    # regenerate from scratch in that case rather than skip and crash on read.
     command: >
-      sh -c "if [ ! -f /app/certs/server.crt ]; then
+      sh -c "if [ ! -f /app/certs/server.crt ] || [ ! -f /app/certs/server.key ] || [ ! -f /app/certs/ca.crt ]; then
+               echo '[dev] HTTPS certs missing or incomplete - regenerating...' &&
+               rm -f /app/certs/server.crt /app/certs/server.key /app/certs/ca.crt /app/certs/ca.key /app/certs/server.csr /app/certs/ca.srl &&
                cp /opt/openssl.cnf.template /app/certs/openssl.cnf &&
                cp /opt/create_certs.sh /app/certs/create_certs.sh &&
                chmod +x /app/certs/create_certs.sh &&

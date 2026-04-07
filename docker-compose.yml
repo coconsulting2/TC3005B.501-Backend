@@ -27,6 +27,7 @@ services:
 
   mongo:
     image: mongo:7
+    command: ["mongod", "--quiet", "--logpath", "/dev/null"]
     volumes:
       - mongodata:/data/db
     healthcheck:
@@ -35,6 +36,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    logging:
+      driver: none
     networks:
       - cocoscheme
 
