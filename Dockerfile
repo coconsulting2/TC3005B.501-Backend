@@ -33,7 +33,8 @@ COPY certs/create_certs.sh /opt/create_certs.sh
 # Strip CR in case the host repo was cloned on Windows with core.autocrlf=true.
 # Without this, the script silently writes filenames like `server.key\r` and the
 # server then fails with ENOENT on `server.key`.
-RUN sed -i 's/\r$//' /opt/create_certs.sh /opt/openssl.cnf.template \
+RUN tr -d '\r' < /opt/create_certs.sh > /opt/create_certs.tmp && mv /opt/create_certs.tmp /opt/create_certs.sh \
+    && tr -d '\r' < /opt/openssl.cnf.template > /opt/openssl.cnf.tmp && mv /opt/openssl.cnf.tmp /opt/openssl.cnf.template \
     && chmod +x /opt/create_certs.sh
 
 # ============================================================
@@ -65,7 +66,7 @@ COPY . .
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN cp /opt/create_certs.sh /app/certs/create_certs.sh \
     && cp /opt/openssl.cnf.template /app/certs/openssl.cnf \
-    && sed -i 's/\r$//' /usr/local/bin/entrypoint.sh \
+    && tr -d '\r' < /usr/local/bin/entrypoint.sh > /usr/local/bin/entrypoint.tmp && mv /usr/local/bin/entrypoint.tmp /usr/local/bin/entrypoint.sh \
     && chmod +x /usr/local/bin/entrypoint.sh /app/certs/create_certs.sh
 
 EXPOSE 3000
