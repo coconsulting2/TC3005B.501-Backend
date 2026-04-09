@@ -4,7 +4,7 @@
  */
 import { ObjectId } from "mongodb";
 import sanitize from "mongo-sanitize";
-import { uploadReceiptFiles, getReceiptFile, getReceiptFilesMetadata } from "../services/receiptFileService.js";
+import { uploadReceiptFiles, getReceiptFile, getReceiptFilesMetadata, CfdiParseError } from "../services/receiptFileService.js";
 import { db } from "../services/fileStorage.js";
 import { upload, getPresignedUrl } from "../services/storageService.js";
 
@@ -40,9 +40,33 @@ export const uploadReceiptFilesController = async (req, res) => {
       xml: {
         fileId: result.xml.fileId,
         fileName: result.xml.fileName
-      }
+      },
+      cfdi: {
+        uuid: result.cfdi.uuid,
+        version: result.cfdi.version,
+        rfcEmisor: result.cfdi.rfcEmisor,
+        rfcReceptor: result.cfdi.rfcReceptor,
+        fecha: result.cfdi.fecha,
+        total: result.cfdi.total,
+        taxes: result.cfdi.taxes,
+      },
     });
   } catch (error) {
+    if (error instanceof CfdiParseError) {
+      return res.status(422).json({
+        error: "CFDI inválido",
+        code: error.code,
+        details: error.message,
+      });
+    }
+    if (error.code === "DUPLICATE_UUID") {
+      return res.status(409).json({
+        error: "CFDI duplicado",
+        code: "DUPLICATE_UUID",
+        details: error.message,
+        existingReceiptId: error.receiptId,
+      });
+    }
     console.error("Error uploading files:", error);
     res.status(500).json({ error: "Internal server error" });
   }
