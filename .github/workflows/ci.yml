@@ -36,6 +36,10 @@ jobs:
   prisma-validate:
     name: Prisma schema validate
     runs-on: ubuntu-latest
+    # The schema references env("DATABASE_URL"), so `prisma validate` needs
+    # the variable to be set even though it doesn't actually connect.
+    env:
+      DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder?schema=public
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -155,6 +159,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
+
+      # The repo uses bun.lock, not package-lock.json, so we generate a
+      # throwaway lockfile for npm audit to consume. --ignore-scripts keeps
+      # this fast and avoids running any install hooks.
+      - name: Generate throwaway package-lock.json
+        run: npm install --package-lock-only --ignore-scripts
 
       - name: Run npm audit (high severity and above)
         run: npx --yes better-npm-audit audit --level high --production
