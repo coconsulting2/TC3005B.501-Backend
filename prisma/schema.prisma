@@ -26,27 +26,27 @@ model Department {
 }
 
 model AlertMessage {
-  messageId   Int    @id @default(autoincrement()) @map("message_id")
-  messageText String @map("message_text") @db.VarChar(60)
+  messageId   Int     @id @default(autoincrement()) @map("message_id")
+  messageText String  @map("message_text") @db.VarChar(60)
   alerts      Alert[]
 
   @@map("AlertMessage")
 }
 
 model User {
-  userId       Int        @id @default(autoincrement()) @map("user_id")
-  roleId       Int?       @map("role_id")
-  departmentId Int?       @map("department_id")
-  userName     String     @unique @map("user_name") @db.VarChar(60)
-  password     String     @db.VarChar(60)
-  workstation  String     @db.VarChar(20)
-  email        String     @unique @db.VarChar(254)
-  phoneNumber  String?    @map("phone_number") @db.VarChar(254)
-  wallet       Float      @default(0.00)
-  creationDate DateTime   @default(now()) @map("creation_date")
-  lastModDate  DateTime   @default(now()) @updatedAt @map("last_mod_date")
-  active       Boolean    @default(true)
-  role         Role?      @relation(fields: [roleId], references: [roleId])
+  userId       Int         @id @default(autoincrement()) @map("user_id")
+  roleId       Int?        @map("role_id")
+  departmentId Int?        @map("department_id")
+  userName     String      @unique @map("user_name") @db.VarChar(60)
+  password     String      @db.VarChar(60)
+  workstation  String      @db.VarChar(20)
+  email        String      @unique @db.VarChar(254)
+  phoneNumber  String?     @map("phone_number") @db.VarChar(254)
+  wallet       Float       @default(0.00)
+  creationDate DateTime    @default(now()) @map("creation_date")
+  lastModDate  DateTime    @default(now()) @updatedAt @map("last_mod_date")
+  active       Boolean     @default(true)
+  role         Role?       @relation(fields: [roleId], references: [roleId])
   department   Department? @relation(fields: [departmentId], references: [departmentId])
   requests     Request[]
 
@@ -62,18 +62,18 @@ model RequestStatus {
 }
 
 model Request {
-  requestId       Int           @id @default(autoincrement()) @map("request_id")
-  userId          Int?          @map("user_id")
-  requestStatusId Int           @default(1) @map("request_status_id")
-  notes           String?       @db.Text
-  requestedFee    Float?        @map("requested_fee")
-  imposedFee      Float?        @map("imposed_fee")
-  requestDays     Float?        @map("request_days")
-  creationDate    DateTime      @default(now()) @map("creation_date")
-  lastModDate     DateTime      @default(now()) @updatedAt @map("last_mod_date")
-  active          Boolean       @default(true)
-  user            User?         @relation(fields: [userId], references: [userId])
-  requestStatus   RequestStatus @relation(fields: [requestStatusId], references: [requestStatusId])
+  requestId       Int            @id @default(autoincrement()) @map("request_id")
+  userId          Int?           @map("user_id")
+  requestStatusId Int            @default(1) @map("request_status_id")
+  notes           String?        @db.Text
+  requestedFee    Float?         @map("requested_fee")
+  imposedFee      Float?         @map("imposed_fee")
+  requestDays     Float?         @map("request_days")
+  creationDate    DateTime       @default(now()) @map("creation_date")
+  lastModDate     DateTime       @default(now()) @updatedAt @map("last_mod_date")
+  active          Boolean        @default(true)
+  user            User?          @relation(fields: [userId], references: [userId])
+  requestStatus   RequestStatus  @relation(fields: [requestStatusId], references: [requestStatusId])
   alerts          Alert[]
   routeRequests   RouteRequest[]
   receipts        Receipt[]
@@ -111,22 +111,22 @@ model City {
 }
 
 model Route {
-  routeId              Int       @id @default(autoincrement()) @map("route_id")
-  idOriginCountry      Int?      @map("id_origin_country")
-  idOriginCity         Int?      @map("id_origin_city")
-  idDestinationCountry Int?      @map("id_destination_country")
-  idDestinationCity    Int?      @map("id_destination_city")
-  routerIndex          Int?      @map("router_index")
-  planeNeeded          Boolean   @default(false) @map("plane_needed")
-  hotelNeeded          Boolean   @default(false) @map("hotel_needed")
-  beginningDate        DateTime? @map("beginning_date") @db.Date
-  beginningTime        DateTime? @map("beginning_time") @db.Time(6)
-  endingDate           DateTime? @map("ending_date") @db.Date
-  endingTime           DateTime? @map("ending_time") @db.Time(6)
-  originCountry        Country?  @relation("OriginCountry", fields: [idOriginCountry], references: [countryId])
-  originCity           City?     @relation("OriginCity", fields: [idOriginCity], references: [cityId])
-  destinationCountry   Country?  @relation("DestinationCountry", fields: [idDestinationCountry], references: [countryId])
-  destinationCity      City?     @relation("DestinationCity", fields: [idDestinationCity], references: [cityId])
+  routeId              Int            @id @default(autoincrement()) @map("route_id")
+  idOriginCountry      Int?           @map("id_origin_country")
+  idOriginCity         Int?           @map("id_origin_city")
+  idDestinationCountry Int?           @map("id_destination_country")
+  idDestinationCity    Int?           @map("id_destination_city")
+  routerIndex          Int?           @map("router_index")
+  planeNeeded          Boolean        @default(false) @map("plane_needed")
+  hotelNeeded          Boolean        @default(false) @map("hotel_needed")
+  beginningDate        DateTime?      @map("beginning_date") @db.Date
+  beginningTime        DateTime?      @map("beginning_time") @db.Time(6)
+  endingDate           DateTime?      @map("ending_date") @db.Date
+  endingTime           DateTime?      @map("ending_time") @db.Time(6)
+  originCountry        Country?       @relation("OriginCountry", fields: [idOriginCountry], references: [countryId])
+  originCity           City?          @relation("OriginCity", fields: [idOriginCity], references: [cityId])
+  destinationCountry   Country?       @relation("DestinationCountry", fields: [idDestinationCountry], references: [countryId])
+  destinationCity      City?          @relation("DestinationCity", fields: [idDestinationCity], references: [cityId])
   routeRequests        RouteRequest[]
 
   @@map("Route")
