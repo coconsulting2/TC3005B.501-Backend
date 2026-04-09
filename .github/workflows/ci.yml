@@ -7,8 +7,39 @@ on:
     branches: [main, development]
     types: [opened, reopened, synchronize]
 
+# Cancel in-flight runs on the same ref when a new commit is pushed.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  typecheck:
+    name: TypeScript check (astro check)
+    runs-on: ubuntu-latest
+    # NOTE: This is non-blocking on purpose. The current codebase has
+    # pre-existing `astro check` errors (see the chore/front/ci-pipeline PR
+    # description for details). Once those are fixed, remove this line so
+    # the job is required to pass before merging.
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+        run: bun install --frozen-lockfile
+
+      - name: Run astro check
+        run: bun run typecheck
+
   build:
+    name: Build (astro build)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -29,3 +60,35 @@ jobs:
           PUBLIC_API_BASE_URL: https://localhost:3000/api
           PUBLIC_IS_DEV: 'false'
         run: bun run build
+
+      - name: Upload build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    # Advisory only — surfaces upstream CVEs without blocking merges.
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The repo uses bun.lock, not package-lock.json, so we generate a
+      # throwaway lockfile for npm audit to consume. --ignore-scripts keeps
+      # this fast and avoids running any install hooks.
+      - name: Generate throwaway package-lock.json
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Run npm audit (high severity and above)
+        run: npx --yes better-npm-audit audit --level high --production

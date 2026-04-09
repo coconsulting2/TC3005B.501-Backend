@@ -8,6 +8,7 @@
     "preview": "astro preview",
     "start": "node ./dist/server/entry.mjs",
     "astro": "astro",
+    "typecheck": "astro check",
     "docker:dev": "docker compose -f docker-compose.dev.yml up",
     "docker:dev:build": "docker compose -f docker-compose.dev.yml up --build",
     "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
@@ -24,12 +25,14 @@
     "tailwindcss": "^4.1.1"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.8",
     "@astrojs/node": "^9.2.2",
     "@tailwindcss/typography": "^0.5.16",
     "@vitejs/plugin-basic-ssl": "^2.0.0",
     "cypress": "^14.4.1",
     "cypress-file-upload": "^5.0.8",
     "dotenv": "^16.5.0",
+    "typescript": "^5.9.0",
     "vite-plugin-svgr": "^4.3.0"
   }
 }
