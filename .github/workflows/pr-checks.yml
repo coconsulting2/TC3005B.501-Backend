@@ -1,0 +1,62 @@
+name: PR Conventions
+
+# Enforces the branch naming and commit message conventions documented in
+# cocowiki/docs/estiloCodigo-documentacion.md. Keep this workflow aligned
+# with the wiki — if the rules change, update both.
+
+on:
+  pull_request:
+    types: [opened, reopened, edited, synchronize]
+    branches: [main, development]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  branch-name:
+    name: Branch name format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate head branch name
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          # Expected format: tipo/area/descripcion-corta
+          # tipo ∈ {feat,fix,hotfix,refactor,docs,test,chore}
+          # area ∈ {back,front,qa,docs,full}
+          # descripcion-corta: lowercase letters, digits and dashes only.
+          pattern='^(feat|fix|hotfix|refactor|docs|test|chore)/(back|front|qa|docs|full)/[a-z0-9]+(-[a-z0-9]+)*$'
+          echo "Head branch: $HEAD_REF"
+          if [[ ! "$HEAD_REF" =~ $pattern ]]; then
+            echo "::error::Branch name '$HEAD_REF' does not match the cocowiki convention."
+            echo "::error::Expected: tipo/area/descripcion-corta"
+            echo "::error::tipo ∈ feat|fix|hotfix|refactor|docs|test|chore"
+            echo "::error::area ∈ back|front|qa|docs|full"
+            echo "::error::See cocowiki/docs/estiloCodigo-documentacion.md"
+            exit 1
+          fi
+          echo "Branch name OK."
+
+  pr-title:
+    name: PR title (Conventional Commits)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # Conventional Commits subset used by the team.
+          # Optional scope in parentheses is allowed: feat(auth): ...
+          pattern='^(feat|fix|hotfix|refactor|docs|test|chore|style)(\([a-z0-9-]+\))?!?: .+'
+          echo "PR title: $PR_TITLE"
+          if [[ ! "$PR_TITLE" =~ $pattern ]]; then
+            echo "::error::PR title '$PR_TITLE' does not follow Conventional Commits."
+            echo "::error::Expected: 'type: short description in English imperative'"
+            echo "::error::Allowed types: feat, fix, hotfix, refactor, docs, test, chore, style"
+            echo "::error::Examples:"
+            echo "::error::  feat: add audit log service"
+            echo "::error::  fix(auth): prevent token reuse after logout"
+            exit 1
+          fi
+          echo "PR title OK."
