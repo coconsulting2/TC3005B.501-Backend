@@ -2,20 +2,46 @@
  * @module receiptFileService
  * @description Handles receipt file operations: uploading, retrieving, and deleting
  * PDF and XML files in MongoDB GridFS, with metadata stored in PostgreSQL via Prisma.
+ * Validates and parses CFDI XML before storage, checking UUID uniqueness.
  */
 import { ObjectId } from "mongodb";
 import { uploadFile, getFile, db, bucket } from "./fileStorage.js";
 import prisma from "../database/config/prisma.js";
+import { parseCFDI, CfdiParseError } from "./cfdiParserService.js";
+import CfdiModel from "../models/cfdiModel.js";
+
+export { CfdiParseError };
 
 /**
- * Uploads a PDF and XML file pair for a receipt to MongoDB GridFS,
- * then updates the receipt record in PostgreSQL with the resulting file IDs.
+ * Uploads a PDF and XML file pair for a receipt to MongoDB GridFS.
+ * Validates and parses the CFDI XML before uploading: rejects invalid structure
+ * and duplicate UUIDs. On success, stores file IDs and CFDI metadata in PostgreSQL.
+ *
  * @param {number} receiptId - ID of the receipt to associate files with
  * @param {Express.Multer.File} pdfFile - Multer file object for the PDF
  * @param {Express.Multer.File} xmlFile - Multer file object for the XML
- * @returns {Promise<{pdf: {fileId: string, fileName: string}, xml: {fileId: string, fileName: string}}>}
+ * @returns {Promise<{
+ *   pdf: {fileId: string, fileName: string},
+ *   xml: {fileId: string, fileName: string},
+ *   cfdi: {version: string, rfcEmisor: string, rfcReceptor: string|null, fecha: Date, total: number, uuid: string, taxes: Object}
+ * }>}
+ * @throws {CfdiParseError} If the XML does not comply with SAT CFDI structure
+ * @throws {Error} With code 'DUPLICATE_UUID' if the UUID already exists in the database
  */
 export async function uploadReceiptFiles(receiptId, pdfFile, xmlFile) {
+  const xmlContent = xmlFile.buffer.toString("utf-8");
+  const cfdiData = parseCFDI(xmlContent);
+
+  const existing = await CfdiModel.findByCfdiUuid(cfdiData.uuid);
+  if (existing) {
+    const err = new Error(
+      `El CFDI con UUID ${cfdiData.uuid} ya está registrado en el comprobante #${existing.receiptId}`
+    );
+    err.code = "DUPLICATE_UUID";
+    err.receiptId = existing.receiptId;
+    throw err;
+  }
+
   try {
     const pdfResult = await uploadFile(
       pdfFile.buffer,
@@ -41,7 +67,9 @@ export async function uploadReceiptFiles(receiptId, pdfFile, xmlFile) {
       },
     });
 
-    return { pdf: pdfResult, xml: xmlResult };
+    await CfdiModel.saveCfdiMetadata(receiptId, cfdiData);
+
+    return { pdf: pdfResult, xml: xmlResult, cfdi: cfdiData };
   } catch (error) {
     console.error("Error uploading receipt files:", error);
     throw error;
