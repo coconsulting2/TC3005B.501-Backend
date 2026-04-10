@@ -13,6 +13,7 @@ dotenv.config();
 const mongoUrl = process.env.MONGO_URI || "mongodb://localhost:27017";
 const dbName = "fileStorage";
 
+let client;
 let db;
 let bucket;
 
@@ -23,15 +24,40 @@ let bucket;
  */
 async function connectMongo() {
   try {
-    const client = await MongoClient.connect(mongoUrl);
+    if (client) return {db, bucket};
+
+    client = await MongoClient.connect(mongoUrl, {connectTimeoutMS: 5_000, serverSelectionTimeoutMS: 5_000});
     db = client.db(dbName);
     bucket = new GridFSBucket(db);
-    console.log("Connected to MongoDB for file storage");
+    console.log("Connected to MongoDB for file storage"); // eslint-disable-line no-console
     return { db, bucket };
   } catch (error) {
-    console.error("MongoDB connection error:", error);
-    throw error;
+    throw new Error(`MongoDB connection error\n${error.message}`);
   }
+}
+
+/**
+ * Basic db reset for testing environment.
+ */
+async function resetMongo() {
+  if (process.env.NODE_ENV !== "test") throw new Error("Call outside testing environment.");
+  if (!db) throw Error("Mongo not connected");
+
+  const collections = await db.collections();
+  await Promise.all(collections.map((c) => c.deleteMany({})));
+}
+
+/**
+ * Disconnects from mongo db.
+ */
+async function disconnectMongo() {
+    if (!client) return;
+
+    await client.close();
+    client = undefined;
+    db = undefined;
+    bucket = undefined;
+    console.log("Successfully disconnected from MongoDB.");  // eslint-disable-line no-console
 }
 
 /**
@@ -85,4 +111,4 @@ async function getFile(fileId) {
   return bucket.openDownloadStream(fileId);
 }
 
-export { connectMongo, uploadFile, getFile, db, bucket };
+export { connectMongo, disconnectMongo, resetMongo, uploadFile, getFile, db, bucket };
