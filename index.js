@@ -14,6 +14,7 @@ import travelAgentRoutes from "./routes/travelAgentRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import accountsPayableRoutes from "./routes/accountsPayableRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js";
+import comprobantesRoutes from "./routes/comprobantesRoutes.js";
 
 import { connectMongo } from "./services/fileStorage.js";
 import { handleAuthError } from "./middleware/authErrors.js";
@@ -48,6 +49,7 @@ app.use("/api/travel-agent", travelAgentRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/accounts-payable", accountsPayableRoutes);
 app.use("/api/files", fileRoutes);
+app.use("/api/comprobantes", comprobantesRoutes);
 
 connectMongo().catch(error => console.error("Failed to connect to MongoDB:", error));
 prisma.$connect()
