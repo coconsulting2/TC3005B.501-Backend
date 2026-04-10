@@ -1,76 +1,67 @@
 ---
 /**
 * Authors: Eduardo Porto Morales
-* Description: This is the draft request component. It displays the user's requests and allows them to edit or delete them.
-**/
+* Updated: Editorial Finance design system
+*/
 
 import MaterialIcon from "@/components/MaterialIcon.astro";
-import TextHeader from "@components/TextHeader.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
 import CancelRequestModal from "@components/CancelRequestModal.tsx";
 import { getCookie } from "@data/cookies";
 
 var { userName, requests } = Astro.props;
 const filteredRequests = requests.filter((request: { status: string; }) => request.status === "Borrador");
-requests= filteredRequests;
-
+requests = filteredRequests;
 ---
 
 <div>
   <main>
-    <TextHeader
-      title={`DRAFT DE VIAJES DE ${userName.toUpperCase()}`}
-      subtitle="Aquí puedes ver los draft de solicitudes por completar"
+    <EditorialHeader
+      eyebrow="Coco / Borradores"
+      title="Solicitudes en borrador"
+      subtitle={`${userName} — Borradores pendientes de completar`}
     />
-    
-    <section class="bg-white p-6 rounded-lg shadow w-full">
-      {requests.length > 0 ? (
-        <div class="grid gap-4">
-          {requests.map((request: any) => {
-            return (
-              <div class="grid grid-cols-[1fr_auto] gap-6 items-center">
-                <a href={`/completar-draft/${request.request_id}`} class="block">
-                  <div class="space-y-2 content-wrapper">
-                    <p class="font-bold text-lg break-words">#{request.request_id}</p>
-                    <div class="text-sm text-gray-700 grid grid-cols-[1fr_2fr] gap-y-1">
-                      <p><span class="font-semibold">País Destino:</span> {request.destination_country === 'notSelected' ? 'NO SELECCIONADO' : request.destination_country}</p>
-                      <p><span class="font-semibold">Fechas:</span> {request.beginning_date === "1900-01-01" ? 'NO DETERMINADA' : `${request.beginning_date} - ${request.ending_date}`}</p>
-                      <p>
-                        <span class="font-semibold">Estado:</span> 
-                        <span class={`ml-1 font-semibold text-gray-500`}>
-                          {request.status.toUpperCase()}
-                        </span>
-                      </p>
-                      <p><span class="font-semibold">Responsable:</span> Eduardo Porto Morales</p>
-                    </div>
-                  </div>
-                </a>
-                <div class="flex justify-end items-center h-full p-2">
-                  <span class="flex items-center justify-center w-6 h-6">                        
-                    <CancelRequestModal
-                        client:only="react"
-                        id={request.request_id}
-                        disabled={false}
-                        token={getCookie("token", Astro.cookies)}
-                      >
-                        <div>
-                          <MaterialIcon
-                            icon="delete"
-                            color="black"
-                            style="cursor: pointer"
-                          />
-                        </div>
-                      </CancelRequestModal>
-                  </span>
+
+    {requests.length > 0 ? (
+      <section class="card-editorial overflow-hidden">
+        {requests.map((request: any, index: number) => {
+          const isLast = index === requests.length - 1;
+          return (
+            <div class={`px-6 py-4 flex items-center justify-between gap-4 ${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''} hover:bg-[var(--color-surface-secondary)] transition-colors`}>
+              <a href={`/completar-draft/${request.request_id}`} class="flex items-center gap-4 flex-1 min-w-0">
+                <span class="font-editorial text-lg text-[var(--color-ink-muted)] tabular-nums w-6 text-right">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <div class="flex-1 min-w-0">
+                  <p class="font-medium text-[var(--color-ink)] truncate">
+                    #{request.request_id} &middot; {request.destination_country === 'notSelected' ? 'Destino pendiente' : request.destination_country}
+                  </p>
+                  <p class="text-xs text-[var(--color-ink-muted)] mt-0.5">
+                    {request.beginning_date === "1900-01-01" ? 'Fechas pendientes' : `${request.beginning_date} — ${request.ending_date}`}
+                  </p>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div class="bg-gray-100 p-6 rounded-lg shadow w-full text-center text-gray-500 font-semibold">
-          NO TIENES DRAFTS DE SOLICITUDES
-        </div>
-      )}
-    </section>
+              </a>
+
+              <span class="status-pill status-pill--review">Borrador</span>
+
+              <CancelRequestModal
+                client:only="react"
+                id={request.request_id}
+                disabled={false}
+                token={getCookie("token", Astro.cookies)}
+              >
+                <div class="p-1.5 rounded-[var(--radius-md)] text-[var(--color-ink-muted)] hover:bg-accent-50 hover:text-accent-400 transition-colors cursor-pointer">
+                  <MaterialIcon icon="delete" color="currentColor" />
+                </div>
+              </CancelRequestModal>
+            </div>
+          );
+        })}
+      </section>
+    ) : (
+      <div class="card-editorial py-16 text-center">
+        <p class="text-[var(--color-ink-muted)]">No tienes borradores de solicitudes</p>
+      </div>
+    )}
   </main>
 </div>

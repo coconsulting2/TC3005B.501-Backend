@@ -1,0 +1,25 @@
+---
+/**
+ * Editorial list row with 1px separator.
+ * Used for request lists, history, and approval queues.
+ *
+ * @param href - Optional link destination
+ * @param isLast - Omit bottom border on last item
+ */
+
+interface Props {
+  href?: string;
+  isLast?: boolean;
+}
+
+const { href, isLast = false } = Astro.props;
+const Tag = href ? 'a' : 'div';
+const borderClass = isLast ? '' : 'border-b border-[var(--color-neutral-200)]';
+---
+
+<Tag
+  href={href}
+  class={`block py-4 px-1 ${borderClass} transition-colors duration-150 ${href ? 'hover:bg-[var(--color-surface-secondary)] cursor-pointer' : ''}`}
+>
+  <slot />
+</Tag>

@@ -1,5 +1,5 @@
 ---
-import '@styles/global.css' 
+import '@styles/global.css'
 
 interface Props {
   title: string;
@@ -8,15 +8,19 @@ interface Props {
 const { title } = Astro.props;
 ---
 <!doctype html>
-<html lang="en">
+<html lang="es">
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 		<meta name="generator" content={Astro.generator} />
+		<!-- Editorial fonts: Fraunces (serif) + Inter (sans) -->
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 		<title>{title}</title>
 	</head>
-	<body>
+	<body class="bg-[var(--color-surface)]">
 		<slot />
 	</body>
 </html>

@@ -3,7 +3,7 @@
  * Author: Nicole Dávila Hernández and Julia Maria Stephanie Duenkelsbuehler Castillo
  * Description: This is the edit user page where an existing user's details can be modified.
  */
-import TextHeader from '@components/TextHeader.astro';
+import EditorialHeader from '@components/EditorialHeader.astro';
 import MainLayout from "@layouts/MainLayout.astro";
 import AdminUserForm from "@/components/AdminUserForm";
 import { getCookie } from "@data/cookies";
@@ -28,9 +28,10 @@ try {
 
 <MainLayout title="Editar Usuario" data={{ userName, buttonLabel, role }}>
   <div>
-    <TextHeader
-      title="EDITAR USUARIO"
-      subtitle="Modifique los campos necesarios y guarde los cambios de usuario"
+    <EditorialHeader
+      eyebrow="Coco / Administración / Editar"
+      title="Editar usuario"
+      subtitle="Modifique los campos necesarios y guarde los cambios."
     />
     <AdminUserForm
       client:only="react"

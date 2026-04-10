@@ -1,12 +1,12 @@
 ---
 /**
  * Author: Michael Devlyn
- *
- * Description: User porfile info page.
+ * Updated: Editorial Finance design system
  */
 
 import MainLayout from "@layouts/HeaderLayout.astro";
-import Typography from "@components/Typography.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
+import Button from "@components/Button.astro";
 
 import type { UserRole } from "@type/roles";
 import { getCookie } from "@data/cookies";
@@ -21,143 +21,73 @@ const userData = await apiRequest(`/user/get-user-data/${userId}`, { cookies: As
 ---
 
 <MainLayout title="Perfil de Usuario" data={{ userName, buttonLabel }}>
-    <div>
-        <div class="mb-8 flex items-center justify-between">
-            <Typography variant="header">Información General</Typography>
-            <a href="/dashboard" class="inline-block bg-blue-600 text-white font-semibold px-5 py-2 rounded-md shadow hover:bg-blue-700 transition-all duration-200">
-                ← Volver a Dashboard
-            </a>
+  <div>
+    <EditorialHeader
+      eyebrow="Coco / Perfil"
+      title="Información general"
+      subtitle={userName}
+    >
+      <a href="/dashboard">
+        <Button variant="border" color="primary" size="medium">
+          &larr; Volver al dashboard
+        </Button>
+      </a>
+    </EditorialHeader>
+
+    <!-- Personal Information -->
+    <section class="card-editorial p-6 mb-6">
+      <h2 class="font-editorial text-lg font-normal text-[var(--color-ink)] mb-5">
+        Información personal
+      </h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+        <div>
+          <p class="eyebrow mb-1">ID Empleado</p>
+          <p class="text-sm text-[var(--color-ink)]">{userData.user_id}</p>
         </div>
-
-        <!-- Personal Information Section -->
-        <div class="mb-8 bg-gray-100 rounded-lg p-6 shadow-sm">
-            <div class="flex justify-between mb-4">
-                <Typography variant="subHeader">Información Personal</Typography
-                >
-                <!--<Button variant="empty" color="primary">Editar</Button>-->
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <div class="mb-4">
-                        <Typography
-                            variant="paragraph"
-                            size="small"
-                            class="text-neutral-500">ID Empleado</Typography
-                        >
-                        <Typography variant="paragraph"
-                            >{userData.user_id}</Typography
-                        >
-                    </div>
-                    <div class="mb-4">
-                        <Typography
-                            variant="paragraph"
-                            size="small"
-                            class="text-neutral-500">Nombre</Typography
-                        >
-                        <Typography variant="paragraph"
-                            >{userData.user_name}</Typography
-                        >
-                    </div>
-                    <div class="mb-4">
-                        <Typography
-                            variant="paragraph"
-                            size="small"
-                            class="text-neutral-500"
-                            >Correo Electrónico</Typography
-                        >
-                        <Typography variant="paragraph"
-                            >{userData.email}</Typography
-                        >
-                    </div>
-                    <div class="mb-4">
-                        <Typography
-                            variant="paragraph"
-                            size="small"
-                            class="text-neutral-500">Número</Typography
-                        >
-                        <Typography variant="paragraph"
-                            >{userData.phone_number}</Typography
-                        >
-                    </div>
-                </div>
-
-                <div>
-                    <div class="mb-4">
-                        <Typography
-                            variant="paragraph"
-                            size="small"
-                            class="text-neutral-500"
-                            >Creación de cuenta</Typography
-                        >
-                        <Typography variant="paragraph"
-                            >{
-                                new Date(
-                                    userData.creation_date,
-                                ).toLocaleDateString()
-                            }</Typography
-                        >
-                    </div>
-                    <div class="mb-4">
-                        <Typography
-                            variant="paragraph"
-                            size="small"
-                            class="text-neutral-500"
-                            >Centro de Costos</Typography
-                        >
-                        <Typography variant="paragraph"
-                            >{userData.costs_center}</Typography
-                        >
-                    </div>
-                    <div class="mb-4">
-                        <Typography
-                            variant="paragraph"
-                            size="small"
-                            class="text-neutral-500">Rol</Typography
-                        >
-                        <Typography variant="paragraph"
-                            >{userData.role_name}</Typography
-                        >
-                    </div>
-                </div>
-            </div>
+        <div>
+          <p class="eyebrow mb-1">Nombre</p>
+          <p class="text-sm text-[var(--color-ink)]">{userData.user_name}</p>
         </div>
-
-        <!-- Position Information Section -->
-        <div class="mb-8 bg-gray-100 rounded-lg p-6 shadow-sm">
-            <div class="flex justify-between mb-4">
-                <Typography variant="subHeader"
-                    >Información de Empleado</Typography
-                >
-                <!--<Button variant="empty" color="primary">Editar</Button>-->
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                    <div class="mb-4">
-                        <Typography
-                            variant="paragraph"
-                            size="small"
-                            class="text-neutral-500">Departamento</Typography
-                        >
-                        <Typography variant="paragraph"
-                            >{userData.department_name}</Typography
-                        >
-                    </div>
-                    <div class="mb-4">
-                        <Typography
-                            variant="paragraph"
-                            size="small"
-                            class="text-neutral-500"
-                            >Estación de trabajo</Typography
-                        >
-                        <Typography variant="paragraph"
-                            >{userData.workstation}</Typography
-                        >
-                    </div>
-                </div>
-            </div>
+        <div>
+          <p class="eyebrow mb-1">Correo electrónico</p>
+          <p class="text-sm text-[var(--color-ink)]">{userData.email}</p>
         </div>
-    </div>
+        <div>
+          <p class="eyebrow mb-1">Número</p>
+          <p class="text-sm text-[var(--color-ink)]">{userData.phone_number}</p>
+        </div>
+        <div>
+          <p class="eyebrow mb-1">Creación de cuenta</p>
+          <p class="text-sm text-[var(--color-ink)] tabular-nums">{new Date(userData.creation_date).toLocaleDateString()}</p>
+        </div>
+        <div>
+          <p class="eyebrow mb-1">Centro de costos</p>
+          <p class="text-sm text-[var(--color-ink)]">{userData.costs_center}</p>
+        </div>
+        <div>
+          <p class="eyebrow mb-1">Rol</p>
+          <span class="status-pill bg-primary-50 text-primary-500">{userData.role_name}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Position Information -->
+    <section class="card-editorial p-6">
+      <h2 class="font-editorial text-lg font-normal text-[var(--color-ink)] mb-5">
+        Información de empleado
+      </h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-5">
+        <div>
+          <p class="eyebrow mb-1">Departamento</p>
+          <p class="text-sm text-[var(--color-ink)]">{userData.department_name}</p>
+        </div>
+        <div>
+          <p class="eyebrow mb-1">Estación de trabajo</p>
+          <p class="text-sm text-[var(--color-ink)]">{userData.workstation}</p>
+        </div>
+      </div>
+    </section>
+  </div>
 </MainLayout>
-

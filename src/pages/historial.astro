@@ -1,39 +1,38 @@
 ---
 /**
  * Author: Hector Julian Zarate Ramirez
- * Description: This script is used to create a page that shows the history of requests made by the user.
- **/
+ * Updated: Editorial Finance design system
+ */
 
 import MainLayout from "@layouts/MainLayout.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
 import History from "@components/History.tsx";
-import TextHeader from "@components/TextHeader.astro";
 
 import type { UserRole } from "@type/roles";
 import { getCookie } from "@data/cookies";
 import { roleLabels } from "@config/role-labels";
+import { apiRequest } from "@/utils/apiClient";
 
 const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
 const userName = getCookie("username", Astro.cookies);
 const buttonLabel = roleLabels[role];
 
-import { apiRequest } from "@/utils/apiClient";
 const requests = await (async () => {
   try {
     return await apiRequest(`/applicant/get-completed-requests/${getCookie("id", Astro.cookies)}`, { cookies: Astro.cookies });
   } catch (error) {
     return [];
   }
-})()
+})();
 ---
 
 <MainLayout title="Historial" data={{ userName, buttonLabel, role }}>
-<div>
-  <TextHeader
-    title={`HISTORIAL DEL VIAJES DE ${ userName.toUpperCase() }`}
-    subtitle="Aquí puedes ver el historial de solicitudes realizadas"
-  />
-  <div class="items-center justify-center">
+  <div>
+    <EditorialHeader
+      eyebrow="Coco / Historial"
+      title="Historial de viajes"
+      subtitle={`${userName} — Solicitudes completadas`}
+    />
     <History client:only="react" data={requests} />
   </div>
-</div>
 </MainLayout>

@@ -1,12 +1,12 @@
 ---
 /**
-* Authors: Gabriel Muñoz Luna
-* Description: Muestra los recibos subidos a una solicitud especifica.
+* Authors: Gabriel Munoz Luna
+* Updated: Editorial Finance design system
 **/
 export const prerender = false;
 
 import MainLayout from "@layouts/MainLayout.astro";
-import TextHeader from "@components/TextHeader.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
 import AstroButton from "@components/Button.astro";
 import Button from "@components/Button.tsx";
 import { getCookie } from "@data/cookies";
@@ -15,7 +15,6 @@ import ValidateReceiptStatus from "@components/ValidateReceiptStatus.tsx";
 const userName = getCookie("username", Astro.cookies);
 const role = getCookie("role", Astro.cookies);
 const buttonLabel = role;
-
 
 import { apiRequest } from "@/utils/apiClient";
 
@@ -29,87 +28,84 @@ try {
   return Astro.redirect('/404');
 }
 
-const StateColors = {
-  'Aprobado': ' text-green-500',
-  'Rechazado': ' text-red-500',
-  'Pendiente': ' text-yellow-500'
+const StateColors: Record<string, string> = {
+  'Aprobado': 'status-pill--approved',
+  'Rechazado': 'status-pill--rejected',
+  'Pendiente': 'status-pill--pending',
 };
-
 ---
 
 <MainLayout title={`Comprobantes de la solicitud #${id}`} data={{ userName, role, buttonLabel }}>
   <main>
-    
-    <div class="flex justify-between items-center mb-4">
-      <TextHeader
-        title={`Lista de comprobantes de la solicitud #${id}`}
-        subtitle="Aquí puedes ver o subir tus comprobantes de gasto"
-      />
-      
+    <EditorialHeader
+      eyebrow={`Coco / Comprobantes / #${id}`}
+      title={`Comprobantes de la solicitud #${id}`}
+      subtitle="Comprobantes de gasto asociados"
+    >
       <a href={`/subir-comprobante/${id}`}>
         <AstroButton variant="filled" color="primary">
-          Agregar 
+          + Agregar comprobante
         </AstroButton>
       </a>
-    </div>
-    <section class="bg-white p-6 rounded-lg shadow w-full">
+    </EditorialHeader>
+
+    <section class="card-editorial overflow-hidden">
       {request.Expenses.length > 0 ? (
-        <div class="grid gap-8">
-          {request.Expenses.map((expense: any, index) => (
-            
-            <div class="border border-gray-200 rounded p-4 text-sm text-gray-700">
-              <div class="flex justify-between items-start w-full">
-                
-                <div class="space-y-1">
-                  <p class="font-bold text-lg break-words">Comprobante #{index + 1}</p>
-                  <p><span class="font-semibold">Id:</span> {expense.receipt_id}</p>
-                  <p><span class="font-semibold">Tipo de gasto:</span> {expense.receipt_type_name}</p>
-                  <p><span class="font-semibold">Monto:</span> ${expense.amount}</p>
+        <div>
+          {request.Expenses.map((expense: any, index: number) => {
+            const isLast = index === request.Expenses.length - 1;
+            return (
+              <div class={`px-6 py-5 flex items-center justify-between gap-4 ${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''}`}>
+                <div class="flex items-center gap-4 flex-1 min-w-0">
+                  <span class="font-editorial text-lg text-[var(--color-ink-muted)] tabular-nums w-6 text-right">
+                    {String(index + 1).padStart(2, '0')}
+                  </span>
+                  <div>
+                    <p class="font-medium text-[var(--color-ink)]">{expense.receipt_type_name}</p>
+                    <p class="text-xs text-[var(--color-ink-muted)] mt-0.5">ID: {expense.receipt_id}</p>
+                  </div>
                 </div>
 
-                <div class="flex flex-col items-end gap-1">
-                  <p class={`text-lg ${StateColors[expense.validation]} font-semibold`}>
-                    <span class="text-black">Estado:</span> {expense.validation}
-                  </p>
+                <span class="money-display text-lg text-[var(--color-ink)]">${expense.amount}</span>
+
+                <div class="flex items-center gap-3">
+                  <span class={`status-pill ${StateColors[expense.validation] || 'status-pill--review'}`}>
+                    {expense.validation}
+                  </span>
                   {expense.validation === 'Rechazado' && (
-                    <a href={`/resubir-comprobante/${id}?replace=${expense.receipt_id}`} class="mt-1">
-                      <AstroButton variant="border" color="warning">
-                        Volver a subir
+                    <a href={`/resubir-comprobante/${id}?replace=${expense.receipt_id}`}>
+                      <AstroButton variant="border" color="accent">
+                        Resubir
                       </AstroButton>
                     </a>
                   )}
                 </div>
-
-
               </div>
-          </div>
-
-          ))}
+            );
+          })}
         </div>
       ) : (
-        <div class="p-6 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 font-semibold rounded">
-          Aún no has subido comprobantes para esta solicitud.
+        <div class="p-8 text-center">
+          <p class="text-sm text-[var(--color-ink-muted)]">
+            Aún no has subido comprobantes para esta solicitud.
+          </p>
         </div>
       )}
     </section>
-    
-
-    </main>
+  </main>
 
   <div class="fixed bottom-6 right-6 z-50">
-    
     <ValidateReceiptStatus
-        client:only="react"
-        request_id={id}
-        title="Confirmar envío"
-        message="¿Está seguro de que desea mandar estos comprobantes?"
-        redirection="/dashboard"
-        modal_type="success"
-        variant="filled"
-        token={getCookie("token", Astro.cookies)}
-        >
-        Mandar a validar
-      </ValidateReceiptStatus>
-    
+      client:only="react"
+      request_id={id}
+      title="Confirmar envío"
+      message="¿Está seguro de que desea mandar estos comprobantes?"
+      redirection="/dashboard"
+      modal_type="success"
+      variant="filled"
+      token={getCookie("token", Astro.cookies)}
+    >
+      Mandar a validar
+    </ValidateReceiptStatus>
   </div>
 </MainLayout>

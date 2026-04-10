@@ -110,7 +110,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
 
       <div className="flex justify-end gap-4 pt-4">
         <a href={`/comprobar-solicitud/${requestId}`}>
-          <Button type="button" variant="border" color="warning">
+          <Button type="button" variant="border" color="danger">
             Cancelar
           </Button>
         </a>

@@ -5,7 +5,7 @@
  * Description: This is the creation page for a new, single user.
  */
 
-import TextHeader from '@components/TextHeader.astro';
+import EditorialHeader from '@components/EditorialHeader.astro';
 import MainLayout from "@layouts/MainLayout.astro";
 import AdminUserForm from "@/components/AdminUserForm";
 import { getCookie } from "@data/cookies";
@@ -19,9 +19,10 @@ const userName = getCookie("username", Astro.cookies);
 
 <MainLayout title="Crear Usuario" data={{ userName, buttonLabel, role }}>
   <div>
-    <TextHeader
-      title="CREAR NUEVO USUARIO"
-      subtitle="Complete el formulario con los datos del nuevo usuario"
+    <EditorialHeader
+      eyebrow="Coco / Administración / Nuevo"
+      title="Crear nuevo usuario"
+      subtitle="Complete el formulario con los datos del nuevo usuario."
     />
     <AdminUserForm
       mode="create"

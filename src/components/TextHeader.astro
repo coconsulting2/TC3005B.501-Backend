@@ -1,13 +1,16 @@
 ---
 /**
  * Author: Eduardo Porto Morales
- * 
- * Description: This component is used to display a 
- **/
+ * Updated: Editorial Finance design system
+ *
+ * Page title heading — serif headline with muted subtitle.
+ */
 const { title, subtitle } = Astro.props;
 ---
 
-<section class="mb-6">
-  <h1 class="text-4xl font-bold">{title}</h1>
-  <p class="text-xl font-semibold text-secondary-500">{subtitle}</p>
+<section class="mb-8">
+  <h1 class="font-editorial text-3xl font-normal text-[var(--color-ink)]">{title}</h1>
+  {subtitle && (
+    <p class="text-sm text-[var(--color-ink-muted)] mt-1">{subtitle}</p>
+  )}
 </section>

@@ -36,7 +36,7 @@ export default function RequestActions({
         Autorizar
       </Button>
 
-      <Button color="warning" size="medium" customSizeClass="w-full" onClick={() => handleClick("reject")}>
+      <Button color="danger" size="medium" customSizeClass="w-full" onClick={() => handleClick("reject")}>
         Rechazar
       </Button>
 

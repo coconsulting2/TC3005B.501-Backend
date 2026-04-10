@@ -2,53 +2,48 @@
  * Author: Leonardo Rodriguez
  *
  * Description:
- * Badge component for status indicators and labels.
- * Supports multiple color variants and sizes with design tokens.
- * Mobile-first responsive from 320px.
+ * Editorial status badge / pill component.
+ * Thin, uppercase, with letter-spacing — never saturated backgrounds.
  *
- * @param variant - Color variant (primary, secondary, success, warning, neutral)
+ * @param variant - Color variant (primary, accent, success, warning, neutral)
  * @param size - Badge size (small, medium, large)
- * @param rounded - Fully rounded pill shape (default: true)
  * @returns React Badge element
  */
 
-type BadgeVariant = "primary" | "secondary" | "success" | "warning" | "neutral";
+type BadgeVariant = "primary" | "accent" | "success" | "warning" | "neutral";
 type BadgeSize = "small" | "medium" | "large";
 
 interface BadgeProps {
   children: React.ReactNode;
   variant?: BadgeVariant;
   size?: BadgeSize;
-  rounded?: boolean;
   className?: string;
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
   primary: "bg-primary-50 text-primary-500 border-primary-200",
-  secondary: "bg-secondary-50 text-secondary-500 border-secondary-200",
-  success: "bg-green-100 text-green-800 border-green-300",
-  warning: "bg-red-100 text-red-800 border-red-300",
-  neutral: "bg-gray-100 text-gray-700 border-gray-300",
+  accent: "bg-accent-50 text-accent-400 border-accent-100",
+  success: "bg-success-50 text-success-500 border-success-100",
+  warning: "bg-warning-50 text-warning-500 border-warning-100",
+  neutral: "bg-neutral-100 text-neutral-500 border-neutral-200",
 };
 
 const sizeClasses: Record<BadgeSize, string> = {
-  small: "px-2 py-0.5 text-xs",
-  medium: "px-2.5 py-1 text-xs",
-  large: "px-3 py-1 text-sm",
+  small: "px-2 py-0.5 text-[0.625rem]",
+  medium: "px-2.5 py-0.5 text-[0.6875rem]",
+  large: "px-3 py-1 text-xs",
 };
 
 export default function Badge({
   children,
-  variant = "primary",
+  variant = "neutral",
   size = "medium",
-  rounded = true,
   className = "",
 }: BadgeProps) {
   const classes = [
-    "inline-flex items-center font-medium border",
+    "status-pill inline-flex items-center font-semibold border tracking-wide uppercase",
     variantClasses[variant],
     sizeClasses[size],
-    rounded ? "rounded-full" : "rounded-md",
     className,
   ].join(" ");
 

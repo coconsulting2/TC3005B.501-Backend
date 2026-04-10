@@ -2,17 +2,8 @@
  * Author: Leonardo Rodriguez
  *
  * Description:
- * React Select component with search/filter functionality.
- * Supports label, error, placeholder, keyboard navigation, and design tokens.
- * Mobile-first responsive from 320px.
- *
- * @param label - Optional label text
- * @param name - Select name attribute (required)
- * @param options - Array of { value, label } options
- * @param searchable - Enable search filtering (default: false)
- * @param error - Error message string
- * @param onChange - Callback when value changes
- * @returns React Select element
+ * Select component — editorial style with 1px borders, warm neutrals,
+ * search/filter, keyboard navigation.
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -80,15 +71,12 @@ export default function Select({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (disabled) return;
-
     switch (e.key) {
       case "Enter":
         e.preventDefault();
-        if (!isOpen) {
-          setIsOpen(true);
-        } else if (highlightIndex >= 0 && highlightIndex < filteredOptions.length) {
+        if (!isOpen) setIsOpen(true);
+        else if (highlightIndex >= 0 && highlightIndex < filteredOptions.length)
           handleSelect(filteredOptions[highlightIndex].value);
-        }
         break;
       case "Escape":
         setIsOpen(false);
@@ -96,27 +84,18 @@ export default function Select({
         break;
       case "ArrowDown":
         e.preventDefault();
-        if (!isOpen) {
-          setIsOpen(true);
-        } else {
-          setHighlightIndex((prev) =>
-            prev < filteredOptions.length - 1 ? prev + 1 : 0
-          );
-        }
+        if (!isOpen) setIsOpen(true);
+        else setHighlightIndex((prev) => prev < filteredOptions.length - 1 ? prev + 1 : 0);
         break;
       case "ArrowUp":
         e.preventDefault();
-        setHighlightIndex((prev) =>
-          prev > 0 ? prev - 1 : filteredOptions.length - 1
-        );
+        setHighlightIndex((prev) => prev > 0 ? prev - 1 : filteredOptions.length - 1);
         break;
     }
   };
 
   useEffect(() => {
-    if (isOpen && searchable && searchInputRef.current) {
-      searchInputRef.current.focus();
-    }
+    if (isOpen && searchable && searchInputRef.current) searchInputRef.current.focus();
   }, [isOpen, searchable]);
 
   useEffect(() => {
@@ -138,18 +117,19 @@ export default function Select({
   }, []);
 
   const triggerClasses = [
-    "flex items-center justify-between w-full px-3 py-2 border rounded-md shadow-sm text-sm",
-    "focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-500",
+    "flex items-center justify-between w-full px-3 py-2.5 border rounded-[var(--radius-md)] text-sm",
+    "bg-[var(--color-surface-white)] text-[var(--color-ink)]",
+    "focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400",
     "transition-colors duration-200",
-    error ? "border-warning-500" : "border-neutral-300",
-    disabled ? "bg-neutral-50 cursor-not-allowed opacity-60" : "bg-white cursor-pointer",
+    error ? "border-accent-400" : "border-[var(--color-neutral-300)]",
+    disabled ? "bg-[var(--color-neutral-100)] cursor-not-allowed opacity-60" : "cursor-pointer",
   ].join(" ");
 
   return (
     <div className="mb-4 w-full relative" ref={containerRef} onKeyDown={handleKeyDown}>
       {label && (
-        <label htmlFor={name} className="block text-sm font-medium mb-1 text-gray-700">
-          {label} {required && <span className="text-warning-500">*</span>}
+        <label htmlFor={name} className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">
+          {label} {required && <span className="text-accent-400">*</span>}
         </label>
       )}
 
@@ -166,11 +146,11 @@ export default function Select({
         aria-invalid={!!error}
         aria-describedby={error ? `${name}-error` : helperText ? `${name}-helper` : undefined}
       >
-        <span className={selectedOption ? "text-gray-900" : "text-neutral-400"}>
+        <span className={selectedOption ? "text-[var(--color-ink)]" : "text-[var(--color-ink-subtle)]"}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <svg
-          className={`w-4 h-4 text-neutral-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          className={`w-4 h-4 text-[var(--color-ink-muted)] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -180,13 +160,13 @@ export default function Select({
       </button>
 
       {isOpen && (
-        <div className="absolute z-40 w-full mt-1 bg-white border border-neutral-300 rounded-md shadow-lg max-h-60 overflow-hidden">
+        <div className="absolute z-40 w-full mt-1 bg-[var(--color-surface-white)] border border-[var(--color-neutral-200)] rounded-[var(--radius-md)] max-h-60 overflow-hidden shadow-[var(--shadow-md)]">
           {searchable && (
-            <div className="p-2 border-b border-neutral-200">
+            <div className="p-2 border-b border-[var(--color-neutral-200)]">
               <input
                 ref={searchInputRef}
                 type="text"
-                className="w-full px-2 py-1.5 text-sm border border-neutral-300 rounded focus:outline-none focus:ring-1 focus:ring-primary-300"
+                className="w-full px-2 py-1.5 text-sm border border-[var(--color-neutral-300)] rounded-[var(--radius-sm)] bg-[var(--color-surface)] focus:outline-none focus:ring-1 focus:ring-primary-200"
                 placeholder="Buscar..."
                 value={search}
                 onChange={(e) => {
@@ -196,13 +176,9 @@ export default function Select({
               />
             </div>
           )}
-          <ul
-            ref={listRef}
-            role="listbox"
-            className="max-h-48 overflow-y-auto"
-          >
+          <ul ref={listRef} role="listbox" className="max-h-48 overflow-y-auto">
             {filteredOptions.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-neutral-400">Sin resultados</li>
+              <li className="px-3 py-2 text-sm text-[var(--color-ink-muted)]">Sin resultados</li>
             ) : (
               filteredOptions.map((opt, idx) => (
                 <li
@@ -212,8 +188,8 @@ export default function Select({
                   className={[
                     "px-3 py-2 text-sm cursor-pointer transition-colors",
                     opt.value === value ? "bg-primary-50 text-primary-500 font-medium" : "",
-                    idx === highlightIndex ? "bg-primary-100 text-primary-500" : "",
-                    opt.value !== value && idx !== highlightIndex ? "hover:bg-gray-100" : "",
+                    idx === highlightIndex ? "bg-[var(--color-surface-secondary)]" : "",
+                    opt.value !== value && idx !== highlightIndex ? "hover:bg-[var(--color-surface-secondary)]" : "",
                   ].join(" ")}
                   onClick={() => handleSelect(opt.value)}
                 >
@@ -226,12 +202,12 @@ export default function Select({
       )}
 
       {error && (
-        <p id={`${name}-error`} className="pl-1 text-xs text-warning-500 mt-1" role="alert">
+        <p id={`${name}-error`} className="pl-1 text-xs text-accent-400 mt-1" role="alert">
           {error}
         </p>
       )}
       {!error && helperText && (
-        <p id={`${name}-helper`} className="pl-1 text-xs text-neutral-400 mt-1">
+        <p id={`${name}-helper`} className="pl-1 text-xs text-[var(--color-ink-muted)] mt-1">
           {helperText}
         </p>
       )}

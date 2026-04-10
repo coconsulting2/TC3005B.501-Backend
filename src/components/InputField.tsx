@@ -2,16 +2,7 @@
  * Author: Leonardo Rodriguez
  *
  * Description:
- * React InputField component for interactive Astro islands.
- * Supports label, error message, helper text, and all standard input types.
- * Uses design tokens for consistent styling.
- *
- * @param label - Optional label text
- * @param name - Input name attribute (required)
- * @param helperText - Optional helper text below input
- * @param error - Error message string
- * @param type - Input type (text, email, tel, url, password, number, date)
- * @returns React InputField element
+ * InputField component — editorial style with 1px borders, warm neutrals.
  */
 
 import { useState } from "react";
@@ -46,26 +37,26 @@ export default function InputField({
   const isControlled = value !== undefined;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!isControlled) {
-      setInternalValue(e.target.value);
-    }
+    if (!isControlled) setInternalValue(e.target.value);
     onChange?.(e);
   };
 
   const inputClasses = [
-    "block w-full px-3 py-2 border rounded-md shadow-sm text-sm",
-    "focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-500",
+    "block w-full px-3 py-2.5 border rounded-[var(--radius-md)] text-sm",
+    "bg-[var(--color-surface-white)] text-[var(--color-ink)]",
+    "placeholder:text-[var(--color-ink-subtle)]",
+    "focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400",
     "transition-colors duration-200",
-    error ? "border-warning-500" : "border-neutral-300",
-    disabled ? "bg-neutral-50 cursor-not-allowed opacity-60" : "bg-white",
+    error ? "border-accent-400" : "border-[var(--color-neutral-300)]",
+    disabled ? "bg-[var(--color-neutral-100)] cursor-not-allowed opacity-60" : "",
     className,
   ].join(" ");
 
   return (
     <div className="mb-4 w-full">
       {label && (
-        <label htmlFor={name} className="block text-sm font-medium mb-1 text-gray-700">
-          {label} {required && <span className="text-warning-500">*</span>}
+        <label htmlFor={name} className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">
+          {label} {required && <span className="text-accent-400">*</span>}
         </label>
       )}
       <input
@@ -84,12 +75,12 @@ export default function InputField({
         {...props}
       />
       {error && (
-        <p id={`${name}-error`} className="pl-1 text-xs text-warning-500 mt-1" role="alert">
+        <p id={`${name}-error`} className="pl-1 text-xs text-accent-400 mt-1" role="alert">
           {error}
         </p>
       )}
       {!error && helperText && (
-        <p id={`${name}-helper`} className="pl-1 text-xs text-neutral-400 mt-1">
+        <p id={`${name}-helper`} className="pl-1 text-xs text-[var(--color-ink-muted)] mt-1">
           {helperText}
         </p>
       )}

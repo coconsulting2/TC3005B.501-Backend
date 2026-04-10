@@ -2,41 +2,65 @@
 @plugin '@tailwindcss/typography';
 
 @theme {
-  /* Neutral */
-  --color-neutral-50: #D6D8DE;
-  --color-neutral-100: #CED1D7;
-  --color-neutral-200: #C5C9D1;
-  --color-neutral-300: #BDC1CA;
-  --color-neutral-400: #A2A8B4;
-  --color-neutral-500: #878E9E;
-  /* Primary */
-  --color-primary-50: #82C0EF;
-  --color-primary-100: #69B3EC;
-  --color-primary-200: #50A7E9;
-  --color-primary-300: #379AE6;
-  --color-primary-400: #1C89DE;
-  --color-primary-500: #1876BE;
-  /* Secondary */
-  --color-secondary-50: #A4B5EE;
-  --color-secondary-100: #8DA3EA;
-  --color-secondary-200: #7691E6;
-  --color-secondary-300: #496CDD;
-  --color-secondary-400: #2A53D7;
-  --color-secondary-500: #2346BA;
-  /* Success */
-  --color-success-50: #6DEB97;
-  --color-success-100: #4FE782;
-  --color-success-200: #32E36D;
-  --color-success-300: #1DD75B;
-  --color-success-400: #19BC50;
-  --color-success-500: #16A144;
-  /* Warning */
-  --color-warning-50: #EA8588;
-  --color-warning-100: #E66C70;
-  --color-warning-200: #E25458;
-  --color-warning-300: #DE3840;
-  --color-warning-400: #D22329;
-  --color-warning-500: #B41E23;
+  /* ── Editorial Finance — Design Tokens ── */
+
+  /* Surface */
+  --color-surface: #FAFAF7;
+  --color-surface-secondary: #F3F2EE;
+  --color-surface-tertiary: #ECEADE;
+  --color-surface-white: #FFFFFF;
+
+  /* Text */
+  --color-ink: #0A0A0A;
+  --color-ink-secondary: #4A4A48;
+  --color-ink-muted: #8A8A86;
+  --color-ink-subtle: #B0AFA8;
+
+  /* Primary — Verde oliva */
+  --color-primary-50: #F4F5F0;
+  --color-primary-100: #E0E4D5;
+  --color-primary-200: #B8C09F;
+  --color-primary-300: #6B7D52;
+  --color-primary-400: #4D6138;
+  --color-primary-500: #3D4A2A;
+
+  /* Accent — Terracota */
+  --color-accent-50: #FEF3EE;
+  --color-accent-100: #FDDCC8;
+  --color-accent-200: #F5A574;
+  --color-accent-300: #E07030;
+  --color-accent-400: #C2410C;
+  --color-accent-500: #9A3009;
+
+  /* Neutral — Grises cálidos */
+  --color-neutral-50: #FAFAF7;
+  --color-neutral-100: #F3F2EE;
+  --color-neutral-200: #E8E7E2;
+  --color-neutral-300: #D4D3CE;
+  --color-neutral-400: #A8A7A2;
+  --color-neutral-500: #6E6E6A;
+
+  /* Semantic — Desaturados */
+  --color-success-50: #F0F7F0;
+  --color-success-100: #D4EDD4;
+  --color-success-200: #7DBF7D;
+  --color-success-300: #4A8C4A;
+  --color-success-400: #3D7A3D;
+  --color-success-500: #2D5F2D;
+
+  --color-warning-50: #FFF8F0;
+  --color-warning-100: #FFE8CC;
+  --color-warning-200: #FFB566;
+  --color-warning-300: #D97706;
+  --color-warning-400: #B45309;
+  --color-warning-500: #92400E;
+
+  --color-error-50: #FEF2F2;
+  --color-error-100: #FDD8D8;
+  --color-error-200: #F5A3A3;
+  --color-error-300: #DC4545;
+  --color-error-400: #B91C1C;
+  --color-error-500: #991B1B;
 
   /* Spacing scale */
   --spacing-xs: 0.25rem;
@@ -45,6 +69,8 @@
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
   --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
+  --spacing-4xl: 6rem;
 
   /* Typography scale */
   --text-xs: 0.75rem;
@@ -53,69 +79,155 @@
   --text-lg: 1.125rem;
   --text-xl: 1.25rem;
   --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
 
-  /* Border radius */
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
+  /* Border radius — 6-8px, no rounded startup */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
   --radius-full: 9999px;
 
   /* Fonts */
-  --font-family: 'Roboto', sans-serif;
-  --font-fallback:
-  system-ui, -apple-system, blinkmacsystemfont, 'Segoe UI',
-  'Noto Sans', helvetica, arial, sans-serif;
+  --font-serif: 'Fraunces', 'Georgia', serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-fallback: system-ui, -apple-system, blinkmacsystemfont, 'Segoe UI', sans-serif;
+
+  /* Shadows — minimal, editorial */
+  --shadow-xs: 0 1px 2px rgba(10, 10, 10, 0.04);
+  --shadow-sm: 0 1px 3px rgba(10, 10, 10, 0.06);
+  --shadow-md: 0 4px 12px rgba(10, 10, 10, 0.08);
 }
 
-/* Contextual classes */
+/* ── Base styles ── */
+html {
+  font-family: var(--font-sans);
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ── Tabular numbers for financial data ── */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Serif heading utility ── */
+.font-editorial {
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
+}
+
+/* ── Eyebrow label ── */
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+/* ── Editorial card — 1px border, no shadow ── */
+.card-editorial {
+  background: var(--color-surface-white);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+}
+
+/* ── Separator line ── */
+.separator {
+  border: none;
+  border-top: 1px solid var(--color-neutral-200);
+}
+
+/* ── Content wrapper — editorial update ── */
 @layer utilities {
   .content-wrapper {
-    @apply bg-gray-100 p-4 rounded shadow-sm w-full h-full hover:scale-101 hover:bg-gray-200 transform transition-transform duration-200;
+    background: var(--color-surface-white);
+    border: 1px solid var(--color-neutral-200);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem;
+    transition: border-color 0.2s ease;
+    width: 100%;
+    height: 100%;
+  }
+  .content-wrapper:hover {
+    border-color: var(--color-neutral-400);
   }
 }
 
-/* Declaration of Roboto fonts */
-@font-face {
-  font-family: 'Roboto';
-  src: url('/fonts/roboto-light.ttf') format('truetype');
-  font-weight: 300;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Roboto';
-  src: url('/fonts/roboto-regular.ttf') format('truetype');
+/* ── Money display — serif + tabular nums ── */
+.money-display {
+  font-family: var(--font-serif);
+  font-variant-numeric: tabular-nums;
   font-weight: 400;
-  font-display: swap;
+  letter-spacing: -0.01em;
 }
 
-@font-face {
-  font-family: 'Roboto';
-  src: url('/fonts/roboto-medium.ttf') format('truetype');
-  font-weight: 500;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Roboto';
-  src: url('/fonts/roboto-bold.ttf') format('truetype');
+/* ── Status pill ── */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.6875rem;
   font-weight: 600;
-  font-display: swap;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-full);
 }
 
-html {
-  font-family: 'Roboto', var(--font-fallback);
+.status-pill--approved {
+  background: var(--color-success-50);
+  color: var(--color-success-500);
 }
 
+.status-pill--rejected {
+  background: var(--color-accent-50);
+  color: var(--color-accent-400);
+}
+
+.status-pill--pending {
+  background: var(--color-warning-50);
+  color: var(--color-warning-500);
+}
+
+.status-pill--review {
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-500);
+}
+
+/* ── Autofill override — dark-on-light ── */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
   transition: background-color 9999s ease-in-out 0s !important;
-  -webkit-text-fill-color: white !important;
-  box-shadow: 0 0 0px 1000px transparent inset !important;
-  caret-color: white !important;
+  -webkit-text-fill-color: var(--color-ink) !important;
+  box-shadow: 0 0 0px 1000px var(--color-surface-white) inset !important;
+  caret-color: var(--color-ink) !important;
 }
 
-// CHEAT SHEET: https://nerdcave.com/tailwind-cheat-sheet
-// GENERATOR: https://tailwind-generator.com/generators
+/* ── Scrollbar styling ── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-neutral-300);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-neutral-400);
+}

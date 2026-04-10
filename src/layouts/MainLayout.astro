@@ -1,5 +1,5 @@
 ---
-import '@styles/global.css' 
+import '@styles/global.css'
 import PageHeader from "@components/PageHeader.astro";
 import SideBar from "@components/Sidebar.astro";
 import Messages from "@/components/Messages.astro"
@@ -19,16 +19,20 @@ const { title, data, showMessages = false } = Astro.props;
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="es">
   <head>
     <meta charset="utf-8" />
-    <meta name="description" content="Astro description" />
+    <meta name="description" content="CocoAPI — Sistema de gestión de viajes" />
     <meta name="viewport" content="width=device-width" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Editorial fonts: Fraunces (serif) + Inter (sans) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,100..900;1,9..144,100..900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
   </head>
-  <body>
+  <body class="bg-[var(--color-surface)]">
     <div id="app" class={`${showMessages ? 'list-messages' : ''}`}>
       <header id="page-header">
         <PageHeader
@@ -42,7 +46,7 @@ const { title, data, showMessages = false } = Astro.props;
       </aside>
 
       <section id="content">
-        <div class="p-12">
+        <div class="px-10 py-8 max-w-[1200px]">
           <slot />
         </div>
       </section>
@@ -81,13 +85,13 @@ const { title, data, showMessages = false } = Astro.props;
         grid-area: content;
         height: 100%;
         overflow-y: auto;
+        background: var(--color-surface);
       }
 
       #messages {
         grid-area: messages;
-        background: white;
-        border-left: 1px solid #D6D8DE;
-        box-shadow: -2px 0 4px rgba(0, 0, 0, 0.05);
+        background: var(--color-surface-white);
+        border-left: 1px solid var(--color-neutral-200);
         padding: 1.5rem;
         overflow-y: auto;
       }

@@ -1,12 +1,11 @@
 ---
 /**
  * Author: Julia Maria Stephanie Duenkelsbuehler Castillo Y Nicole Davila
- * 
- * Description: This Astro page renders a travel request form.
- * It includes sections for destinations, dates, additional information, and cost assignment.
+ *
+ * Description: Travel request form page — editorial style.
  */
 
-import TextHeader from '@components/TextHeader.astro';
+import EditorialHeader from '@components/EditorialHeader.astro';
 import MainLayout from "@layouts/MainLayout.astro";
 import TravelRequestForm from "@/components/TravelRequestForm";
 
@@ -21,11 +20,12 @@ const userName = getCookie("username", Astro.cookies);
 
 <MainLayout title="Crear Solicitud" data={{ userName, buttonLabel, role }}>
   <div>
-    <TextHeader
-      title="CREAR NUEVA SOLICITUD DE VIAJE"
-      subtitle="Por favor complete el siguiente formulario para generar una nueva solicitud de viaje."
+    <EditorialHeader
+      eyebrow="Coco / Solicitudes / Nueva"
+      title="Solicitar un viaje"
+      subtitle="Complete el formulario para generar una nueva solicitud de viaje."
     />
-    <main class="bg-white rounded-lg shadow-md p-8">
+    <main class="card-editorial p-8">
       <TravelRequestForm
         user_id={getCookie("id", Astro.cookies)}
         client:only="react"
@@ -36,4 +36,3 @@ const userName = getCookie("username", Astro.cookies);
     </main>
   </div>
 </MainLayout>
-

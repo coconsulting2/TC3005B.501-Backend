@@ -1,44 +1,27 @@
 ---
-
 /**
  * Author: José Antonio González and Kenia Esmeralda Ramos Javier
- * Description: This is the page where we separate the content that is stablished for a certain user of Account Payable team.
- * 
+ * Updated: Editorial Finance design system
  */
 export const prerender = false;
 import MainLayout from "@layouts/MainLayout.astro";
-import TextHeader from "@components/TextHeader.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
 import ReceiptActions from "@components/ReceiptActions";
 import type { UserRole } from "@type/roles";
 import FinishRequestButton from "@components/FinisCheck.tsx";
 
 import { getCookie } from "@data/cookies";
 import { roleLabels } from "@config/role-labels";
+import { apiRequest } from "@/utils/apiClient";
 
 const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
 const userName = getCookie("username", Astro.cookies);
 const buttonLabel = roleLabels[role];
 
-
-const status_colors = {
-  'Pending': 'text-warning-400',
-  'Aproved': 'text-success-400',
-  'Declined': 'text-danger-400',
-};
-
-const validationColors = {
-  "Aprobado": "text-green-500",
-  "Rechazado": "text-red-500",
-  "Pendiente": "text-yellow-500",
-};
-
-import { apiRequest } from "@/utils/apiClient";
-
 const { id } = Astro.params;
 let request = null;
 try {
   request = await apiRequest(`/accounts-payable/get-expense-validations/${id}`, { cookies: Astro.cookies });
-  console.log(request);
 } catch (error) {
   request = null;
   throw new Error(`No request found with ID ${id}`);
@@ -57,101 +40,99 @@ const enrichedExpenses = await Promise.all(
   })
 );
 const allReviewed = enrichedExpenses.every((receipt: any) => receipt.validation !== "Pendiente");
+
+const validationPill: Record<string, string> = {
+  "Aprobado": "status-pill--approved",
+  "Rechazado": "status-pill--rejected",
+  "Pendiente": "status-pill--pending",
+};
 ---
 
-<MainLayout title={`Solicitud #${request.request_id}`} data={{ userName, buttonLabel, role }} >
+<MainLayout title={`Solicitud #${request.request_id}`} data={{ userName, buttonLabel, role }}>
+  <main>
+    <EditorialHeader
+      eyebrow={`Coco / Comprobaciones / #${request.request_id}`}
+      title={`Solicitud #${request.request_id}`}
+      subtitle="Comprobantes de gastos"
+    >
+      {allReviewed && (
+        <FinishRequestButton
+          client:only="react"
+          requestId={request.request_id}
+          token={getCookie("token", Astro.cookies)}
+        />
+      )}
+    </EditorialHeader>
 
-<main class="flex flex-col items-center">
-  <div class="w-full flex flex-col rounded border border-gray-300 p-10">
-
-    <div class="flex justify-between items-center">
-  <TextHeader
-    title={`SOLICITUD #${request.request_id}`}
-    subtitle="Comprobantes de Gastos"
-  />
-
-  <div class="flex items-center gap-4">
-    <h1 class={`text-m ${status_colors[request.status as keyof typeof status_colors]} font-semibold`}>
-      Sin Pendientes
-    </h1>
-
-    {allReviewed && (
-      <FinishRequestButton
-        client:only="react"
-        requestId={request.request_id}
-        token={getCookie("token", Astro.cookies)}
-      />
-    )}
-  </div>
-</div>
-  <div>
-    <h3 class="text-xl font-semibold text-gray-800 mb-4 border-b pb-2">Comprobantes</h3>
-
-    {enrichedExpenses.length === 0 ? (
-      <div class="bg-gray-100 p-6 rounded-lg shadow w-full text-center text-gray-500 font-semibold">
-        NO HAY COMPROBANTES DE GASTOS PENDIENTES DE COMPROBAR
+    <section class="card-editorial overflow-hidden">
+      <div class="px-6 py-3 border-b border-[var(--color-neutral-200)]">
+        <h3 class="eyebrow">Comprobantes</h3>
       </div>
-    ) : (
-      <div class="grid gap-4">     
-        {enrichedExpenses.map((receipt: any) => {
-          const pdf = receipt.fileMap?.pdf;
-          const xml = receipt.fileMap?.xml;
 
-          return (
-            <div class="grid grid-cols-[2fr_2fr_1fr] gap-6">
-              
-              <div class="col-span-2 space-y-2 content-wrapper">
-                <p class="font-bold text-lg break-words">#{receipt.receipt_id}</p>
-                <div class="text-sm text-gray-700 grid grid-cols-[1fr_2fr] gap-y-1">
-                  
-                  <p><span class="font-semibold">Monto:</span> {receipt.amount} <span>MXN </span> </p>
-                  <p><span class="font-semibold">Rubro:</span> {receipt.receipt_type_name}</p>
-                  
-                  <p class="flex items-center gap-2">
-                    <span class="font-semibold">Status:</span>
-                    <span class={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${validationColors[receipt.validation] || "text-gray-400"}`}>
+      {enrichedExpenses.length === 0 ? (
+        <div class="p-8 text-center">
+          <p class="text-sm text-[var(--color-ink-muted)]">No hay comprobantes de gastos pendientes de comprobar</p>
+        </div>
+      ) : (
+        <div>
+          {enrichedExpenses.map((receipt: any, index: number) => {
+            const pdf = receipt.fileMap?.pdf;
+            const xml = receipt.fileMap?.xml;
+            const isLast = index === enrichedExpenses.length - 1;
+
+            return (
+              <div class={`px-6 py-5 ${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''}`}>
+                <div class="flex items-start justify-between gap-6">
+                  <!-- Receipt info -->
+                  <div class="flex items-center gap-4 flex-1">
+                    <span class="font-editorial text-lg text-[var(--color-ink-muted)] tabular-nums w-6 text-right">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    <div>
+                      <p class="font-medium text-[var(--color-ink)]">#{receipt.receipt_id}</p>
+                      <div class="flex gap-4 mt-1 text-sm text-[var(--color-ink-secondary)]">
+                        <span>Monto: <span class="money-display">{receipt.amount} MXN</span></span>
+                        <span>Rubro: {receipt.receipt_type_name}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Status + Actions column -->
+                  <div class="flex flex-col items-end gap-2">
+                    <span class={`status-pill ${validationPill[receipt.validation] || 'status-pill--review'}`}>
                       {receipt.validation}
                     </span>
+                  </div>
+                </div>
 
-                  </p>
+                <!-- File downloads + Receipt actions -->
+                <div class="flex items-center gap-3 mt-3 ml-10">
+                  {pdf && (
+                    <a href={`${import.meta.env.PUBLIC_API_BASE_URL}/files/receipt-file/${pdf.fileId}`}
+                      class="px-3 py-1.5 text-xs font-medium border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-[var(--color-ink-secondary)] hover:bg-[var(--color-surface-secondary)] transition-colors">
+                      PDF: {pdf.fileName}
+                    </a>
+                  )}
+                  {xml && (
+                    <a href={`${import.meta.env.PUBLIC_API_BASE_URL}/files/receipt-file/${xml.fileId}`}
+                      class="px-3 py-1.5 text-xs font-medium border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-[var(--color-ink-secondary)] hover:bg-[var(--color-surface-secondary)] transition-colors">
+                      XML: {xml.fileName}
+                    </a>
+                  )}
+
+                  <ReceiptActions
+                    client:only="react"
+                    receipt_id={receipt.receipt_id}
+                    expense_status={receipt.expense_status}
+                    disabled={receipt.validation !== "Pendiente"}
+                    token={getCookie("token", Astro.cookies)}
+                  />
                 </div>
               </div>
-
-              <div class="flex flex-col justify-center h-full gap-3">
-                {pdf && (
-                      <a href={`${import.meta.env.PUBLIC_API_BASE_URL}/files/receipt-file/${pdf.fileId}`}>
-                        <button class="btn bg-primary-300 rounded w-full h-12 flex flex-col items-center justify-center hover:bg-blue-300 transition-colors gap-y-1">
-                          <span class="text-xs font-semibold">Nombre de archivo: {pdf.fileName}</span>
-                          <span class="text-sm">Descargar PDF</span>
-                        </button>
-                      </a>
-                    )}
-
-                    {xml && (
-                      <a href={`${import.meta.env.PUBLIC_API_BASE_URL}/files/receipt-file/${xml.fileId}`}>
-                        <button class="btn bg-primary-300 rounded w-full h-12 flex flex-col items-center justify-center hover:bg-blue-300 transition-colors gap-y-1">
-                          <span class="text-xs font-semibold">Nombre de archivo: {xml.fileName}</span>
-                          <span class="text-sm">Descargar XML</span>
-                        </button>
-                      </a>
-                    )}
-
-                <ReceiptActions
-                  client:only="react"
-                  receipt_id={receipt.receipt_id}
-                  expense_status={receipt.expense_status}
-                  disabled={receipt.validation !== "Pendiente"}
-                  token={getCookie("token", Astro.cookies)}
-                />
-              </div>
-            </div>    
-          );
-        })}
-      </div>
-    )}
-  </div>
-  
-</div>
-</main>
-
+            );
+          })}
+        </div>
+      )}
+    </section>
+  </main>
 </MainLayout>

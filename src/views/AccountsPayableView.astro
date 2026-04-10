@@ -1,62 +1,85 @@
 ---
 /**
  * Authors: Eduardo Porto Morales
- * 
- * Description: This is the accounts payable view of the dashboard.
- **/
+ * Updated: Editorial Finance design system
+ *
+ * Cuentas por pagar — "Revisión financiera" editorial view.
+ */
 
-import TextHeader from "@components/TextHeader.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MetricCard from "@components/MetricCard.astro";
 import RequestSection from "@components/RequestSection.astro";
 
 import { getCookie } from "@data/cookies";
 import { apiRequest } from '@utils/apiClient';
-const deparment = getCookie("department_id", Astro.cookies);
+
+const department = getCookie("department_id", Astro.cookies);
 
 const requestsInCotizar = await (async () => {
   try {
-    return await apiRequest(`/user/get-travel-requests/${deparment}/4`, { cookies: Astro.cookies });
+    return await apiRequest(`/user/get-travel-requests/${department}/4`, { cookies: Astro.cookies });
   } catch (error) {
     return [];
   }
-})()
+})();
 
 const requestsInComprobar = await (async () => {
   try {
-    return await apiRequest(`/user/get-travel-requests/${deparment}/7`, { cookies: Astro.cookies });
+    return await apiRequest(`/user/get-travel-requests/${department}/7`, { cookies: Astro.cookies });
   } catch (error) {
     return [];
   }
-})()
-
-// ACA HAY QUE PONER DOS FETCH, UNO PARA SOLICITUDES POR COTIZAR Y OTRO PARA SOLICITUDES POR COMPROBAR
+})();
 
 const { userName } = Astro.props;
+const totalPending = requestsInCotizar.length + requestsInComprobar.length;
 ---
 
 <div>
   <main>
-    <TextHeader
-      title={`BIENVENIDO, ${userName.toUpperCase()}`}
-      subtitle="DITTA CONSULTING"
+    <EditorialHeader
+      eyebrow="Coco / Aprobaciones / Finanzas"
+      title="Revisión financiera"
+      subtitle={`${userName} &middot; Cuentas por pagar`}
     />
 
-    <div class="grid grid-cols-1 gap-8">
+    <!-- Metrics -->
+    <div class="flex mb-8">
+      <MetricCard
+        label="Por cotizar"
+        value={String(requestsInCotizar.length)}
+        position="first"
+      />
+      <MetricCard
+        label="Por comprobar"
+        value={String(requestsInComprobar.length)}
+        position="middle"
+      />
+      <MetricCard
+        label="Total pendientes"
+        value={String(totalPending)}
+        position="last"
+      />
+    </div>
+
+    <!-- Sections -->
+    <div class="grid grid-cols-1 gap-6">
       <RequestSection
-        title="SOLICITUDES POR COTIZAR"
+        title="Solicitudes por cotizar"
         requests={requestsInCotizar}
         anchor="cotizaciones"
         urlBase="cotizar-solicitud"
-        subtitle="Esta solicitud está esperando cotización."
-        emptyMessage="NO HAY SOLICITUDES POR COTIZAR"
+        subtitle="Pendiente de cotización"
+        emptyMessage="No hay solicitudes por cotizar"
       />
 
       <RequestSection
-        title="SOLICITUDES POR COMPROBAR"
+        title="Solicitudes por comprobar"
         requests={requestsInComprobar}
         anchor="comprobaciones"
         urlBase="comprobar-gastos"
-        subtitle="Esta solicitud está esperando comprobación."
-        emptyMessage="NO HAY SOLICITUDES POR COMPROBAR"
+        subtitle="Pendiente de comprobación"
+        emptyMessage="No hay solicitudes por comprobar"
       />
     </div>
   </main>

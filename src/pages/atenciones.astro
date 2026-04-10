@@ -1,25 +1,23 @@
 ---
 /**
- * Author: Diego Ortega Fernández
- *
- **/
+ * Author: Diego Ortega Fernandez
+ * Updated: Editorial Finance design system
+ */
 
 import MainLayout from "@layouts/MainLayout.astro";
-import TextHeader from "@components/TextHeader.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
 import AuthRequestsList from "@/components/RequestsLists/AuthRequestsList";
 import TableFallback from "@/components/Table/TableFallback.astro";
 
 import type { UserRole } from "@type/roles";
 import { getCookie } from "@data/cookies";
 import { roleLabels } from "@config/role-labels";
+import { apiRequest } from "@/utils/apiClient";
 
 const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
 const userName = getCookie("username", Astro.cookies);
 const buttonLabel = roleLabels[role];
 
-import { apiRequest } from "@/utils/apiClient";
-
-//Status corresponding to TravelAgency
 const status = 5;
 const requests = await (async () => {
   try {
@@ -27,7 +25,7 @@ const requests = await (async () => {
   } catch (error) {
     return [];
   }
-})()
+})();
 ---
 
 <MainLayout title="Atenciones pendientes" data={{ userName, buttonLabel, role }}>
@@ -35,9 +33,10 @@ const requests = await (async () => {
     {requests && requests.length === 0 ? (
       <TableFallback />
     ) : (
-      <TextHeader
-        title={"ATENCIONES DE " + userName.toUpperCase()}
-        subtitle="Aquí puedes ver las solicitudes pendientes de atender"
+      <EditorialHeader
+        eyebrow="Coco / Agencia / Atenciones"
+        title={`Atenciones de ${userName}`}
+        subtitle="Solicitudes pendientes de atender"
       />
       <AuthRequestsList
         client:only="react"
@@ -45,6 +44,5 @@ const requests = await (async () => {
         role={role}
       />
     )}
-    </div>
   </div>
 </MainLayout>

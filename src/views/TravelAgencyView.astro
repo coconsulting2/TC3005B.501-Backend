@@ -1,40 +1,57 @@
 ---
 /**
- * Authors: Gabriel Muñoz, José González
- * 
- * Description: This is the travel agent view of the application.
- **/
+ * Authors: Gabriel Munoz, Jose Gonzalez
+ * Updated: Editorial Finance design system
+ *
+ * Agencia de viajes — "Cotización para el cliente" editorial view.
+ */
 
-import TextHeader from "@components/TextHeader.astro";
-import { getRequestPriority } from "@utils/getPriorityDates";
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MetricCard from "@components/MetricCard.astro";
+import RequestSection from "@components/RequestSection.astro";
 import { getCookie } from "@data/cookies";
 import { apiRequest } from '@utils/apiClient';
-import RequestSection from "@components/RequestSection.astro";
 
-const { userName} = Astro.props;
+const { userName } = Astro.props;
 const requests = await (async () => {
   try {
     return await apiRequest(`/user/get-travel-requests/${getCookie("department_id", Astro.cookies)}/5`, { cookies: Astro.cookies });
   } catch (error) {
     return [];
   }
-})()
-
+})();
 ---
 
 <div>
   <main>
-    <TextHeader
-      title={`BIENVENIDO, ${userName.toUpperCase()}`}
-      subtitle="DITTA CONSULTING"
-    />
-      <RequestSection
-        title="SOLICITUDES POR ATENDER"
-        requests={requests}
-        anchor="atenciones"
-        urlBase="atender-solicitud"
-        subtitle="Esta solicitud está esperando ser atendida."
-        emptyMessage="NO HAY SOLICITUDES POR ATENDER"
+    <EditorialHeader
+      eyebrow="Coco / Agencia / Viajes"
+      title="Solicitudes por atender"
+      subtitle={`${userName} &middot; Agencia de viajes`}
+    >
+      <span class="status-pill bg-warning-50 text-warning-500">
+        {requests.length} pendientes
+      </span>
+    </EditorialHeader>
+
+    <!-- Metric -->
+    <div class="flex mb-8">
+      <MetricCard
+        label="Esperando cotización"
+        value={String(requests.length)}
+        detail="Solicitudes asignadas a tu agencia"
+        position="solo"
       />
+    </div>
+
+    <!-- Request list -->
+    <RequestSection
+      title="Solicitudes por atender"
+      requests={requests}
+      anchor="atenciones"
+      urlBase="atender-solicitud"
+      subtitle="Pendiente de atención por la agencia"
+      emptyMessage="No hay solicitudes por atender"
+    />
   </main>
 </div>

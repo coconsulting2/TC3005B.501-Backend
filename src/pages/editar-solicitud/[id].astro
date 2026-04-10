@@ -7,7 +7,7 @@
  **/
 
 export const prerender = false;
-import TextHeader from '@components/TextHeader.astro';
+import EditorialHeader from '@components/EditorialHeader.astro';
 import MainLayout from "@layouts/MainLayout.astro";
 import TravelRequestForm from "@components/TravelRequestForm.tsx";
 
@@ -34,11 +34,12 @@ try {
 
 <MainLayout title="Editar Solicitud" data={{ userName, buttonLabel, role }}>
   <div>
-    <TextHeader
-      title="EDITAR UNA SOLICITUD DE VIAJE EXISTENTE"
-      subtitle="Por favor termine de editar el siguiente formulario por completo"
+    <EditorialHeader
+      eyebrow="Coco / Solicitudes / Editar"
+      title="Editar solicitud de viaje"
+      subtitle="Termine de editar el formulario por completo."
     />
-    <main class="bg-white rounded-lg shadow-md p-8">
+    <main class="card-editorial p-8">
       <TravelRequestForm
         client:only="react"
         data={request}

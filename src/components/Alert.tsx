@@ -2,15 +2,7 @@
  * Author: Leonardo Rodriguez
  *
  * Description:
- * Alert component for inline notifications and messages.
- * Supports info, success, warning, and error types with optional dismiss.
- * Uses design tokens for consistent styling. Mobile-first responsive from 320px.
- *
- * @param type - Alert type (info, success, warning, error)
- * @param title - Optional alert title
- * @param dismissible - Whether the alert can be dismissed (default: false)
- * @param onDismiss - Callback when alert is dismissed
- * @returns React Alert element
+ * Alert component — editorial style with desaturated colors and left border accent.
  */
 
 import { useState } from "react";
@@ -27,10 +19,10 @@ interface AlertProps {
 }
 
 const typeClasses: Record<AlertType, string> = {
-  info: "bg-blue-50 border-primary-300 text-blue-800",
-  success: "bg-green-50 border-green-400 text-green-800",
-  warning: "bg-yellow-50 border-yellow-400 text-yellow-800",
-  error: "bg-red-50 border-warning-300 text-red-800",
+  info: "bg-[var(--color-surface-secondary)] border-[var(--color-ink-muted)] text-[var(--color-ink-secondary)]",
+  success: "bg-success-50 border-success-400 text-success-500",
+  warning: "bg-warning-50 border-warning-400 text-warning-500",
+  error: "bg-accent-50 border-accent-400 text-accent-500",
 };
 
 const iconPaths: Record<AlertType, string> = {
@@ -49,7 +41,6 @@ export default function Alert({
   className = "",
 }: AlertProps) {
   const [visible, setVisible] = useState(true);
-
   if (!visible) return null;
 
   const handleDismiss = () => {
@@ -59,21 +50,11 @@ export default function Alert({
 
   return (
     <div
-      className={`flex items-start gap-3 p-4 border-l-4 rounded-md ${typeClasses[type]} ${className}`}
+      className={`flex items-start gap-3 p-4 border-l-4 rounded-[var(--radius-md)] ${typeClasses[type]} ${className}`}
       role="alert"
     >
-      <svg
-        className="w-5 h-5 flex-shrink-0 mt-0.5"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth={2}
-          d={iconPaths[type]}
-        />
+      <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={iconPaths[type]} />
       </svg>
       <div className="flex-1 min-w-0">
         {title && <p className="font-medium text-sm mb-1">{title}</p>}
@@ -82,7 +63,7 @@ export default function Alert({
       {dismissible && (
         <button
           onClick={handleDismiss}
-          className="flex-shrink-0 ml-auto p-1 rounded hover:bg-black/10 transition-colors"
+          className="flex-shrink-0 ml-auto p-1 rounded hover:bg-black/5 transition-colors cursor-pointer"
           aria-label="Cerrar alerta"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

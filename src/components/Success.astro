@@ -1,50 +1,38 @@
 ---
 /**
  * Author: Julia Maria Stephanie Duenkelsbuehler Castillo
- * 
- * Description: This Astro page renders a success page after a travel request has been created.
+ * Updated: Editorial Finance design system
  */
 
 import Button from '@components/Button.astro';
-import Typography from '@components/Typography.astro';
-import MainLayout from "@layouts/MainLayout.astro";
-
-const headerData = {
-  userName: "John Doe",
-  showButtonLabel: "Solicitante"
-};
-
-const sidebarData = {
-  role: "Applicant"
-};
 
 const pageTitle = "Solicitud Creada";
 ---
 
-<main class="p-12 bg-neutral-50 min-h-screen">
-  <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-8 text-center">
+<main class="p-12 min-h-screen" style="background-color: var(--color-surface);">
+  <div class="max-w-xl mx-auto card-editorial p-10 text-center">
     <div class="mb-6">
-      <svg class="mx-auto h-16 w-16 text-success-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg class="mx-auto h-14 w-14 text-success-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
       </svg>
     </div>
 
-    <Typography variant="header" size="default" class="mb-4 text-primary-500">
-      Solicitud Enviada
-    </Typography>
-    
-    <Typography variant="paragraph" class="mb-8 text-primary-400">
+    <h1 class="font-editorial text-2xl font-normal text-[var(--color-ink)] mb-3">
+      Solicitud enviada
+    </h1>
+
+    <p class="text-sm text-[var(--color-ink-muted)] mb-8">
       Tu solicitud de viaje ha sido registrada correctamente.
-    </Typography>
+    </p>
 
     <div class="flex justify-center">
-      <a href="/dashboard" class="mr-4">
-        <Button 
-        variant="filled" 
-        color="primary" 
-        class="px-8"
+      <a href="/dashboard">
+        <Button
+          variant="filled"
+          color="primary"
+          class="px-8"
         >
-          Ir al Dashboard
+          Ir al dashboard
         </Button>
       </a>
     </div>

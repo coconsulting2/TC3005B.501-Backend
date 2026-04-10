@@ -44,7 +44,7 @@ const departments = [
   { id: 2, name: 'Recursos Humanos' },
   { id: 3, name: 'IT' },
   { id: 4, name: 'Marketing' },
-  { id: 5, name: 'Operaciones' }
+  { id: 5, name: 'Operaciones' },
   { id: 6, name: 'Administración' }
 ];
 
@@ -212,19 +212,15 @@ export default function CreateUserForm({ mode, user_data, redirectTo,token }: Cr
   };
 
   const inputClass = (fieldName: string) =>
-    `w-full border rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-500 ${
-      errors[fieldName] ? 'border-red-500' : 'border-gray-300'
+    `w-full border rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors ${
+      errors[fieldName] ? 'border-accent-400' : 'border-[var(--color-neutral-300)]'
     }`;
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-8">
-      <div className="flex items-center bg-gradient-to-r from-blue-50 to-blue-100 border-l-4 border-blue-500 p-4 mb-8 rounded shadow-sm">
-        <svg className="w-6 h-6 text-blue-500 mr-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="white" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01" />
-        </svg>
-        <p className="text-sm text-blue-900 font-medium">
-          Los campos obligatorios están marcados con un asterisco.
+    <div className="card-editorial p-8">
+      <div className="flex items-center border-l-4 p-4 mb-8 rounded-[var(--radius-md)]" style={{ borderColor: "var(--color-ink-muted)", backgroundColor: "var(--color-surface-secondary)" }}>
+        <p className="text-sm font-medium" style={{ color: "var(--color-ink-secondary)" }}>
+          Los campos obligatorios están marcados con un asterisco (*).
         </p>
       </div>
 
@@ -232,8 +228,8 @@ export default function CreateUserForm({ mode, user_data, redirectTo,token }: Cr
         {/* Usuario y Contraseña */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nombre de Usuario <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-ink-secondary)" }}>
+              Nombre de Usuario <span className="text-accent-400">*</span>
             </label>
             <input
               type="text"
@@ -244,13 +240,13 @@ export default function CreateUserForm({ mode, user_data, redirectTo,token }: Cr
               placeholder="Ej: juan.perez"
             />
             {errors.user_name && (
-              <p className="text-red-500 text-sm mt-1">{errors.user_name}</p>
+              <p className="text-accent-400 text-xs mt-1">{errors.user_name}</p>
             )}
           </div>
           { mode === 'create' && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contraseña <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-ink-secondary)" }}>
+              Contraseña <span className="text-accent-400">*</span>
             </label>
             <input
               type="password"
@@ -261,7 +257,7 @@ export default function CreateUserForm({ mode, user_data, redirectTo,token }: Cr
               placeholder="Contraseña segura"
             />
             {errors.password && (
-              <p className="text-red-500 text-sm mt-1">{errors.password}</p>
+              <p className="text-accent-400 text-xs mt-1">{errors.password}</p>
             )}
           </div>
           )}
@@ -270,8 +266,8 @@ export default function CreateUserForm({ mode, user_data, redirectTo,token }: Cr
         {/* Email y Teléfono */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-ink-secondary)" }}>
+              Email <span className="text-accent-400">*</span>
             </label>
             <input
               type="email"
@@ -282,13 +278,13 @@ export default function CreateUserForm({ mode, user_data, redirectTo,token }: Cr
               placeholder="usuario@empresa.com"
             />
             {errors.email && (
-              <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+              <p className="text-accent-400 text-xs mt-1">{errors.email}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Número de Teléfono <span className="text-gray-400">(opcional)</span>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-ink-secondary)" }}>
+              Número de Teléfono <span style={{ color: "var(--color-ink-muted)" }}>(opcional)</span>
             </label>
             <input
               type="tel"
@@ -299,15 +295,15 @@ export default function CreateUserForm({ mode, user_data, redirectTo,token }: Cr
               placeholder="555-1234"
             />
             {errors.phone_number && (
-              <p className="text-red-500 text-sm mt-1">{errors.phone_number}</p>
+              <p className="text-accent-400 text-xs mt-1">{errors.phone_number}</p>
             )}
           </div>
         </div>
 
         {/* Estación de Trabajo */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Estación de Trabajo <span className="text-red-500">*</span>
+          <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-ink-secondary)" }}>
+            Estación de Trabajo <span className="text-accent-400">*</span>
           </label>
           <input
             type="text"
@@ -318,15 +314,15 @@ export default function CreateUserForm({ mode, user_data, redirectTo,token }: Cr
             placeholder="Ej: WS-001"
           />
           {errors.workstation && (
-            <p className="text-red-500 text-sm mt-1">{errors.workstation}</p>
+            <p className="text-accent-400 text-xs mt-1">{errors.workstation}</p>
           )}
         </div>
 
         {/* Rol y Departamento */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Rol <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-ink-secondary)" }}>
+              Rol <span className="text-accent-400">*</span>
             </label>
             <select
               name="role_id"
@@ -342,13 +338,13 @@ export default function CreateUserForm({ mode, user_data, redirectTo,token }: Cr
               ))}
             </select>
             {errors.role_id && (
-              <p className="text-red-500 text-sm mt-1">{errors.role_id}</p>
+              <p className="text-accent-400 text-xs mt-1">{errors.role_id}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Departamento <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium mb-1.5" style={{ color: "var(--color-ink-secondary)" }}>
+              Departamento <span className="text-accent-400">*</span>
             </label>
             <select
               name="department_id"
@@ -364,7 +360,7 @@ export default function CreateUserForm({ mode, user_data, redirectTo,token }: Cr
               ))}
             </select>
             {errors.department_id && (
-              <p className="text-red-500 text-sm mt-1">{errors.department_id}</p>
+              <p className="text-accent-400 text-xs mt-1">{errors.department_id}</p>
             )}
           </div>
         </div>
@@ -375,7 +371,7 @@ export default function CreateUserForm({ mode, user_data, redirectTo,token }: Cr
             type="button"
             onClick={handleReset}
             variant="border"
-            color="secondary"
+            color="accent"
             disabled={isSubmitting}
           >
             {mode === 'edit' ? 'Cancelar' : 'Limpiar Formulario'}

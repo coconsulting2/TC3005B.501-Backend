@@ -1,11 +1,12 @@
 ---
 /**
 * Authors: Eduardo Porto Morales
-* Description: This page allows the user to view and manage their draft requests.
+* Updated: Editorial Finance design system
 **/
 
 import MainLayout from "@layouts/MainLayout.astro";
-import TextHeader from "@components/TextHeader.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MetricCard from "@components/MetricCard.astro";
 import type { UserRole } from "@type/roles";
 
 import { getCookie } from "@data/cookies";
@@ -26,7 +27,6 @@ function getVerificationStats(request: any) {
   return { total, accepted, rejected, pending };
 }
 
-// Obtener solicitudes
 const requestsRaw = await (async () => {
   try {
     const requests = await apiRequest(`/applicant/get-user-requests/${user_id}`, { cookies: Astro.cookies });
@@ -38,7 +38,6 @@ const requestsRaw = await (async () => {
   }
 })();
 
-// Agregar verificaciones a cada solicitud
 const requests = await Promise.all(
   requestsRaw.map(async (request: any) => {
     try {
@@ -52,80 +51,74 @@ const requests = await Promise.all(
 );
 ---
 
-<MainLayout title="Dashboard" data={{ userName, buttonLabel, role }}>
+<MainLayout title="Comprobaciones" data={{ userName, buttonLabel, role }}>
   <div>
     <main>
-      <TextHeader
-        title={`COMPROBACIONES PENDIENTES DE ${userName.toUpperCase()}`}
-        subtitle="Aquí puedes conocer el estado de solicitudes en proceso de comprobación"
+      <EditorialHeader
+        eyebrow="Coco / Comprobaciones"
+        title="Comprobaciones pendientes"
+        subtitle={`${userName} — Solicitudes en proceso de comprobación`}
       />
-      <section class="bg-white p-6 rounded-lg shadow w-full">
-        {requests.length > 0 ? (
-          <div class="grid gap-8">
-            {requests.map((request: any) => {
-              const { total, accepted, rejected, pending } = getVerificationStats(request);
-              const percent = (count: number) => total ? (count / total) * 100 : 0;
-              return (
-                <div class="grid grid-cols-[1fr_auto] items-center rounded-lg">
-                  <a href={`/comprobar-solicitud/${request.request_id}`} class="block w-full">
-                    <div class="space-y-2 content-wrapper">
-                      <div class="flex items-center justify-between">
-                        <p class="font-bold text-lg break-words">#{request.request_id}</p>
-                        { total === 0 ? (
-                          <span class="text-sm text-gray-500">
-                          NO SE HAN ENVIADO COMPROBANTES
-                          </span>
-                        ) : (
-                          <p class="text-sm text-gray-500">{accepted}/{total} ACEPTADAS</p>
-                        )}
-                      </div>
-                      { total != 0 && (
-                        <div class="w-full h-2 bg-gray-200 rounded overflow-hidden flex">
-                          <div class="bg-green-500 h-full" style={`width: ${percent(accepted)}%`} />
-                          <div class="bg-red-500 h-full" style={`width: ${percent(rejected)}%`} />
-                          <div class="bg-yellow-400 h-full" style={`width: ${percent(pending)}%`} />
-                        </div>
-                      )}
 
-                      <div class="text-sm text-gray-700 grid grid-cols-[1fr_2fr] gap-y-1">
-                        <p><span class="font-semibold">Lugar:</span> {request.destination_country}</p>
-                        <p><span class="font-semibold">Fechas:</span> {request.beginning_date} - {request.ending_date}</p>
-                        <p>
-                          <span class="font-semibold">Estado:</span> 
-                          <span
-                            class={`ml-1 font-semibold ${
-                              pending > 0
-                                ? 'text-yellow-600'
-                                : accepted === total
-                                  ? 'text-green-600'
-                                  : rejected === total
-                                    ? 'text-red-600'
-                                    : 'text-blue-600'
-                            }`}
-                          >
-                            {pending > 0 || total === 0
-                              ? 'PENDIENTE'
-                              : accepted === total
-                                ? 'ACEPTADA'
-                                : rejected === total
-                                  ? 'RECHAZADA'
-                                  : 'MIXTA'}
-                          </span>
-                        </p>
-                        <p><span class="font-semibold">Responsable:</span> Eduardo Porto Morales</p>
-                      </div>
-                    </div>
-                  </a>
+      <div class="flex mb-8">
+        <MetricCard
+          label="Solicitudes"
+          value={String(requests.length)}
+          position="solo"
+        />
+      </div>
+
+      {requests.length > 0 ? (
+        <section class="card-editorial overflow-hidden">
+          {requests.map((request: any, index: number) => {
+            const { total, accepted, rejected, pending } = getVerificationStats(request);
+            const percent = (count: number) => total ? (count / total) * 100 : 0;
+            const isLast = index === requests.length - 1;
+
+            let statusText = 'Pendiente';
+            let statusClass = 'status-pill--pending';
+            if (total > 0) {
+              if (accepted === total) { statusText = 'Aceptada'; statusClass = 'status-pill--approved'; }
+              else if (rejected === total) { statusText = 'Rechazada'; statusClass = 'status-pill--rejected'; }
+              else if (pending === 0) { statusText = 'Mixta'; statusClass = 'status-pill--review'; }
+            }
+
+            return (
+              <a href={`/comprobar-solicitud/${request.request_id}`}
+                class={`block px-6 py-5 ${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''} hover:bg-[var(--color-surface-secondary)] transition-colors`}>
+                <div class="flex items-center justify-between gap-4 mb-2">
+                  <div class="flex items-center gap-3">
+                    <span class="font-editorial text-lg text-[var(--color-ink)] tabular-nums">#{request.request_id}</span>
+                    <span class="text-sm text-[var(--color-ink-secondary)]">{request.destination_country}</span>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    {total > 0 && (
+                      <span class="text-xs text-[var(--color-ink-muted)] tabular-nums">{accepted}/{total} aceptadas</span>
+                    )}
+                    <span class={`status-pill ${statusClass}`}>{statusText}</span>
+                  </div>
                 </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div class="bg-gray-100 p-6 rounded-lg shadow w-full text-center text-gray-500 font-semibold">
-            NO TIENES COMPROBACIONES PENDIENTES
-          </div>
-        )}
-      </section>
+
+                {total > 0 && (
+                  <div class="w-full h-1.5 bg-[var(--color-neutral-200)] rounded-full overflow-hidden flex">
+                    <div class="bg-success-400 h-full transition-all" style={`width: ${percent(accepted)}%`} />
+                    <div class="bg-accent-400 h-full transition-all" style={`width: ${percent(rejected)}%`} />
+                    <div class="bg-warning-300 h-full transition-all" style={`width: ${percent(pending)}%`} />
+                  </div>
+                )}
+
+                <div class="flex gap-4 mt-2 text-xs text-[var(--color-ink-muted)]">
+                  <span>{request.beginning_date} — {request.ending_date}</span>
+                </div>
+              </a>
+            );
+          })}
+        </section>
+      ) : (
+        <div class="card-editorial py-16 text-center">
+          <p class="text-[var(--color-ink-muted)]">No tienes comprobaciones pendientes</p>
+        </div>
+      )}
     </main>
   </div>
 </MainLayout>

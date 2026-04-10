@@ -1,6 +1,7 @@
 ---
 /**
- * Author: Diego Ortega Fernández
+ * Author: Diego Ortega Fernandez
+ * Updated: Editorial Finance design system
  */
 
 interface Props {
@@ -11,20 +12,24 @@ interface Props {
 }
 
 const {
-  title = "¡Oops, no hay solicitudes pendientes!",
+  title = "Sin solicitudes pendientes",
   message = "Actualmente no hay información disponible para mostrar.",
   buttonText = "Regresar al dashboard",
   buttonLink = "/dashboard",
 } = Astro.props;
 ---
 
-<div class="flex flex-grow h-[calc(100vh-175px)] items-center justify-center bg-gray-50 px-4 py-12">
-  <div class="max-w-lg w-full bg-white rounded-2xl shadow-lg p-10 text-center">
-    <h1 class="text-3xl font-extrabold text-gray-800 mb-4">{title}</h1>
-    <p class="text-base text-gray-600 mb-6">{message}</p>
+<div style="display:flex; flex-grow:1; height:calc(100vh - 175px); align-items:center; justify-content:center; padding:1rem 1rem;">
+  <div style="max-width:28rem; width:100%; background:white; border:1px solid #E8E7E2; border-radius:8px; padding:2.5rem; text-align:center;">
+    <h1 style="font-family:'Fraunces',Georgia,serif; font-size:1.5rem; font-weight:400; color:#0A0A0A; margin:0 0 0.75rem 0;">
+      {title}
+    </h1>
+    <p style="font-size:0.875rem; color:#8A8A86; margin:0 0 1.5rem 0;">
+      {message}
+    </p>
     <a
       href={buttonLink}
-      class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-md transition duration-300"
+      style="display:inline-block; padding:0.625rem 1.5rem; font-size:0.875rem; font-weight:500; color:white; background:#3D4A2A; border-radius:6px; text-decoration:none; transition:background-color 0.2s;"
     >
       {buttonText}
     </a>

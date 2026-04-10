@@ -1,17 +1,8 @@
 /**
  * Author: Diego Ortega Fernandez
+ * Updated: Editorial Finance design system
  *
- * Description:
- * DataTable component with sorting and pagination.
- * Supports column-based ascending/descending sorting,
- * configurable rows per page, and responsive layout.
- *
- * @param columns - Array of { key, label, sortable? } column definitions
- * @param rows - Array of row data objects
- * @param role - User role for action routing
- * @param type - Optional custom route type
- * @param rowsPerPage - Rows per page (default: 10)
- * @returns React DataTable element
+ * DataTable — editorial table with 1px borders, no shadows, clean typography.
  */
 
 import { useState, useMemo } from "react";
@@ -50,29 +41,12 @@ const roleDictionary = {
 
 type ValidRole = keyof typeof roleDictionary;
 
-/**
- * Description: Determines the href path based on user role and optional type override.
- * @param role - The current user role
- * @param type - Optional route type override
- * @returns The resolved route string
- */
 function getRoleHref(role: UserRole, type: string): string {
-  if (type) {
-    return type;
-  }
-  if (role in roleDictionary) {
-    return roleDictionary[role as ValidRole];
-  }
+  if (type) return type;
+  if (role in roleDictionary) return roleDictionary[role as ValidRole];
   return "error";
 }
 
-/**
- * Description: Compares two row values for sorting.
- * @param a - First value
- * @param b - Second value
- * @param direction - Sort direction
- * @returns Comparison number
- */
 function compareValues(
   a: string | number | boolean | undefined,
   b: string | number | boolean | undefined,
@@ -88,7 +62,6 @@ function compareValues(
   } else {
     comparison = String(a).localeCompare(String(b), "es", { sensitivity: "base" });
   }
-
   return direction === "desc" ? -comparison : comparison;
 }
 
@@ -107,12 +80,8 @@ export default function DataTable({
 
   const handleSort = (columnKey: string) => {
     setSort((prev) => {
-      if (prev.column !== columnKey) {
-        return { column: columnKey, direction: "asc" };
-      }
-      if (prev.direction === "asc") {
-        return { column: columnKey, direction: "desc" };
-      }
+      if (prev.column !== columnKey) return { column: columnKey, direction: "asc" };
+      if (prev.direction === "asc") return { column: columnKey, direction: "desc" };
       return { column: "", direction: null };
     });
     setPage(1);
@@ -120,7 +89,6 @@ export default function DataTable({
 
   const sortedRows = useMemo(() => {
     if (!sort.column || !sort.direction) return rows;
-
     return [...rows].sort((a, b) =>
       compareValues(a[sort.column], b[sort.column], sort.direction as "asc" | "desc")
     );
@@ -134,7 +102,7 @@ export default function DataTable({
 
   if (isLoading) {
     return (
-      <div className="p-4 text-center text-gray-500">
+      <div className="p-8 text-center" style={{ color: "var(--color-ink-muted, #8A8A86)" }}>
         Cargando datos...
       </div>
     );
@@ -142,8 +110,8 @@ export default function DataTable({
 
   return (
     <div className="w-full">
-      <div className="rounded-md shadow-md overflow-x-auto">
-        <table className="min-w-full bg-white">
+      <div className="card-editorial overflow-x-auto">
+        <table className="min-w-full">
           <TableHeader
             columns={columns}
             sortColumn={sort.column}

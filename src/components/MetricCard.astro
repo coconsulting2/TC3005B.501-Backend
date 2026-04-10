@@ -1,0 +1,55 @@
+---
+/**
+ * Metric card for dashboard KPIs.
+ * Uses 1px borders joined together — "newspaper grid" style.
+ * Money values rendered in Fraunces serif with tabular-nums.
+ *
+ * @param label - Metric label (e.g. "POR APROBAR")
+ * @param value - Display value (e.g. "$284,610")
+ * @param detail - Optional subtext (e.g. "47 comprobantes")
+ * @param variant - Visual emphasis: default | positive | negative
+ * @param isMoney - Format as money display (serif font)
+ * @param position - Join borders: first | middle | last | solo
+ */
+
+interface Props {
+  label: string;
+  value: string;
+  detail?: string;
+  variant?: 'default' | 'positive' | 'negative';
+  isMoney?: boolean;
+  position?: 'first' | 'middle' | 'last' | 'solo';
+}
+
+const {
+  label,
+  value,
+  detail,
+  variant = 'default',
+  isMoney = false,
+  position = 'solo'
+} = Astro.props;
+
+const valueColor = {
+  default: 'text-[var(--color-ink)]',
+  positive: 'text-[var(--color-success-500)]',
+  negative: 'text-[var(--color-accent-400)]',
+}[variant];
+
+const borderRadius = {
+  first: 'rounded-l-[var(--radius-lg)] rounded-r-none border-r-0',
+  middle: 'rounded-none border-r-0',
+  last: 'rounded-r-[var(--radius-lg)] rounded-l-none',
+  solo: 'rounded-[var(--radius-lg)]',
+}[position];
+---
+
+<div class={`bg-[var(--color-surface-white)] border border-[var(--color-neutral-200)] px-5 py-4 ${borderRadius}`}>
+  <p class="eyebrow mb-1">{label}</p>
+  <p class={`text-2xl font-light leading-tight ${valueColor} ${isMoney ? 'money-display' : 'font-editorial'}`}>
+    {value}
+  </p>
+  {detail && (
+    <p class="mt-1 text-xs text-[var(--color-ink-muted)]">{detail}</p>
+  )}
+</div>

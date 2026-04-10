@@ -1,13 +1,12 @@
 ---
 /**
  * Component: SidebarButton
- * Description: Renders a button for the sidebar menu.
+ * Description: Sidebar nav link — editorial style with subtle backgrounds.
  * Author: Kenia Ramos.
  **/
 
 import type { MenuItem } from "@type/menu-config";
 import MaterialIcon from "@components/MaterialIcon.astro";
-import Icon from "@assets/sign-in.svg";
 
 interface Props {
   item: MenuItem;
@@ -19,17 +18,17 @@ const { item, isActive } = Astro.props;
 
 <a
   href={item.route}
-  class={`flex items-center gap-4 px-4 py-3 rounded-lg transition-colors duration-200 group
-    bg-primary-300 hover:bg-secondary-400
-    ${isActive ? 'bg-primary-500 text-white pointer-events-none' : 'text-black hover:text-white'}
+  class={`flex items-center gap-3 px-3 py-2.5 rounded-[var(--radius-md)] transition-colors duration-150 group
+    ${isActive
+      ? 'bg-primary-50 text-primary-500 pointer-events-none font-medium'
+      : 'text-[var(--color-ink-secondary)] hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-ink)]'}
   `}
 >
-  <span class="flex items-center justify-center w-6 h-6">
+  <span class="flex items-center justify-center w-5 h-5">
     <MaterialIcon
       icon={item.icon}
-      color={isActive ? 'white' : 'black'}
-      style="group-hover:brightness-0 group-hover:invert"
+      color={isActive ? 'var(--color-primary-500)' : 'currentColor'}
     />
   </span>
-  <span class="truncate text-sm font-medium">{item.label}</span>
+  <span class="truncate text-sm">{item.label}</span>
 </a>

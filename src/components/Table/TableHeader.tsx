@@ -1,15 +1,8 @@
 /**
  * Author: Diego Ortega Fernandez
+ * Updated: Editorial Finance design system
  *
- * Description:
- * TableHeader component with sort indicators.
- * Renders column headers with clickable sorting for sortable columns.
- *
- * @param columns - Array of column definitions
- * @param sortColumn - Currently sorted column key
- * @param sortDirection - Current sort direction
- * @param onSort - Callback when a sortable column header is clicked
- * @returns React thead element
+ * Table header — eyebrow-style column labels with sort indicators.
  */
 
 import type { TableColumn } from "@components/Table/DataTable";
@@ -23,26 +16,19 @@ interface Props {
   onSort: (columnKey: string) => void;
 }
 
-/**
- * Description: Returns the sort indicator arrow based on current sort state.
- * @param columnKey - The column to check
- * @param sortColumn - The currently sorted column
- * @param sortDirection - The current sort direction
- * @returns Sort indicator string
- */
 function getSortIndicator(
   columnKey: string,
   sortColumn: string,
   sortDirection: SortDirection
 ): string {
-  if (columnKey !== sortColumn || !sortDirection) return "↕";
-  return sortDirection === "asc" ? "↑" : "↓";
+  if (columnKey !== sortColumn || !sortDirection) return "";
+  return sortDirection === "asc" ? " ↑" : " ↓";
 }
 
 export default function TableHeader({ columns, sortColumn, sortDirection, onSort }: Props) {
   return (
     <thead>
-      <tr className="bg-gray-200">
+      <tr style={{ borderBottom: "1px solid var(--color-neutral-200, #E8E7E2)" }}>
         {columns.map((col) => {
           const isSortable = col.sortable !== false && col.key !== "action";
           const isActive = col.key === sortColumn && sortDirection !== null;
@@ -50,24 +36,23 @@ export default function TableHeader({ columns, sortColumn, sortDirection, onSort
           return (
             <th
               key={col.key}
-              className={[
-                "px-4 py-3 font-bold text-md text-gray-700",
-                col.key === "action" ? "text-center" : "text-left",
-                isSortable ? "cursor-pointer select-none hover:bg-gray-300 transition-colors" : "",
-              ].join(" ")}
+              className="eyebrow"
+              style={{
+                padding: "0.75rem 1.5rem",
+                textAlign: col.key === "action" ? "center" : "left",
+                cursor: isSortable ? "pointer" : "default",
+              }}
               onClick={isSortable ? () => onSort(col.key) : undefined}
               aria-sort={
                 isActive
-                  ? sortDirection === "asc"
-                    ? "ascending"
-                    : "descending"
+                  ? sortDirection === "asc" ? "ascending" : "descending"
                   : undefined
               }
             >
               <span className="inline-flex items-center gap-1">
                 {col.label}
                 {isSortable && (
-                  <span className={`text-xs ${isActive ? "text-primary-500" : "text-neutral-400"}`}>
+                  <span style={{ color: isActive ? "var(--color-primary-500, #3D4A2A)" : "var(--color-ink-subtle, #B0AFA8)" }}>
                     {getSortIndicator(col.key, sortColumn, sortDirection)}
                   </span>
                 )}

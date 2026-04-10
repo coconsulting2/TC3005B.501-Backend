@@ -1,40 +1,106 @@
 ---
 /**
- * Authors: Gabriel Muñoz, José González
- * 
- * Description: This is the authorizer view of the dashboard.
- **/
+ * Authors: Gabriel Munoz, Jose Gonzalez
+ * Updated: Editorial Finance design system
+ *
+ * Jefe directo / N2 — "Bandeja de aprobación" editorial view.
+ */
 
-import TextHeader from "@components/TextHeader.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MetricCard from "@components/MetricCard.astro";
 import RequestSection from "@components/RequestSection.astro";
-import {apiRequest} from "@utils/apiClient";
+import { apiRequest } from "@utils/apiClient";
 import { getCookie } from "@data/cookies";
 
+const role = getCookie("role", Astro.cookies);
 const requests = await (async () => {
   try {
-    const status = getCookie("role", Astro.cookies) === "N1" ? 3 : 2;
+    const status = role === "N1" ? 3 : 2;
     return await apiRequest(`/user/get-travel-requests/${getCookie("department_id", Astro.cookies)}/${status}`, { cookies: Astro.cookies });
   } catch (error) {
     return [];
   }
-})()
+})();
+
 const { userName } = Astro.props;
+const roleLabel = role === "N1" ? "Jefe directo" : "Finanzas";
 ---
 
 <div>
   <main>
-    <TextHeader
-      title={`BIENVENIDO, ${userName.toUpperCase()}`}
-      subtitle="DITTA CONSULTING"
+    <EditorialHeader
+      eyebrow={`Coco / Aprobaciones / ${roleLabel}`}
+      title="Por revisar"
+      subtitle={`${userName} &middot; ${requests.length} solicitudes pendientes`}
     />
-      <RequestSection
-        title="SOLICITUDES POR AUTORIZAR"
-        requests={requests}
-        anchor="autorizaciones"
-        urlBase="autorizar-solicitud"
-        subtitle="Esta solicitud está esperando ser autorizada."
-        emptyMessage="NO HAY SOLICITUDES POR AUTORIZAR"
+
+    <!-- Metrics -->
+    <div class="flex mb-8">
+      <MetricCard
+        label="Pendientes"
+        value={String(requests.length)}
+        position="first"
       />
+      <MetricCard
+        label="Requieren atención hoy"
+        value={String(Math.min(requests.length, 3))}
+        detail="Respuesta a solicitudes urgentes"
+        position="last"
+      />
+    </div>
+
+    <!-- Request list -->
+    {requests.length > 0 ? (
+      <section class="card-editorial">
+        <div class="px-6 py-4 border-b border-[var(--color-neutral-200)]">
+          <h2 class="font-editorial text-lg font-normal text-[var(--color-ink)]">
+            Solicitudes por autorizar
+          </h2>
+        </div>
+
+        {requests.map((request: any, index: number) => {
+          const isLast = index === requests.length - 1;
+          return (
+            <a
+              href={`/autorizar-solicitud/${request.request_id}`}
+              class={`block px-6 py-4 flex items-center justify-between gap-6 ${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''} hover:bg-[var(--color-surface-secondary)] transition-colors`}
+            >
+              <div class="flex items-center gap-4 flex-1 min-w-0">
+                <!-- Avatar with initials -->
+                <div class="flex items-center justify-center w-9 h-9 rounded-full bg-[var(--color-neutral-200)] text-[var(--color-ink-secondary)] flex-shrink-0">
+                  <span class="text-xs font-semibold">
+                    {(request.requester_name || 'U').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </span>
+                </div>
+                <div class="flex-1 min-w-0">
+                  <p class="font-medium text-[var(--color-ink)] truncate">
+                    {request.requester_name || 'Solicitante'} <span class="text-[var(--color-ink-muted)] font-normal text-xs uppercase tracking-wide ml-1">{request.department_name || ''}</span>
+                  </p>
+                  <p class="text-xs text-[var(--color-ink-muted)] mt-0.5 truncate">
+                    Viaje a {request.destination_country} &middot; {request.beginning_date} &ndash; {request.ending_date}
+                  </p>
+                </div>
+              </div>
+
+              <span class="money-display text-lg text-[var(--color-ink)]">
+                #{request.request_id}
+              </span>
+            </a>
+          );
+        })}
+
+        {requests.length > 5 && (
+          <div class="px-6 py-3 border-t border-[var(--color-neutral-200)] text-center">
+            <a href="/autorizaciones" class="text-sm text-primary-500 hover:text-primary-400 transition-colors">
+              Ver {requests.length} solicitudes &rarr;
+            </a>
+          </div>
+        )}
+      </section>
+    ) : (
+      <div class="card-editorial py-16 text-center">
+        <p class="text-[var(--color-ink-muted)]">No hay solicitudes por autorizar</p>
+      </div>
+    )}
   </main>
 </div>
-

@@ -1,7 +1,7 @@
 ---
 /*
   Component: Sidebar
-  Description: Renders a vertical sidebar menu based on the user's role.
+  Description: Vertical sidebar — editorial style with white background, 1px border, subtle hover states.
   Author: Kenia Ramos.
 */
 
@@ -19,9 +19,10 @@ const currentPath = Astro.url.pathname;
 const items = SIDEBAR_CONFIG[role] ?? [];
 ---
 
-<aside class="w-64 h-full bg-primary-200 border-r border-neutral-100 shadow-md">
-  <div class="h-full px-4 py-6 overflow-auto">
-    <ul class="space-y-4 font-medium list-none p-0 m-0">
+<aside class="w-56 h-full bg-[var(--color-surface-white)] border-r border-[var(--color-neutral-200)]">
+  <div class="h-full px-3 py-6 overflow-auto">
+    <p class="eyebrow px-3 mb-4">Navegación</p>
+    <ul class="space-y-1 font-medium list-none p-0 m-0">
       {
         items.map((item) => {
           const isActive = currentPath.startsWith(item.route);

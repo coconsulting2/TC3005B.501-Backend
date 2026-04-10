@@ -1,40 +1,39 @@
 ---
 /**
- * Authors: Gabriel Muñoz, José González
- * 
- * Description: This is the applicant view of the dashboard.
- **/
+ * Authors: Gabriel Munoz, Jose Gonzalez
+ * Updated: Editorial Finance design system
+ *
+ * Solicitante dashboard — "Mis pendientes" editorial view.
+ */
 
 import MaterialIcon from "@components/MaterialIcon.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MetricCard from "@components/MetricCard.astro";
 import Button from "@components/Button.astro";
-import TextHeader from "@components/TextHeader.astro";
 import CancelRequestModal from "@components/CancelRequestModal.tsx";
 
 import { getCookie } from "@data/cookies";
 import { apiRequest } from '@utils/apiClient';
 
-const colorDesign: { [key: string]: string } = {
-  'Primera Revisión': "text-orange-400",
-  'Segunda Revisión': "text-orange-500",
-  'Cotización del Viaje': "text-orange-600",
-  'Atención Agencia de Viajes': "text-orange-700",
-  'Comprobación gastos del viaje': "text-blue-500",
-  'Validación de comprobantes': "text-blue-600",
+const statusMap: { [key: string]: string } = {
+  'Primera Revisión': "status-pill--review",
+  'Segunda Revisión': "status-pill--review",
+  'Cotización del Viaje': "status-pill--pending",
+  'Atención Agencia de Viajes': "status-pill--pending",
+  'Comprobación gastos del viaje': "status-pill--review",
+  'Validación de comprobantes': "status-pill--review",
 };
 
 const user_id = getCookie("id", Astro.cookies);
 
-
 const requests = await (async () => {
   try {
-    // Try to fetch requests with error handling
     try {
       const allRequests = await apiRequest(`/applicant/get-user-requests/${user_id}`, {
         cookies: Astro.cookies
       });
       return allRequests.filter((request: any) => request.status !== "Borrador");
     } catch (apiError) {
-      // If there's an SSL error, show empty requests instead of breaking the page
       console.error("Error fetching requests:", apiError);
       return [];
     }
@@ -43,94 +42,134 @@ const requests = await (async () => {
     return [];
   }
 })();
+
 const { userName } = Astro.props;
+
+const inReview = requests.filter((r: any) =>
+  ['Primera Revisión', 'Segunda Revisión'].includes(r.status)
+).length;
+const pending = requests.filter((r: any) =>
+  ['Cotización del Viaje', 'Atención Agencia de Viajes'].includes(r.status)
+).length;
+const toVerify = requests.filter((r: any) =>
+  ['Comprobación gastos del viaje', 'Validación de comprobantes'].includes(r.status)
+).length;
 ---
 
 <div>
   <main>
-    <TextHeader
-      title={`BIENVENIDO, ${userName.toUpperCase()}`}
-      subtitle="DITTA CONSULTING"
-    />
+    <EditorialHeader
+      eyebrow="Coco / Mis solicitudes"
+      title={`Buenas tardes, ${userName}`}
+      subtitle={`Tienes ${requests.length} solicitudes activas`}
+    >
+      <a href="/crear-solicitud">
+        <Button variant="filled" color="primary" size="medium">
+          + Nueva solicitud
+        </Button>
+      </a>
+    </EditorialHeader>
 
-    <section class="bg-white p-6 rounded-lg shadow w-full">
-      <h2 class="flex text-xl font-bold mb-4">
-        VIAJES EN PROCESO
-        <span class="px-2 align-middle text-primary-500">({requests.length})</span>
-      </h2>
+    <!-- Metric cards joined -->
+    <div class="flex mb-8">
+      <MetricCard
+        label="En revisión"
+        value={String(inReview)}
+        position="first"
+      />
+      <MetricCard
+        label="Por comprobar"
+        value={String(toVerify)}
+        position="middle"
+      />
+      <MetricCard
+        label="En proceso"
+        value={String(pending)}
+        position="last"
+      />
+    </div>
 
-      {requests.length > 0 ? (
-        <div class="grid gap-4">
-          {requests.map((request: any) => {
-            const isEditable = request.status === "Primera Revisión";
-            const isNotCancelable = request.status === "Comprobación gastos del viaje" || request.status === "Validación de comprobantes";
-            const mustBeChecked = request.status === "Comprobación gastos del viaje";
-            return (
-              <div class="grid grid-cols-[2fr_2fr_1fr] gap-8">
-                <a href={`/detalles-solicitud/${request.request_id}`} class="col-span-2">
-                  <div class="col-span-2 space-y-2 content-wrapper">
-                    <p class="font-bold text-lg break-words">#{request.request_id}</p>
-                    <div class="text-sm text-gray-700 grid grid-cols-[2fr_3fr] gap-y-1">
-                      <p><span class="font-semibold">País Destino:</span> {request.destination_country}</p>
-                      <p>
-                        <span class="font-semibold">Estado:</span> 
-                        <span class={`ml-1 font-semibold text-sm rounded bg-yellow ${colorDesign[String(request.status)]}`}>
-                          {(request.status ? request.status.toUpperCase() : '')}
-                        </span>
-                      </p>
-                      <p><span class="font-semibold">Fechas:</span> {request.beginning_date} - {request.ending_date}</p>
-                      <p><span class="font-semibold">Responsable:</span> Eduardo Porto Morales</p>
-                    </div>
-                  </div>
+    <!-- Requests requiring attention -->
+    {requests.length > 0 && (
+      <section class="card-editorial">
+        <div class="px-6 py-4 border-b border-[var(--color-neutral-200)]">
+          <h2 class="font-editorial text-lg font-normal text-[var(--color-ink)]">
+            Requieren tu atención
+          </h2>
+        </div>
+
+        {requests.map((request: any, index: number) => {
+          const isEditable = request.status === "Primera Revisión";
+          const isNotCancelable = request.status === "Comprobación gastos del viaje" || request.status === "Validación de comprobantes";
+          const mustBeChecked = request.status === "Comprobación gastos del viaje";
+          const isLast = index === requests.length - 1;
+
+          return (
+            <div class={`px-6 py-4 flex items-center justify-between gap-6 ${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''} hover:bg-[var(--color-surface-secondary)] transition-colors`}>
+              <!-- Left: Number + Info -->
+              <div class="flex items-center gap-4 flex-1 min-w-0">
+                <span class="font-editorial text-lg text-[var(--color-ink-muted)] tabular-nums w-6 text-right">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <a href={`/detalles-solicitud/${request.request_id}`} class="flex-1 min-w-0">
+                  <p class="font-medium text-[var(--color-ink)] truncate">
+                    {request.destination_country}
+                  </p>
+                  <p class="text-xs text-[var(--color-ink-muted)] mt-0.5">
+                    #{request.request_id} &middot; {request.beginning_date} &ndash; {request.ending_date}
+                  </p>
                 </a>
-                <div class="grid grid-cols-[1fr_auto] gap-4 items-center">
-                  <div class="flex flex-col gap-2">
-                    <a href={`/editar-solicitud/${request.request_id}`}>
-                      <Button color="primary" disabled={!isEditable} variant="filled" size="medium" customSizeClass="w-full">
-                        EDITAR
-                      </Button>
-                    </a>
-                    <a href={`/comprobar-solicitud/${request.request_id}`}>
-                      <Button color="secondary" disabled={!mustBeChecked} variant="filled" size="medium" customSizeClass="w-full">
-                        COMPROBAR GASTOS
-                      </Button>
-                    </a>
-                  </div>
-                  <div class="flex justify-end items-center h-full">
-                    <span class="flex items-center justify-center w-6 h-6">                        
-                      <CancelRequestModal
-                        client:only="react"
-                        id={request.request_id}
-                        disabled={isNotCancelable}
-                        token={getCookie("token", Astro.cookies)}
-                      >
-                        <div>
-                          <MaterialIcon
-                            icon="delete"
-                            color="black"
-                            style="cursor: pointer"
-                          />
-                        </div>
-                      </CancelRequestModal>
-                    </span>
-                  </div>
-                </div>
               </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div class="bg-gray-100 p-6 rounded-lg shadow w-full text-center text-gray-500 font-semibold">
-          NO TIENES VIAJES AGENDADOS
-        </div>
-      )}
-    </section>
 
-    <a href="/crear-solicitud" class="mt-8 flex justify-center">
-      <Button variant="filled" color="secondary" size="custom" customSizeClass="w-128 py-3 text-base font-bold">
-        SOLICITA UN NUEVO VIAJE
-      </Button>
-    </a>
+              <!-- Status pill -->
+              <span class={`status-pill ${statusMap[request.status] || 'status-pill--review'}`}>
+                {request.status}
+              </span>
 
+              <!-- Actions -->
+              <div class="flex items-center gap-2">
+                {isEditable && (
+                  <a href={`/editar-solicitud/${request.request_id}`}>
+                    <Button variant="border" color="primary" size="small">
+                      Editar
+                    </Button>
+                  </a>
+                )}
+                {mustBeChecked && (
+                  <a href={`/comprobar-solicitud/${request.request_id}`}>
+                    <Button variant="filled" color="primary" size="small">
+                      Comprobar
+                    </Button>
+                  </a>
+                )}
+                {!isNotCancelable && (
+                  <CancelRequestModal
+                    client:only="react"
+                    id={request.request_id}
+                    disabled={isNotCancelable}
+                    token={getCookie("token", Astro.cookies)}
+                  >
+                    <div class="p-1.5 rounded-[var(--radius-md)] text-[var(--color-ink-muted)] hover:bg-accent-50 hover:text-accent-400 transition-colors cursor-pointer">
+                      <MaterialIcon icon="delete" color="currentColor" />
+                    </div>
+                  </CancelRequestModal>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </section>
+    )}
+
+    {requests.length === 0 && (
+      <div class="card-editorial py-16 text-center">
+        <p class="text-[var(--color-ink-muted)]">No tienes viajes agendados</p>
+        <a href="/crear-solicitud" class="mt-4 inline-block">
+          <Button variant="filled" color="primary" size="medium">
+            Solicita tu primer viaje
+          </Button>
+        </a>
+      </div>
+    )}
   </main>
 </div>
