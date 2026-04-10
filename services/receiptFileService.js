@@ -2,7 +2,7 @@
  * @module receiptFileService
  * @description Handles receipt file operations: uploading, retrieving, and deleting
  * PDF and XML files in MongoDB GridFS, with metadata stored in PostgreSQL via Prisma.
- * Validates and parses CFDI XML before storage, checking UUID uniqueness.
+ * Validates and parses CFDI XML before storage; UUID duplicado se valida contra cfdi_comprobantes.
  */
 import { ObjectId } from "mongodb";
 import { uploadFile, getFile, db, bucket } from "./fileStorage.js";
@@ -15,7 +15,7 @@ export { CfdiParseError };
 /**
  * Uploads a PDF and XML file pair for a receipt to MongoDB GridFS.
  * Validates and parses the CFDI XML before uploading: rejects invalid structure
- * and duplicate UUIDs. On success, stores file IDs and CFDI metadata in PostgreSQL.
+ * and duplicate UUIDs. On success, stores file IDs en Receipt; el CFDI fiscal completo va por POST /api/comprobantes.
  *
  * @param {number} receiptId - ID of the receipt to associate files with
  * @param {Express.Multer.File} pdfFile - Multer file object for the PDF
@@ -67,7 +67,7 @@ export async function uploadReceiptFiles(receiptId, pdfFile, xmlFile) {
       },
     });
 
-    await CfdiModel.saveCfdiMetadata(receiptId, cfdiData);
+    // Los datos fiscales completos se persisten en cfdi_comprobantes vía POST /api/comprobantes/:receipt_id
 
     return { pdf: pdfResult, xml: xmlResult, cfdi: cfdiData };
   } catch (error) {
