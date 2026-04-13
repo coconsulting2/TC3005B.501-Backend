@@ -1,9 +1,23 @@
 import js from "@eslint/js";
 import jsdoc from "eslint-plugin-jsdoc";
+import tseslint from "typescript-eslint";
 
 export default [
+    {
+        ignores: [
+            "node_modules/**",
+            "database/config/**",
+            "uploads/**",
+            "backup_scripts/**",
+            "certs/**",
+            "coverage/**",
+            "dist/**",
+            "scripts/**/*.mjs",
+        ],
+    },
     js.configs.recommended,
     {
+        files: ["**/*.js"],
         plugins: {
             jsdoc,
         },
@@ -27,13 +41,10 @@ export default [
             },
         },
         rules: {
-            // --- Style ---
             "semi": ["error", "always"],
             "quotes": ["warn", "double", { avoidEscape: true, allowTemplateLiterals: true }],
             "no-trailing-spaces": "warn",
             "eol-last": ["warn", "always"],
-
-            // --- Best practices ---
             "eqeqeq": ["warn", "always"],
             "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
             "no-console": ["warn", { allow: ["error", "warn"] }],
@@ -42,8 +53,6 @@ export default [
             "no-useless-escape": "warn",
             "no-dupe-keys": "warn",
             "no-useless-catch": "warn",
-
-            // --- JSDoc (controllers) ---
             "jsdoc/require-jsdoc": ["warn", {
                 require: {
                     FunctionDeclaration: true,
@@ -57,7 +66,6 @@ export default [
             "jsdoc/require-returns-type": "warn",
         },
     },
-    // CJS files (.cjs) — allow require()
     {
         files: ["**/*.cjs"],
         languageOptions: {
@@ -68,10 +76,12 @@ export default [
                 exports: "writable",
                 __dirname: "readonly",
                 __filename: "readonly",
+                process: "readonly",
+                console: "readonly",
+                Buffer: "readonly",
             },
         },
     },
-    // Test files — register Jest globals and relax JSDoc rules
     {
         files: ["tests/**/*.js", "**/*.test.js", "**/*.spec.js"],
         languageOptions: {
@@ -94,14 +104,37 @@ export default [
             "no-constant-binary-expression": "off",
         },
     },
-    {
-        ignores: [
-            "node_modules/**",
-            "database/config/**",
-            "uploads/**",
-            "backup_scripts/**",
-            "certs/**",
-            "coverage/**",
-        ],
-    },
+    ...tseslint.config(
+        {
+            files: ["src/ts/**/*.ts"],
+            extends: [tseslint.configs.recommended],
+            rules: {
+                "@typescript-eslint/no-unused-vars": [
+                    "warn",
+                    { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+                ],
+            },
+        },
+        {
+            files: ["tests/**/*.ts", "**/*.test.ts", "**/*.spec.ts"],
+            extends: [tseslint.configs.recommended],
+            languageOptions: {
+                globals: {
+                    describe: "readonly",
+                    test: "readonly",
+                    expect: "readonly",
+                    beforeAll: "readonly",
+                    beforeEach: "readonly",
+                    afterAll: "readonly",
+                    afterEach: "readonly",
+                },
+            },
+            rules: {
+                "@typescript-eslint/no-unused-vars": [
+                    "warn",
+                    { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+                ],
+            },
+        },
+    ),
 ];

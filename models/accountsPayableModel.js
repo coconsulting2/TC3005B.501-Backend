@@ -100,6 +100,24 @@ const AccountsPayable = {
   },
 
   /**
+   * Recibo con CFDI para validacion CPP (aprobacion / rechazo).
+   * @param {number} receiptId
+   * @returns {Promise<{ receipt_id: number, validation: string, cfdiComprobante: Object|null }|undefined>}
+   */
+  async findReceiptForValidation(receiptId) {
+    const receipt = await prisma.receipt.findUnique({
+      where: { receiptId: Number(receiptId) },
+      include: { cfdiComprobante: true },
+    });
+    if (!receipt) return undefined;
+    return {
+      receipt_id: receipt.receiptId,
+      validation: receipt.validation,
+      cfdiComprobante: receipt.cfdiComprobante,
+    };
+  },
+
+  /**
    * Validate (approve or reject) a receipt.
    * The controller calls this with `3 - approval` which maps to:
    *   approval=1 -> 2 (Aprobado is index 2 in the old enum)
@@ -129,7 +147,7 @@ const AccountsPayable = {
   async getExpenseValidations(requestId) {
     const rows = await prisma.receipt.findMany({
       where: { requestId: Number(requestId) },
-      include: { receiptType: true },
+      include: { receiptType: true, cfdiComprobante: true },
     });
 
     if (rows.length === 0) {
@@ -153,6 +171,7 @@ const AccountsPayable = {
         receipt_type_name: row.receiptType?.receiptTypeName,
         amount: row.amount,
         validation: row.validation,
+        sat_estado: row.cfdiComprobante?.satEstado ?? null,
         pdf_id: row.pdfFileId,
         pdf_name: row.pdfFileName,
         xml_id: row.xmlFileId,

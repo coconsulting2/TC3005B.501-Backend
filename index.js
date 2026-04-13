@@ -51,10 +51,12 @@ app.use("/api/accounts-payable", accountsPayableRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/comprobantes", comprobantesRoutes);
 
-connectMongo().catch(error => console.error("Failed to connect to MongoDB:", error));
-prisma.$connect()
-  .then(() => console.log("PostgreSQL connected via Prisma"))
-  .catch(error => console.error("Failed to connect to PostgreSQL:", error));
+if (!process.env.JEST_WORKER_ID) {
+  connectMongo().catch(error => console.error("Failed to connect to MongoDB:", error));
+  prisma.$connect()
+    .then(() => console.log("PostgreSQL connected via Prisma"))
+    .catch(error => console.error("Failed to connect to PostgreSQL:", error));
+}
 
 // Centralized auth error handler — must be registered after all routes
 app.use(handleAuthError);
@@ -65,15 +67,18 @@ app.get("/", (req, res) => {
   });
 });
 
-const privateKey = fs.readFileSync("./certs/server.key", "utf8");
-const certificate = fs.readFileSync("./certs/server.crt", "utf8");
-const ca = fs.readFileSync("./certs/ca.crt", "utf8");
-const credentials = { key: privateKey, cert: certificate, ca: ca };
+export default app;
 
-console.clear();
-const httpsServer = https.createServer(credentials, app);
-httpsServer.listen(PORT, () =>
-  console.log(`
+if (!process.env.JEST_WORKER_ID) {
+  const privateKey = fs.readFileSync("./certs/server.key", "utf8");
+  const certificate = fs.readFileSync("./certs/server.crt", "utf8");
+  const ca = fs.readFileSync("./certs/ca.crt", "utf8");
+  const credentials = { key: privateKey, cert: certificate, ca: ca };
+
+  console.clear();
+  const httpsServer = https.createServer(credentials, app);
+  httpsServer.listen(PORT, () => {
+    console.log(`
          )         )            (   (
    (  ( /(   (  ( /(      (     )\\ ))\\ )
    )\\ )\\())  )\\ )\\())     )\\   (()/(()/( 
@@ -83,5 +88,6 @@ httpsServer.listen(PORT, () =>
  | (_| (_) | (_| (_) |   / _ \\ |  _/| |
   \\___\\___/ \\___\\___/   /_/ \\_\\|_| |___|
 🚀 Server running on port ${PORT} with HTTPS
-`),
-);
+`);
+  });
+}
