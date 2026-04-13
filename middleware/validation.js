@@ -480,7 +480,8 @@ const RFC_GENERICOS = ["XAXX010101000", "XEXX010101000"]; // RFC genérico extra
 
 /**
  * Validates all CFDI 4.0 fields (from M1-001 XML parsing)
- * and the SAT Acuse response fields (from M1-002 SAT validation).
+ * El acuse SAT se obtiene en servidor (satConsultaService); el cliente solo envia datos del CFDI.
+ * Opcional: sello_emisor (atributo Sello del XML) para armar el parametro fe en la consulta SAT.
  * WebService SAT: https://consultaqr.facturaelectronica.sat.gob.mx/ConsultaCFDIService.svc
  * (Hector Lugo — M1-003)
  */
@@ -521,16 +522,7 @@ export const validateCfdi = [
   body("domicilio_fiscal_receptor").matches(/^\d{5}$/).withMessage("domicilio_fiscal_receptor debe ser CP de 5 dígitos"),
   body("regimen_fiscal_receptor").isString().trim().isLength({ min: 3, max: 3 }),
   body("uso_cfdi").isString().trim().isLength({ min: 2, max: 4 }).withMessage("uso_cfdi inválido (ej. G03, S01, D01)"),
-  // --- Acuse SAT (respuesta del WebService de consulta CFDI v1.4) ---
-  body("sat_codigo_estatus").isString().trim().notEmpty().withMessage("sat_codigo_estatus es requerido"),
-  body("sat_estado")
-    .isIn(["Vigente", "Cancelado", "No Encontrado"])
-    .withMessage("sat_estado debe ser: Vigente, Cancelado o No Encontrado"),
-  body("sat_es_cancelable").optional().isString().trim(),
-  body("sat_estatus_cancelacion").optional().isString().trim(),
-  body("sat_validacion_efos")
-    .isIn(["100", "101", "102", "103", "104", "200", "201"])
-    .withMessage("sat_validacion_efos debe ser código EFOS válido (100-104, 200, 201)"),
+  body("sello_emisor").optional().isString().trim().isLength({ min: 1 }).withMessage("sello_emisor debe ser texto del XML si se envia"),
 ];
 
 /*

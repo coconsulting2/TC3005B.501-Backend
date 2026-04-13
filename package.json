@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
+    "dev:with-ts-watch": "concurrently -n tsc,api -c blue,green \"bunx tsc -p tsconfig.build.json --watch --preserveWatchOutput\" \"node --watch index.js\"",
     "dummy_db": "bunx prisma db push --force-reset && node prisma/seed.js dev",
     "empty_db": "bunx prisma db push --force-reset && node prisma/seed.js",
     "migrate": "bunx prisma migrate dev",
@@ -14,7 +15,9 @@
     "studio": "bunx prisma studio",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "build": "eslint . --quiet && echo Build passed",
+    "build:ts": "bunx tsc -p tsconfig.build.json",
+    "typecheck:new": "bunx tsc -p tsconfig.src-ts.json --noEmit",
+    "build": "node scripts/verify-build.mjs",
     "test": "NODE_OPTIONS='--experimental-vm-modules' bunx jest --coverage",
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules' bunx jest --watch",
     "docker:test": "docker compose -f docker-compose.dev.yml exec -T -e NODE_OPTIONS=--experimental-vm-modules backend bunx jest --coverage",
@@ -54,20 +57,28 @@
     "mongo-sanitize": "^1.1.0",
     "mongodb": "^5.0.0",
     "multer": "^2.0.1",
-    "nodemailer": "^7.0.3"
+    "nodemailer": "^7.0.3",
+    "soap": "^1.8.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
-    "prisma": "^6.16.0",
     "@jest/globals": "^30.3.0",
+    "@swc/core": "^1.15.24",
+    "@swc/jest": "^0.2.39",
+    "concurrently": "^9.2.1",
     "eslint": "^9.0.0",
     "eslint-plugin-jsdoc": "^50.0.0",
     "jest": "^30.3.0",
-    "supertest": "^7.2.2"
+    "prisma": "^6.16.0",
+    "supertest": "^7.2.2",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.1"
   },
   "jest": {
     "testEnvironment": "node",
-    "transform": {},
+    "transform": {
+      "^.+\\.ts$": "@swc/jest"
+    },
     "coverageDirectory": "coverage",
     "collectCoverageFrom": [
       "middleware/authMiddleware.js",
