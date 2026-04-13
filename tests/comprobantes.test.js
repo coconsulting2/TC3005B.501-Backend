@@ -11,7 +11,7 @@
 import request from "supertest";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
-import { jest } from "@jest/globals";
+import { jest, describe, test, expect, beforeEach } from "@jest/globals";
 
 dotenv.config();
 process.env.JWT_SECRET ??= "jest-secret-comprobantes-sat";
@@ -58,7 +58,7 @@ const { default: AccountsPayable } = await import("../models/accountsPayableMode
 const { consultarCfdiWithRetries } = await import("../services/satConsultaService.js");
 
 // Import app after mocks are set up
-const { default: app } = await import("../index.js");
+const { default: app } = await import("../app.js");
 
 // ──────────────────────────────────────────────────────────
 // Helpers
