@@ -7,7 +7,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-import cors from "cors";
 import fs from "fs";
 import https from "https";
 
@@ -15,16 +14,6 @@ import { connectMongo } from "./services/fileStorage.js";
 import { connectPostgres } from "./database/config/prisma.js";
 
 import app from "./app.js";
-
-const corsOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
-    : "https://localhost:4321";
-
-app.use(cors({
-    origin: corsOrigins,
-    credentials: true,
-    methods: ["GET", "POST", "PUT"],
-}));
 
 const PORT = process.env.PORT || 3000;
 

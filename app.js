@@ -1,8 +1,8 @@
 /**
  * @file app.js
  * @description CocoAPI backend server.
- * Loads environment variables, registers Express middleware (CORS, JSON, cookies),
- * mounts all API route groups. (No side effects on import).
+ * CORS debe ir antes que rutas y body parsers para que OPTIONS (preflight) reciba headers.
+ * Monta middleware, rutas y manejador de errores de auth. (Sin efectos al importar salvo stack.)
  */
 import applicantRoutes from "./routes/applicantRoutes.js";
 import authorizerRoutes from "./routes/authorizerRoutes.js";
@@ -17,9 +17,19 @@ import { handleAuthError } from "./middleware/authErrors.js";
 
 import express from "express";
 import cookieParser from "cookie-parser";
+import cors from "cors";
 
 const app = express();
 
+const corsOrigins = process.env.CORS_ORIGIN
+    ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
+    : ["https://localhost:4321", "http://localhost:4321"];
+
+app.use(cors({
+    origin: corsOrigins,
+    credentials: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+}));
 
 app.use(express.json());
 app.use(cookieParser());
