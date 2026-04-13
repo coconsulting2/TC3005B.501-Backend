@@ -1,0 +1,91 @@
+name: e2e-ci.yml
+
+on:
+  push:
+    branches: [ main, development ]
+  pull_request:
+    branches: [ main, development ]
+    types: [ opened, reopened, synchronize ]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cocoscheme
+          POSTGRES_PASSWORD: cocoscheme_dev
+          POSTGRES_DB: CocoScheme
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cocoscheme -d CocoScheme"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Wait for Postgres and Mongo
+        run: |
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 -U cocoscheme -d CocoScheme && break
+            echo "Waiting for Postgres..."
+            sleep 2
+          done
+
+          for i in {1..30}; do
+            mongosh "mongodb://localhost:27017" --quiet --eval 'db.runCommand({ ping: 1 }).ok' && break
+            echo "Waiting for Mongo..."
+            sleep 2
+          done
+
+      - name: Prepare database
+        env:
+          DATABASE_URL: postgresql://cocoscheme:cocoscheme_dev@localhost:5432/CocoScheme?schema=public
+          MONGO_URI: mongodb://localhost:27017
+          AES_SECRET_KEY: 12345678901234567890123456789012
+          JWT_SECRET: dev_jwt_secret_change_me
+        run: |
+          bunx prisma generate
+          bunx prisma db push --accept-data-loss
+
+      - name: Run e2e tests
+        env:
+          NODE_ENV: test
+          PORT: 3000
+          DATABASE_URL: postgresql://cocoscheme:cocoscheme_dev@localhost:5432/CocoScheme?schema=public
+          MONGO_URI: mongodb://localhost:27017
+          CORS_ORIGIN: http://localhost:4321,https://localhost:4321
+          AES_SECRET_KEY: 12345678901234567890123456789012
+          JWT_SECRET: dev_jwt_secret_change_me
+          MAIL_USER: test.mail@outlook.com
+          MAIL_PASSWORD: changeme
+          NODE_OPTIONS: --experimental-vm-modules
+        run: bun run test:e2e
