@@ -169,6 +169,13 @@ model Receipt {
   pdfFileName     String?          @map("pdf_file_name") @db.VarChar(255)
   xmlFileId       String?          @map("xml_file_id") @db.VarChar(24)
   xmlFileName     String?          @map("xml_file_name") @db.VarChar(255)
+  cfdiUuid        String?          @unique @map("cfdi_uuid") @db.VarChar(36)
+  cfdiVersion     String?          @map("cfdi_version") @db.VarChar(3)
+  cfdiEmisorRfc   String?          @map("cfdi_emisor_rfc") @db.VarChar(13)
+  cfdiReceptorRfc String?          @map("cfdi_receptor_rfc") @db.VarChar(13)
+  cfdiFecha       DateTime?        @map("cfdi_fecha")
+  cfdiTotal       Float?           @map("cfdi_total")
+  cfdiImpuestos   String?          @map("cfdi_impuestos") @db.Text
   receiptType     ReceiptType?     @relation(fields: [receiptTypeId], references: [receiptTypeId])
   request         Request?         @relation(fields: [requestId], references: [requestId])
   cfdiComprobante CfdiComprobante?
