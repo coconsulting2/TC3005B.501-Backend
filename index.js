@@ -20,7 +20,6 @@ import { connectMongo } from "./services/fileStorage.js";
 import { handleAuthError } from "./middleware/authErrors.js";
 // Temporarily comment out Prisma for testing
 // import prisma from "./database/config/prisma.js";
-
 import fs from "fs";
 import https from "https";
 import express from "express";
@@ -62,7 +61,10 @@ app.get("/", (req, res) => {
 
 connectMongo().catch(error => console.error("Failed to connect to MongoDB:", error));
 
-console.clear(); // eslint-disable-line no-console
+/** Jest importa `app` desde `app.js`; aquí no abrimos puerto ni conectamos BD. */
+if (!process.env.JEST_WORKER_ID) {
+    connectMongo().catch((error) => console.error("Failed to connect to MongoDB:", error));
+    connectPostgres().catch((error) => console.error("Failed to connect to PostgreSQL:", error));
 
 // Temporarily use HTTP instead of HTTPS for testing
 const server = app.listen(PORT, () =>
@@ -79,3 +81,4 @@ const server = app.listen(PORT, () =>
 🚀 Server running on port ${PORT} with HTTP (testing mode)
 `),
 );
+}
