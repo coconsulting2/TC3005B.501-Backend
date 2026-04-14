@@ -6,7 +6,7 @@ import { describe, it, expect } from "@jest/globals";
 import {
   buildExpresionImpresa,
   normalizeConsultaResult,
-} from "../../services/satConsultaService.js";
+} from "../../../services/satConsultaService.js";
 
 describe("satConsultaService", () => {
   describe("buildExpresionImpresa", () => {
