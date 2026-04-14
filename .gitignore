@@ -144,7 +144,12 @@ dist
 # configuration
 *.cnf
 
-#MacOS Stuff
+# MacOS Stuff
 .DS_Store
 
+# prisma cache
 /generated/prisma
+
+# IDEs stuff
+.idea/
+*.local/

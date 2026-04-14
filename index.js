@@ -1,77 +1,50 @@
 /**
  * @file index.js
  * @description Entry point for the CocoAPI backend server.
- * Loads environment variables, registers Express middleware (CORS, JSON, cookies),
- * mounts all API route groups, connects to MongoDB, and starts the HTTPS server.
+ * Configures env variables, connects to DBs and starts the HTTPS server.
  */
 import dotenv from "dotenv";
+
 dotenv.config();
 
-import applicantRoutes from "./routes/applicantRoutes.js";
-import authorizerRoutes from "./routes/authorizerRoutes.js";
-import userRoutes from "./routes/userRoutes.js";
-import travelAgentRoutes from "./routes/travelAgentRoutes.js";
-import adminRoutes from "./routes/adminRoutes.js";
-import accountsPayableRoutes from "./routes/accountsPayableRoutes.js";
-import fileRoutes from "./routes/fileRoutes.js";
-
-import { connectMongo } from "./services/fileStorage.js";
-import { handleAuthError } from "./middleware/authErrors.js";
-import prisma from "./database/config/prisma.js";
+import cors from "cors";
 
 import fs from "fs";
 import https from "https";
-import express from "express";
-import cors from "cors";
-import cookieParser from "cookie-parser";
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+import { connectMongo } from "./services/fileStorage.js";
+import { connectPostgres } from "./database/config/prisma.js";
+
+import app from "./app.js";
+
 
 const corsOrigins = process.env.CORS_ORIGIN
-  ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
-  : "https://localhost:4321";
+    ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
+    : "https://localhost:4321";
 
 app.use(cors({
-  origin: corsOrigins,
-  credentials: true,
-  methods: ["GET", "POST", "PUT"],
+    origin: corsOrigins,
+    credentials: true,
+    methods: ["GET", "POST", "PUT"],
 }));
 
-app.use(express.json());
-app.use(cookieParser());
 
-app.use("/api/applicant", applicantRoutes);
-app.use("/api/authorizer", authorizerRoutes);
-app.use("/api/user", userRoutes);
-app.use("/api/travel-agent", travelAgentRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/accounts-payable", accountsPayableRoutes);
-app.use("/api/files", fileRoutes);
+connectMongo();
+connectPostgres();
 
-connectMongo().catch(error => console.error("Failed to connect to MongoDB:", error));
-prisma.$connect()
-  .then(() => console.log("PostgreSQL connected via Prisma"))
-  .catch(error => console.error("Failed to connect to PostgreSQL:", error));
-
-// Centralized auth error handler — must be registered after all routes
-app.use(handleAuthError);
-
-app.get("/", (req, res) => {
-  res.json({
-    message: "This is my backend endpoint for the travel management system",
-  });
-});
+const PORT = process.env.PORT || 3000;
 
 const privateKey = fs.readFileSync("./certs/server.key", "utf8");
 const certificate = fs.readFileSync("./certs/server.crt", "utf8");
 const ca = fs.readFileSync("./certs/ca.crt", "utf8");
 const credentials = { key: privateKey, cert: certificate, ca: ca };
 
-console.clear();
+console.clear(); // eslint-disable-line no-console
+
 const httpsServer = https.createServer(credentials, app);
 httpsServer.listen(PORT, () =>
-  console.log(`
+    // eslint-disable-next-line no-console
+    console.log(`
          )         )            (   (
    (  ( /(   (  ( /(      (     )\\ ))\\ )
    )\\ )\\())  )\\ )\\())     )\\   (()/(()/( 

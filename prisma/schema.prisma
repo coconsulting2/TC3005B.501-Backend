@@ -181,3 +181,56 @@ model Receipt {
 
   @@map("Receipt")
 }
+
+model CfdiComprobante {
+  cfdiId                  Int      @id @default(autoincrement()) @map("cfdi_id")
+  receiptId               Int      @unique @map("receipt_id")
+
+  // --- TimbreFiscalDigital (da validez legal, generado por el PAC) ---
+  uuid                    String   @unique @db.VarChar(36)
+  fechaTimbrado           DateTime @map("fecha_timbrado")
+  rfcPac                  String   @map("rfc_pac") @db.VarChar(13)
+
+  // --- cfdi:Comprobante ---
+  version                 String   @default("4.0") @db.VarChar(3)
+  serie                   String?  @db.VarChar(25)
+  folio                   String?  @db.VarChar(40)
+  fechaEmision            DateTime @map("fecha_emision")
+  tipoComprobante         String   @map("tipo_comprobante") @db.VarChar(1)
+  lugarExpedicion         String   @map("lugar_expedicion") @db.VarChar(5)
+  exportacion             String   @default("01") @db.VarChar(2)
+  metodoPago              String   @map("metodo_pago") @db.VarChar(3)
+  formaPago               String   @map("forma_pago") @db.VarChar(2)
+  moneda                  String   @default("MXN") @db.VarChar(3)
+  tipoCambio              Float    @default(1.0) @map("tipo_cambio")
+  subtotal                Float
+  descuento               Float    @default(0.0)
+  iva                     Float    @default(0.0)
+  total                   Float
+
+  // --- cfdi:Emisor ---
+  rfcEmisor               String   @map("rfc_emisor") @db.VarChar(13)
+  nombreEmisor            String   @map("nombre_emisor") @db.VarChar(254)
+  regimenFiscalEmisor     String   @map("regimen_fiscal_emisor") @db.VarChar(3)
+
+  // --- cfdi:Receptor ---
+  rfcReceptor             String   @map("rfc_receptor") @db.VarChar(13)
+  nombreReceptor          String   @map("nombre_receptor") @db.VarChar(254)
+  domicilioFiscalReceptor String   @map("domicilio_fiscal_receptor") @db.VarChar(5)
+  regimenFiscalReceptor   String   @map("regimen_fiscal_receptor") @db.VarChar(3)
+  usoCfdi                 String   @map("uso_cfdi") @db.VarChar(4)
+
+  // --- Acuse SAT (WebService: https://consultaqr.facturaelectronica.sat.gob.mx) ---
+  satCodigoEstatus        String   @map("sat_codigo_estatus") @db.VarChar(60)
+  satEstado               String   @map("sat_estado") @db.VarChar(20)
+  satEsCancelable         String?  @map("sat_es_cancelable") @db.VarChar(40)
+  satEstatusCancelacion   String?  @map("sat_estatus_cancelacion") @db.VarChar(40)
+  satValidacionEfos       String   @map("sat_validacion_efos") @db.VarChar(3)
+
+  // --- Metadata ---
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  receipt                 Receipt  @relation(fields: [receiptId], references: [receiptId])
+
+  @@map("cfdi_comprobantes")
+}
