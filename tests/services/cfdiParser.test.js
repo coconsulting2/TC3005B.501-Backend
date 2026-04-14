@@ -325,6 +325,20 @@ describe("parseCFDI", () => {
       result = parseCFDI(CFDI_V40_RESTAURANT);
       expect(result.taxes.totalTrasladados).toBe(160.00);
     });
+
+    it("expone sello y selloUltimos8 null cuando Sello tiene menos de 8 caracteres", () => {
+      result = parseCFDI(CFDI_V40_RESTAURANT);
+      expect(result.sello).toBe("ABC123");
+      expect(result.selloUltimos8).toBeNull();
+    });
+
+    it("expone selloUltimos8 con los ultimos 8 cuando Sello es suficientemente largo", () => {
+      const longSello = "ABCDEF00GH12345678IJ";
+      const xml = CFDI_V40_RESTAURANT.replace('Sello="ABC123"', `Sello="${longSello}"`);
+      result = parseCFDI(xml);
+      expect(result.sello).toBe(longSello);
+      expect(result.selloUltimos8).toBe("345678IJ");
+    });
   });
 
   // ── Fixture 2: CFDI v3.3 Hotel ──────────────────────────────────────────

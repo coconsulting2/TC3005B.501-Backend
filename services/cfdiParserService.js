@@ -8,6 +8,22 @@ import { XMLParser } from "fast-xml-parser";
 
 const SUPPORTED_VERSIONS = ["3.3", "4.0"];
 
+/**
+ * Ultimos 8 caracteres del Sello del emisor (parametro `fe` en expresion impresa SAT).
+ * @param {string|null|undefined} sello - Valor de cfdi:Comprobante@Sello
+ * @returns {string|null}
+ */
+export function selloUltimos8FromSello(sello) {
+  if (!sello || typeof sello !== "string") {
+    return null;
+  }
+  const t = sello.trim();
+  if (t.length < 8) {
+    return null;
+  }
+  return t.slice(-8);
+}
+
 /** Maps CFDI impuesto code to human-readable name */
 const IMPUESTO_NOMBRES = {
   "001": "ISR",
@@ -47,6 +63,8 @@ const parser = new XMLParser({
  *   fecha: Date,
  *   total: number,
  *   uuid: string,
+ *   sello: string|null,
+ *   selloUltimos8: string|null,
  *   taxes: {
  *     totalTrasladados: number|null,
  *     totalRetenidos: number|null,
@@ -172,6 +190,9 @@ export function parseCFDI(xmlString) {
 
   const taxes = extractTaxes(comprobante.Impuestos);
 
+  const selloRaw = comprobante["@_Sello"] ?? null;
+  const sello = selloRaw != null && selloRaw !== "" ? String(selloRaw).trim() : null;
+
   return {
     version,
     rfcEmisor: rfcEmisor.toUpperCase().trim(),
@@ -179,6 +200,8 @@ export function parseCFDI(xmlString) {
     fecha: fechaDate,
     total,
     uuid: uuidNormalized,
+    sello,
+    selloUltimos8: selloUltimos8FromSello(sello),
     taxes,
   };
 }
