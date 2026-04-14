@@ -17,8 +17,13 @@
     "build": "eslint . --quiet && echo Build passed",
     "test": "NODE_OPTIONS='--experimental-vm-modules' bunx jest --coverage",
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules' bunx jest --watch",
-    "docker:dev": "docker compose -f docker-compose.dev.yml up",
-    "docker:dev:build": "docker compose -f docker-compose.dev.yml up --build",
+    "docker:test": "docker compose -f docker-compose.dev.yml exec -T -e NODE_OPTIONS=--experimental-vm-modules backend bunx jest --coverage",
+    "docker:test:watch": "docker compose -f docker-compose.dev.yml exec -e NODE_OPTIONS=--experimental-vm-modules backend bunx jest --watch",
+    "docker:prisma": "docker compose -f docker-compose.dev.yml exec -T backend bunx prisma",
+    "test:e2e": "NODE_OPTIONS='--experimental-vm-modules' bunx jest tests/e2e --verbose --detectOpenHandles --testTimeout=60000 --config '{\"testPathIgnorePatterns\":[\"/node_modules\"]}'",
+    "test:e2e:watch": "NODE_OPTIONS='--experimental-vm-modules' bunx jest tests/e2e --watch --verbose --detectOpenHandles --testTimeout=60000 --config '{\"testPathIgnorePatterns\":[\"/node_modules\"]}`\"",
+    "docker:dev": "docker compose -f docker-compose.dev.yml up --watch",
+    "docker:dev:build": "docker compose -f docker-compose.dev.yml up --build --watch",
     "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
     "docker:dev:clean": "docker compose -f docker-compose.dev.yml down -v",
     "seed": "node prisma/seed-orgs.js"
@@ -70,6 +75,10 @@
     "collectCoverageFrom": [
       "middleware/authMiddleware.js",
       "middleware/authErrors.js"
+    ],
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/tests/e2e/"
     ]
   },
   "prisma": {

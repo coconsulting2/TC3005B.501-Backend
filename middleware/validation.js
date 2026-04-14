@@ -474,6 +474,65 @@ export const validateCreateUser = [
     .withMessage("Phone number cannot be empty.")
 ];
 
+// --- RFC format: Personas Morales (12 chars) + Personas Físicas (13 chars) ---
+const RFC_REGEX = /^([A-ZÑ&]{3,4})(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])([A-Z\d]{3})$/;
+const RFC_GENERICOS = ["XAXX010101000", "XEXX010101000"]; // RFC genérico extranjero/sin efectos
+
+/**
+ * Validates all CFDI 4.0 fields (from M1-001 XML parsing)
+ * and the SAT Acuse response fields (from M1-002 SAT validation).
+ * WebService SAT: https://consultaqr.facturaelectronica.sat.gob.mx/ConsultaCFDIService.svc
+ * (Hector Lugo — M1-003)
+ */
+export const validateCfdi = [
+  // Path param
+  param("receipt_id").isInt({ min: 1 }).toInt().withMessage("receipt_id debe ser entero positivo"),
+  // --- TimbreFiscalDigital ---
+  body("uuid").isUUID(4).withMessage("uuid debe ser UUID v4 (Folio Fiscal del SAT)"),
+  body("fecha_timbrado").isISO8601().withMessage("fecha_timbrado debe ser fecha ISO 8601"),
+  body("rfc_pac").isString().trim().notEmpty().withMessage("rfc_pac es requerido (RFC del PAC)"),
+  // --- Comprobante ---
+  body("version").optional().isIn(["3.3", "4.0"]).withMessage("version debe ser 3.3 o 4.0"),
+  body("serie").optional().isString().trim().isLength({ max: 25 }),
+  body("folio").optional().isString().trim().isLength({ max: 40 }),
+  body("fecha_emision").isISO8601().withMessage("fecha_emision debe ser fecha ISO 8601"),
+  body("tipo_comprobante").isIn(["I", "E", "T", "P", "N"]).withMessage("tipo_comprobante inválido (I, E, T, P, N)"),
+  body("lugar_expedicion").matches(/^\d{5}$/).withMessage("lugar_expedicion debe ser CP de 5 dígitos"),
+  body("exportacion").optional().isIn(["01", "02", "03", "04"]).withMessage("exportacion debe ser 01, 02, 03 o 04"),
+  body("metodo_pago").isIn(["PUE", "PPD"]).withMessage("metodo_pago debe ser PUE o PPD"),
+  body("forma_pago").isString().trim().isLength({ min: 2, max: 2 }).withMessage("forma_pago debe ser 2 caracteres (ej. 03)"),
+  body("moneda").isString().trim().isLength({ min: 3, max: 3 }).withMessage("moneda debe ser código ISO 4217 de 3 caracteres"),
+  body("tipo_cambio").optional().isFloat({ min: 0.0001 }).withMessage("tipo_cambio debe ser > 0"),
+  body("subtotal").isFloat({ min: 0 }).withMessage("subtotal debe ser número >= 0"),
+  body("descuento").optional().isFloat({ min: 0 }),
+  body("iva").optional().isFloat({ min: 0 }),
+  body("total").isFloat({ min: 0 }).withMessage("total debe ser número >= 0"),
+  // --- Emisor ---
+  body("rfc_emisor")
+    .custom(v => RFC_REGEX.test(v) || RFC_GENERICOS.includes(v))
+    .withMessage("rfc_emisor no tiene formato SAT válido"),
+  body("nombre_emisor").isString().trim().notEmpty().isLength({ max: 254 }),
+  body("regimen_fiscal_emisor").isString().trim().isLength({ min: 3, max: 3 }).withMessage("regimen_fiscal_emisor debe ser código de 3 dígitos (ej. 601)"),
+  // --- Receptor ---
+  body("rfc_receptor")
+    .custom(v => RFC_REGEX.test(v) || RFC_GENERICOS.includes(v))
+    .withMessage("rfc_receptor no tiene formato SAT válido"),
+  body("nombre_receptor").isString().trim().notEmpty().isLength({ max: 254 }),
+  body("domicilio_fiscal_receptor").matches(/^\d{5}$/).withMessage("domicilio_fiscal_receptor debe ser CP de 5 dígitos"),
+  body("regimen_fiscal_receptor").isString().trim().isLength({ min: 3, max: 3 }),
+  body("uso_cfdi").isString().trim().isLength({ min: 2, max: 4 }).withMessage("uso_cfdi inválido (ej. G03, S01, D01)"),
+  // --- Acuse SAT (respuesta del WebService de consulta CFDI v1.4) ---
+  body("sat_codigo_estatus").isString().trim().notEmpty().withMessage("sat_codigo_estatus es requerido"),
+  body("sat_estado")
+    .isIn(["Vigente", "Cancelado", "No Encontrado"])
+    .withMessage("sat_estado debe ser: Vigente, Cancelado o No Encontrado"),
+  body("sat_es_cancelable").optional().isString().trim(),
+  body("sat_estatus_cancelacion").optional().isString().trim(),
+  body("sat_validacion_efos")
+    .isIn(["100", "101", "102", "103", "104", "200", "201"])
+    .withMessage("sat_validacion_efos debe ser código EFOS válido (100-104, 200, 201)"),
+];
+
 /*
  * This reviews any errors received in previous validations
  */
@@ -491,5 +550,6 @@ export default {
   validateExpenseReceipts,
   validateInputs,
   validateDraftTravelRequest,
-  validateCreateUser
+  validateCreateUser,
+  validateCfdi,
 };
