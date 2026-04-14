@@ -26,6 +26,31 @@ const ComprobantesModel = {
   },
 
   /**
+   * Actualiza solo los campos de acuse SAT para el CFDI ligado al recibo.
+   * @param {number} receiptId
+   * @param {Object} data - sat_codigo_estatus, sat_estado, sat_es_cancelable, sat_estatus_cancelacion, sat_validacion_efos
+   * @returns {Promise<Object|null>}
+   */
+  async updateSatAcuseByReceiptId(receiptId, data) {
+    const row = await prisma.cfdiComprobante.findUnique({
+      where: { receiptId: Number(receiptId) },
+    });
+    if (!row) {
+      return null;
+    }
+    return prisma.cfdiComprobante.update({
+      where: { receiptId: Number(receiptId) },
+      data: {
+        satCodigoEstatus:        data.sat_codigo_estatus,
+        satEstado:               data.sat_estado,
+        satEsCancelable:         data.sat_es_cancelable ?? null,
+        satEstatusCancelacion:   data.sat_estatus_cancelacion ?? null,
+        satValidacionEfos:       data.sat_validacion_efos,
+      },
+    });
+  },
+
+  /**
    * Insert a new CfdiComprobante linked to a Receipt atomically.
    * Uses prisma.$transaction to guarantee full rollback on any failure.
    * @param {number} receiptId

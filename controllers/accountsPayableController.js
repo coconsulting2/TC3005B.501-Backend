@@ -5,8 +5,12 @@
  */
 import AccountsPayable from "../models/accountsPayableModel.js";
 import AccountsPayableService from "../services/accountsPayableService.js";
+import ComprobantesModel from "../models/comprobantesModel.js";
+import { consultarCfdiWithRetries, acuseToCfdiRow } from "../services/satConsultaService.js";
 import mailData from "../services/email/mailData.js";
 import { Mail } from "../services/email/mail.cjs";
+
+const EFOS_EMISOR_BLACKLIST_APPROVAL = ["100", "101", "104"];
 
 /**
  * Attends a travel request by setting the imposed fee and advancing its status.
@@ -94,13 +98,48 @@ const validateReceipt = async (req, res) => {
     }
 
     try {
-        const receipt = await AccountsPayable.receiptExists(receiptId);
+        const receipt = await AccountsPayable.findReceiptForValidation(receiptId);
         if (!receipt) {
             return res.status(404).json({ error: "Receipt not found" });
         }
 
         if (receipt.validation !== "Pendiente") {
             return res.status(404).json({ error: "Receipt already approved or rejected" });
+        }
+
+        if (approval === 1) {
+            if (!receipt.cfdiComprobante) {
+                return res.status(409).json({
+                    error: "No hay CFDI registrado para este comprobante. No se puede aprobar el reembolso.",
+                });
+            }
+            const c = receipt.cfdiComprobante;
+            try {
+                const acuse = await consultarCfdiWithRetries({
+                    rfcEmisor: c.rfcEmisor,
+                    rfcReceptor: c.rfcReceptor,
+                    total: c.total,
+                    uuid: c.uuid,
+                    selloUltimos8: null,
+                });
+                const row = acuseToCfdiRow(acuse);
+                await ComprobantesModel.updateSatAcuseByReceiptId(receiptId, row);
+                if (acuse.estado !== "Vigente") {
+                    return res.status(409).json({
+                        error: `El SAT reporta el CFDI como "${acuse.estado}". No se puede aprobar el reembolso.`,
+                    });
+                }
+                if (EFOS_EMISOR_BLACKLIST_APPROVAL.includes(String(acuse.validacionEFOS))) {
+                    return res.status(409).json({
+                        error: "El emisor figura en lista EFOS. No se puede aprobar el reembolso.",
+                    });
+                }
+            } catch (satErr) {
+                console.error("SAT validation on approve:", satErr);
+                return res.status(503).json({
+                    error: "No se pudo validar el CFDI con el SAT. Intente mas tarde.",
+                });
+            }
         }
 
         const updated = await AccountsPayable.validateReceipt(receiptId, 3 - approval);
