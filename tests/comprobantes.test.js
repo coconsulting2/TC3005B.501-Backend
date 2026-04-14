@@ -18,9 +18,10 @@ process.env.JWT_SECRET ??= "jest-secret-comprobantes-sat";
 process.env.NODE_ENV ??= "test";
 
 // ──────────────────────────────────────────────────────────
-// Mocks (un solo registro por worker: evita desincronizar index.js con varios archivos)
+// Mocks ESM: `jest.mock` no sustituye módulos cargados vía `import()`; usar
+// `unstable_mockModule` antes de cualquier `import()` del módulo bajo prueba.
 // ──────────────────────────────────────────────────────────
-jest.mock("../models/accountsPayableModel.js", () => ({
+await jest.unstable_mockModule("../models/accountsPayableModel.js", () => ({
   default: {
     attendTravelRequest: jest.fn(),
     requestExists: jest.fn(),
@@ -33,7 +34,7 @@ jest.mock("../models/accountsPayableModel.js", () => ({
   },
 }));
 
-jest.mock("../services/satConsultaService.js", () => ({
+await jest.unstable_mockModule("../services/satConsultaService.js", () => ({
   consultarCfdiWithRetries: jest.fn(),
   acuseToCfdiRow: (a) => ({
     sat_codigo_estatus: a.codigoEstatus,
@@ -44,11 +45,11 @@ jest.mock("../services/satConsultaService.js", () => ({
   }),
 }));
 
-jest.mock("../models/comprobantesModel.js", () => ({
+await jest.unstable_mockModule("../models/comprobantesModel.js", () => ({
   default: {
     findReceiptById: jest.fn(),
-    findByUUID:      jest.fn(),
-    createCfdi:      jest.fn(),
+    findByUUID: jest.fn(),
+    createCfdi: jest.fn(),
     updateSatAcuseByReceiptId: jest.fn().mockResolvedValue({}),
   },
 }));
@@ -56,8 +57,6 @@ jest.mock("../models/comprobantesModel.js", () => ({
 const { default: ComprobantesModel } = await import("../models/comprobantesModel.js");
 const { default: AccountsPayable } = await import("../models/accountsPayableModel.js");
 const { consultarCfdiWithRetries } = await import("../services/satConsultaService.js");
-
-// Import app after mocks are set up
 const { default: app } = await import("../app.js");
 
 // ──────────────────────────────────────────────────────────
@@ -405,7 +404,7 @@ describe("PUT /api/accounts-payable/validate-receipt/:receipt_id (SAT)", () => {
       .send({ approval: 1 });
     expect(res.status).toBe(200);
     expect(ComprobantesModel.updateSatAcuseByReceiptId).toHaveBeenCalled();
-    expect(AccountsPayable.validateReceipt).toHaveBeenCalledWith("12", 2);
+    expect(AccountsPayable.validateReceipt).toHaveBeenCalledWith(12, 2);
   });
 
   test("rechazar no llama al SAT", async () => {
