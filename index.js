@@ -17,6 +17,7 @@ import fileRoutes from "./routes/fileRoutes.js";
 import exchangeRateRoutes from "./routes/exchangeRateRoutes.js";
 
 import { connectMongo } from "./services/fileStorage.js";
+import { connectPostgres } from "./database/config/prisma.js";
 import { handleAuthError } from "./middleware/authErrors.js";
 // Temporarily comment out Prisma for testing
 // import prisma from "./database/config/prisma.js";
@@ -41,6 +42,11 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+
+// Add CSRF middleware for security
+import csrf from 'csurf';
+const csrfProtection = csrf({ cookie: true });
+app.use(csrfProtection);
 
 app.use("/api/applicant", applicantRoutes);
 app.use("/api/authorizer", authorizerRoutes);
