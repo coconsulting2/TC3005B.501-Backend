@@ -21,7 +21,7 @@ process.env.NODE_ENV ??= "test";
 // Mocks ESM: `jest.mock` no sustituye módulos cargados vía `import()`; usar
 // `unstable_mockModule` antes de cualquier `import()` del módulo bajo prueba.
 // ──────────────────────────────────────────────────────────
-await jest.unstable_mockModule("../models/accountsPayableModel.js", () => ({
+await jest.unstable_mockModule("../../../models/accountsPayableModel.js", () => ({
   default: {
     attendTravelRequest: jest.fn(),
     requestExists: jest.fn(),
@@ -34,7 +34,7 @@ await jest.unstable_mockModule("../models/accountsPayableModel.js", () => ({
   },
 }));
 
-await jest.unstable_mockModule("../services/satConsultaService.js", () => ({
+await jest.unstable_mockModule("../../../services/satConsultaService.js", () => ({
   consultarCfdiWithRetries: jest.fn(),
   acuseToCfdiRow: (a) => ({
     sat_codigo_estatus: a.codigoEstatus,
@@ -45,7 +45,7 @@ await jest.unstable_mockModule("../services/satConsultaService.js", () => ({
   }),
 }));
 
-await jest.unstable_mockModule("../models/comprobantesModel.js", () => ({
+await jest.unstable_mockModule("../../../models/comprobantesModel.js", () => ({
   default: {
     findReceiptById: jest.fn(),
     findByUUID: jest.fn(),
@@ -54,10 +54,10 @@ await jest.unstable_mockModule("../models/comprobantesModel.js", () => ({
   },
 }));
 
-const { default: ComprobantesModel } = await import("../models/comprobantesModel.js");
-const { default: AccountsPayable } = await import("../models/accountsPayableModel.js");
-const { consultarCfdiWithRetries } = await import("../services/satConsultaService.js");
-const { default: app } = await import("../app.js");
+const { default: ComprobantesModel } = await import("../../../models/comprobantesModel.js");
+const { default: AccountsPayable } = await import("../../../models/accountsPayableModel.js");
+const { consultarCfdiWithRetries } = await import("../../../services/satConsultaService.js");
+const { default: app } = await import("../../../app.js");
 
 // ──────────────────────────────────────────────────────────
 // Helpers
