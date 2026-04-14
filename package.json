@@ -28,7 +28,8 @@
     "docker:dev": "docker compose -f docker-compose.dev.yml up --watch",
     "docker:dev:build": "docker compose -f docker-compose.dev.yml up --build --watch",
     "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
-    "docker:dev:clean": "docker compose -f docker-compose.dev.yml down -v"
+    "docker:dev:clean": "docker compose -f docker-compose.dev.yml down -v",
+    "seed": "node prisma/seed-orgs.js"
   },
   "repository": {
     "type": "git",
