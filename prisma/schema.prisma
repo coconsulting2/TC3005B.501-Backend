@@ -178,6 +178,7 @@ model Receipt {
   cfdiImpuestos   String?          @map("cfdi_impuestos") @db.Text
   receiptType     ReceiptType?     @relation(fields: [receiptTypeId], references: [receiptTypeId])
   request         Request?         @relation(fields: [requestId], references: [requestId])
+  cfdiComprobante CfdiComprobante?
 
   @@map("Receipt")
 }
