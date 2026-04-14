@@ -1,0 +1,30 @@
+
+<cfdi:Comprobante xmlns:cfdi="http://www.sat.gob.mx/cfd/4" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd" Version="4.0" Fecha="" Sello="" FormaPago="" NoCertificado="" Certificado="" SubTotal="" Moneda="" Total="" TipoDeComprobante="" Exportacion="" MetodoPago="" LugarExpedicion="">
+    <cfdi:Emisor Rfc="" Nombre="" RegimenFiscal=""/>
+    <cfdi:Receptor Rfc="" Nombre="" DomicilioFiscalReceptor="" RegimenFiscalReceptor="" UsoCFDI=""/>
+    <cfdi:Conceptos>
+        <cfdi:Concepto ClaveProdServ="" Cantidad="" ClaveUnidad="" Unidad="" Descripcion="" ValorUnitario="" Importe="" ObjetoImp="">
+            <cfdi:Impuestos>
+                <cfdi:Traslados>
+                    <cfdi:Traslado Base="" Impuesto="" TipoFactor="" TasaOCuota="" Importe=""/>
+                </cfdi:Traslados>
+                <cfdi:Retenciones>
+                    <cfdi:Retencion Base="" Impuesto="" TipoFactor="" TasaOCuota="" Importe=""/>
+                    <cfdi:Retencion Base="" Impuesto="" TipoFactor="" TasaOCuota="" Importe=""/>
+                </cfdi:Retenciones>
+            </cfdi:Impuestos>
+        </cfdi:Concepto>
+    </cfdi:Conceptos>
+    <cfdi:Impuestos TotalImpuestosTrasladados="" TotalImpuestosRetenidos="">
+        <cfdi:Retenciones>
+            <cfdi:Retencion Impuesto="" Importe=""/>
+            <cfdi:Retencion Impuesto="" Importe=""/>
+        </cfdi:Retenciones>
+        <cfdi:Traslados>
+            <cfdi:Traslado Base="" Impuesto="" TipoFactor="" TasaOCuota="" Importe=""/>
+        </cfdi:Traslados>
+    </cfdi:Impuestos>
+    <cfdi:Complemento>
+        <tfd:TimbreFiscalDigital xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital" xsi:schemaLocation="http://www.sat.gob.mx/TimbreFiscalDigital http://www.sat.gob.mx/sitio_internet/cfd/TimbreFiscalDigital/TimbreFiscalDigitalv11.xsd" Version="1.1" UUID="" FechaTimbrado="" RfcProvCertif="" SelloCFD="" NoCertificadoSAT="" SelloSAT=""/>
+    </cfdi:Complemento>
+</cfdi:Comprobante>
