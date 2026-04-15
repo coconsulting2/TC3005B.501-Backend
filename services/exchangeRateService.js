@@ -6,7 +6,9 @@ import https from 'https';
 
 class ExchangeRateService {
   constructor() {
-    this.mongoClient = new MongoClient(process.env.MONGO_URI);
+    // Handle test environment where MONGO_URI might be undefined
+    const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/test';
+    this.mongoClient = new MongoClient(mongoUri);
     this.db = null;
     this.wiseApiUrl = process.env.NODE_ENV === 'production' 
       ? 'https://api-mtls.transferwise.com/v1/rates' 
@@ -87,9 +89,18 @@ class ExchangeRateService {
       const db = await this.connectDB();
       const today = new Date().toISOString().split('T')[0];
       
+      // Sanitize user input to prevent injection
+      const sanitizedSource = String(source).toUpperCase().trim();
+      const sanitizedTarget = String(target).toUpperCase().trim();
+      
+      // Validate currency codes (3 letters max)
+      if (!/^[A-Z]{1,3}$/.test(sanitizedSource) || !/^[A-Z]{1,3}$/.test(sanitizedTarget)) {
+        throw new Error('Invalid currency codes');
+      }
+      
       const cachedRate = await db.collection('exchange_rates').findOne({
-        source,
-        target,
+        source: sanitizedSource,
+        target: sanitizedTarget,
         date: today
       });
 
@@ -112,14 +123,23 @@ class ExchangeRateService {
       const db = await this.connectDB();
       const today = new Date().toISOString().split('T')[0];
       
+      // Sanitize user input to prevent injection
+      const sanitizedSource = String(source).toUpperCase().trim();
+      const sanitizedTarget = String(target).toUpperCase().trim();
+      
+      // Validate currency codes (3 letters max)
+      if (!/^[A-Z]{1,3}$/.test(sanitizedSource) || !/^[A-Z]{1,3}$/.test(sanitizedTarget)) {
+        throw new Error('Invalid currency codes');
+      }
+      
       await db.collection('exchange_rates').updateOne(
-        { source, target, date: today },
-        {
+        { source: sanitizedSource, target: sanitizedTarget, date: today },
+        { 
           $set: {
             rate,
             dataSource,
             date: today,
-            updatedAt: new Date()
+            timestamp: new Date()
           }
         },
         { upsert: true }
@@ -234,7 +254,7 @@ class ExchangeRateService {
         dataSource: rateData.source,
         rateDate: rateData.date,
         fromCache: rateData.fromCache
-      }
+      };
     } catch (error) {
       console.error('Error converting currency:', error);
       throw error;
