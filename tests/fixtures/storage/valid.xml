@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<comprobante xmlns="http://www.sat.gob.mx/cfd/4"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 cfdv40.xsd"
+             Version="4.0"
+             Serie="A"
+             Folio="12345"
+             Fecha="2024-01-15T10:30:00"
+             Sello="ABCD1234EFGH5678"
+             FormaPago="01"
+             NoCertificado="00001000000504465028"
+             Certificado="MIIB..."
+             SubTotal="1000.00"
+             Moneda="MXN"
+             Total="1160.00"
+             TipoDeComprobante="I"
+             MetodoPago="PUE"
+             LugarExpedicion="06600">
+  <cfdi:Emisor xmlns:cfdi="http://www.sat.gob.mx/cfd/4"
+               Rfc="XAXX010101000"
+               Nombre="Empresa Ejemplo SA de CV"
+               RegimenFiscal="601"/>
+  <cfdi:Receptor xmlns:cfdi="http://www.sat.gob.mx/cfd/4"
+                 Rfc="XEXX010101000"
+                 Nombre="Cliente Ejemplo"
+                 DomicilioFiscalReceptor="06600"
+                 RegimenFiscalReceptor="616"
+                 UsoCFDI="G03"/>
+  <cfdi:Conceptos xmlns:cfdi="http://www.sat.gob.mx/cfd/4">
+    <cfdi:Concepto ClaveProdServ="78101800"
+                   NoIdentificacion="VIAJE-001"
+                   Cantidad="1"
+                   ClaveUnidad="E48"
+                   Unidad="Servicio"
+                   Descripcion="Servicio de viaje de negocios"
+                   ValorUnitario="1000.00"
+                   Importe="1000.00"
+                   ObjetoImp="02">
+      <cfdi:Impuestos>
+        <cfdi:Traslados>
+          <cfdi:Traslado Base="1000.00"
+                         Impuesto="002"
+                         TipoFactor="Tasa"
+                         TasaOCuota="0.160000"
+                         Importe="160.00"/>
+        </cfdi:Traslados>
+      </cfdi:Impuestos>
+    </cfdi:Concepto>
+  </cfdi:Conceptos>
+  <cfdi:Impuestos xmlns:cfdi="http://www.sat.gob.mx/cfd/4"
+                  TotalImpuestosTrasladados="160.00">
+    <cfdi:Traslados>
+      <cfdi:Traslado Base="1000.00"
+                     Impuesto="002"
+                     TipoFactor="Tasa"
+                     TasaOCuota="0.160000"
+                     Importe="160.00"/>
+    </cfdi:Traslados>
+  </cfdi:Impuestos>
+</comprobante>
