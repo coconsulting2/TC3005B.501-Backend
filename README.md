@@ -1,5 +1,9 @@
 # TC3005B.501-Backend
 
+![Tests](https://github.com/coconsulting2/TC3005B.501-Backend/.github/workflows/ci.yml/badge.svg)
+
+![E2E Tests](https://github.com/coconsulting2/TC3005B.501-Backend/.github/workflows/e2e-ci.yml/badge.svg)
+
 API and Database for the conection and the functioning of the trip management system portal developed in course TC3005B by group 501.
 
 ## Getting Started
