@@ -1,10 +1,12 @@
 # TC3005B.501-Backend
 
-![Tests](https://github.com/coconsulting2/TC3005B.501-Backend/.github/workflows/ci.yml/badge.svg)
+![Tests](https://github.com/coconsulting2/TC3005B.501-Backend/actions/workflows/ci.yml/badge.svg)
+![E2E Tests](https://github.com/coconsulting2/TC3005B.501-Backend/actions/workflows/e2e-ci.yml/badge.svg)
 
-![E2E Tests](https://github.com/coconsulting2/TC3005B.501-Backend/.github/workflows/e2e-ci.yml/badge.svg)
+---
 
-API and Database for the conection and the functioning of the trip management system portal developed in course TC3005B by group 501.
+API and Database for the connection and the functioning of the trip management system portal developed in course 
+TC3005B by group 501.
 
 ## Getting Started
 
@@ -17,13 +19,13 @@ The only option currently is to clone the repository locally from GitHub.
 #### Using `git`
 
 ```sh
-git clone https://github.com/101-Coconsulting/TC3005B.501-Backend
+git clone https://github.com/coconsulting2/TC3005B.501-Backend.git 
 ```
 
 #### Using `gh` (GitHub CLI)
 
 ```sh
-gh repo clone 101-Coconsulting/TC3005B.501-Backend
+gh repo clone coconsulting2/TC3005B.501-Backend
 ```
 
 ### Dependencies
@@ -38,7 +40,7 @@ bun install
 
 ### Create HTTPS certificates
 
-To succesfully create the certificates to use the server with HTTPS you will need to follow the next steps:
+To successfully create the certificates to use the server with HTTPS you will need to follow the next steps:
 
 #### Configuring OpenSSL
 
@@ -141,9 +143,9 @@ The first start auto-generates self-signed HTTPS certs, applies the Prisma schem
 
 ### Image tags
 
-| Tag | Description |
-|-----|-------------|
-| `ghcr.io/coconsulting2/tc3005b-501-backend:latest` | Latest commit on `main` |
+| Tag                                                     | Description                 |
+|---------------------------------------------------------|-----------------------------|
+| `ghcr.io/coconsulting2/tc3005b-501-backend:latest`      | Latest commit on `main`     |
 | `ghcr.io/coconsulting2/tc3005b-501-backend:sha-<short>` | Pinned to a specific commit |
 
 ### Overriding secrets

@@ -1,4 +1,4 @@
-name: e2e-ci.yml
+name: Backend CI:E2E
 
 on:
   push:
