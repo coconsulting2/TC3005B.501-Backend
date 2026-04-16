@@ -90,6 +90,9 @@ const LAST_NAMES = [
 
 // ── Schema setup (idempotent DDL) ────────────────────────────────────────────
 
+/**
+ *
+ */
 async function setupTables() {
   // Add business columns to organizaciones (migration 20260409000000 only has id + timestamps)
   await prisma.$executeRawUnsafe(`
@@ -133,6 +136,9 @@ async function setupTables() {
 
 // ── Seed functions ────────────────────────────────────────────────────────────
 
+/**
+ *
+ */
 async function seedRoles() {
   await prisma.role.createMany({ data: ROLES, skipDuplicates: true });
 
@@ -142,6 +148,9 @@ async function seedRoles() {
   return Object.fromEntries(rows.map((r) => [r.roleName, r.roleId]));
 }
 
+/**
+ *
+ */
 async function seedOrganizations() {
   const orgIds = [];
 
@@ -158,6 +167,9 @@ async function seedOrganizations() {
   return orgIds;
 }
 
+/**
+ *
+ */
 async function seedDepartments() {
   const orgDepts = [];
 
@@ -183,6 +195,11 @@ async function seedDepartments() {
   return orgDepts;
 }
 
+/**
+ *
+ * @param roleMap
+ * @param orgDepts
+ */
 async function seedUsers(roleMap, orgDepts) {
   for (let orgIdx = 0; orgIdx < ORGS.length; orgIdx++) {
     const { prefix, shortName } = ORGS[orgIdx];
@@ -216,6 +233,10 @@ async function seedUsers(roleMap, orgDepts) {
   }
 }
 
+/**
+ *
+ * @param orgIds
+ */
 async function seedSuppliers(orgIds) {
   const suppliers = [
     {
@@ -273,6 +294,10 @@ async function seedSuppliers(orgIds) {
   }
 }
 
+/**
+ *
+ * @param orgIds
+ */
 async function seedMongoConfig(orgIds) {
   const client = await MongoClient.connect(MONGO_URL);
   const db     = client.db("orgConfig");
@@ -312,6 +337,9 @@ async function seedMongoConfig(orgIds) {
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
+/**
+ *
+ */
 async function main() {
   console.log("Configuring schema extensions...");
   await setupTables();

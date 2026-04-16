@@ -6,7 +6,9 @@
 import { PrismaClient } from "@prisma/client";
 import { triggerExtension } from "../../prisma/middleware.js";
 
-const prisma = new PrismaClient().$extends(triggerExtension);
+const client = new PrismaClient();
+const disable_triggers = process.env.PRISMA_DISABLE_TRIGGERS === "true" && process.env.NODE_ENV === 'test';
+const prisma = disable_triggers ? client : client.$extends(triggerExtension);
 
 async function connectPostgres() {
     try {
