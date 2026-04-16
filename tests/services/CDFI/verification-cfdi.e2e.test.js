@@ -61,12 +61,32 @@ const startMockServer = async () => { // TODO: logs server logs to a file
  * @returns {Promise<import("@prisma/client").Receipt>}
  */
 async function seedReceiptWithCfdi(invoice) {
-    const receipt = await prisma.receipt.create({
-        data: {
-            amount: invoice.amount,
-            validation: "Pendiente",
-        },
-    });
+     // Create a test user
+     const user = await prisma.user.create({
+         data: {
+             userName: `test_user_${Date.now()}`,
+             password: "test",
+             workstation: "TEST",
+             email: `test_${Date.now()}@test.local`,
+         },
+     });
+
+     // Create a test request linked to the user
+     const request = await prisma.request.create({
+         data: {
+             userId: user.userId,
+             requestStatusId: 1,
+         },
+     });
+
+     // Create the receipt linked to the request
+     const receipt = await prisma.receipt.create({
+         data: {
+             requestId: request.requestId,
+             amount: invoice.amount,
+             validation: "Pendiente",
+         },
+     });
 
     await prisma.cfdiComprobante.create({
         data: {
