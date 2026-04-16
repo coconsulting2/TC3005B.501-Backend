@@ -5,7 +5,11 @@
  * invalid XML, missing required nodes, unsupported version, and malformed UUID.
  */
 import { describe, it, expect } from "@jest/globals";
-import { parseCFDI, CfdiParseError } from "../../services/cfdiParserService.js";
+import { parseCFDI, CfdiParseError } from "../../../services/cfdiParserService.js";
+import { Importer } from "../../utils/importXML.js";
+
+
+const CFDI = new Importer("./tax_invoices(CFDIs)", import.meta.url);
 
 // ─── CFDI Fixtures ────────────────────────────────────────────────────────────
 
@@ -14,251 +18,21 @@ import { parseCFDI, CfdiParseError } from "../../services/cfdiParserService.js";
  * Emisor: EKU9003173C9, Receptor: XAXX010101000 (público en general)
  * Total: MXN 1,160.00 (Subtotal 1,000 + IVA 160)
  */
-const CFDI_V40_RESTAURANT = `<?xml version="1.0" encoding="UTF-8"?>
-<cfdi:Comprobante
-  xmlns:cfdi="http://www.sat.gob.mx/cfd/4"
-  xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd"
-  Version="4.0"
-  Serie="R"
-  Folio="0001"
-  Fecha="2024-03-15T14:30:00"
-  Sello="ABC123"
-  FormaPago="03"
-  NoCertificado="30001000000400002434"
-  Certificado="MIID..."
-  SubTotal="1000.00"
-  Total="1160.00"
-  Moneda="MXN"
-  TipoDeComprobante="I"
-  Exportacion="01"
-  MetodoPago="PUE"
-  LugarExpedicion="06600">
-  <cfdi:Emisor
-    Rfc="EKU9003173C9"
-    Nombre="EMPRESA KOKONE SA DE CV"
-    RegimenFiscal="601"/>
-  <cfdi:Receptor
-    Rfc="XAXX010101000"
-    Nombre="PUBLICO EN GENERAL"
-    DomicilioFiscalReceptor="06600"
-    RegimenFiscalReceptor="616"
-    UsoCFDI="S01"/>
-  <cfdi:Conceptos>
-    <cfdi:Concepto
-      ClaveProdServ="90111500"
-      Cantidad="1"
-      ClaveUnidad="ACT"
-      Descripcion="Servicio de alimentos"
-      ValorUnitario="1000.00"
-      Importe="1000.00"
-      ObjetoImp="02">
-      <cfdi:Impuestos>
-        <cfdi:Traslados>
-          <cfdi:Traslado
-            Base="1000.00"
-            Impuesto="002"
-            TipoFactor="Tasa"
-            TasaOCuota="0.160000"
-            Importe="160.00"/>
-        </cfdi:Traslados>
-      </cfdi:Impuestos>
-    </cfdi:Concepto>
-  </cfdi:Conceptos>
-  <cfdi:Impuestos TotalImpuestosTrasladados="160.00">
-    <cfdi:Traslados>
-      <cfdi:Traslado
-        Base="1000.00"
-        Impuesto="002"
-        TipoFactor="Tasa"
-        TasaOCuota="0.160000"
-        Importe="160.00"/>
-    </cfdi:Traslados>
-  </cfdi:Impuestos>
-  <cfdi:Complemento>
-    <tfd:TimbreFiscalDigital
-      xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
-      Version="1.1"
-      UUID="A1B2C3D4-E5F6-7890-ABCD-EF1234567890"
-      NoCertificadoSAT="20001000000300022323"
-      RfcProvCertif="SAT970701NN3"
-      FechaTimbrado="2024-03-15T14:30:45"
-      SelloCFD="xyz..."
-      SelloSAT="sat..."/>
-  </cfdi:Complemento>
-</cfdi:Comprobante>`;
+const CFDI_V40_RESTAURANT = await CFDI.import("CFDI-v40-restaurant.xml");
 
 /**
  * Fixture 2: CFDI v3.3 – Hotel receipt with IVA 16%
  * Emisor: AAA010101AAA, Receptor: JUFA7509103S4
  * Total: MXN 3,480.00 (Subtotal 3,000 + IVA 480)
  */
-const CFDI_V33_HOTEL = `<?xml version="1.0" encoding="UTF-8"?>
-<cfdi:Comprobante
-  xmlns:cfdi="http://www.sat.gob.mx/cfd/3"
-  xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://www.sat.gob.mx/cfd/3 http://www.sat.gob.mx/sitio_internet/cfd/3/cfdv33.xsd"
-  Version="3.3"
-  Serie="H"
-  Folio="5500"
-  Fecha="2023-11-20T18:00:00"
-  Sello="DEF456"
-  FormaPago="04"
-  NoCertificado="30001000000400002434"
-  Certificado="MIID..."
-  SubTotal="3000.00"
-  Total="3480.00"
-  Moneda="MXN"
-  TipoDeComprobante="I"
-  MetodoPago="PUE"
-  LugarExpedicion="64000">
-  <cfdi:Emisor
-    Rfc="AAA010101AAA"
-    Nombre="HOTEL COSTA AZUL SA DE CV"
-    RegimenFiscal="601"/>
-  <cfdi:Receptor
-    Rfc="JUFA7509103S4"
-    Nombre="JUAN FLORES AGUILAR"
-    UsoCFDI="D01"/>
-  <cfdi:Conceptos>
-    <cfdi:Concepto
-      ClaveProdServ="55111500"
-      Cantidad="3"
-      ClaveUnidad="E48"
-      Descripcion="Hospedaje noche"
-      ValorUnitario="1000.00"
-      Importe="3000.00">
-      <cfdi:Impuestos>
-        <cfdi:Traslados>
-          <cfdi:Traslado
-            Base="3000.00"
-            Impuesto="002"
-            TipoFactor="Tasa"
-            TasaOCuota="0.160000"
-            Importe="480.00"/>
-        </cfdi:Traslados>
-      </cfdi:Impuestos>
-    </cfdi:Concepto>
-  </cfdi:Conceptos>
-  <cfdi:Impuestos TotalImpuestosTrasladados="480.00">
-    <cfdi:Traslados>
-      <cfdi:Traslado
-        Base="3000.00"
-        Impuesto="002"
-        TipoFactor="Tasa"
-        TasaOCuota="0.160000"
-        Importe="480.00"/>
-    </cfdi:Traslados>
-  </cfdi:Impuestos>
-  <cfdi:Complemento>
-    <tfd:TimbreFiscalDigital
-      xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
-      Version="1.1"
-      UUID="B2C3D4E5-F6A7-8901-BCDE-F12345678901"
-      NoCertificadoSAT="20001000000300022323"
-      RfcProvCertif="SAT970701NN3"
-      FechaTimbrado="2023-11-20T18:01:10"
-      SelloCFD="abc..."
-      SelloSAT="def..."/>
-  </cfdi:Complemento>
-</cfdi:Comprobante>`;
+const CFDI_V33_HOTEL = await CFDI.import("CFDI-v33-hotel.xml");
 
 /**
  * Fixture 3: CFDI v4.0 – Transport with IVA traslado + ISR retencion
  * Emisor: TAXS730423FG8, Receptor: MARG850601QX3
  * SubTotal: 1,000 | IVA 16%: 160 | ISR 10% retencion: 100 | Total: 1,060
  */
-const CFDI_V40_TRANSPORT_WITH_RETENCION = `<?xml version="1.0" encoding="UTF-8"?>
-<cfdi:Comprobante
-  xmlns:cfdi="http://www.sat.gob.mx/cfd/4"
-  xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://www.sat.gob.mx/cfd/4 http://www.sat.gob.mx/sitio_internet/cfd/4/cfdv40.xsd"
-  Version="4.0"
-  Serie="T"
-  Folio="0099"
-  Fecha="2024-06-10T09:15:00"
-  Sello="GHI789"
-  FormaPago="99"
-  NoCertificado="30001000000400002434"
-  Certificado="MIID..."
-  SubTotal="1000.00"
-  Total="1060.00"
-  Moneda="MXN"
-  TipoDeComprobante="I"
-  Exportacion="01"
-  MetodoPago="PPD"
-  LugarExpedicion="44100">
-  <cfdi:Emisor
-    Rfc="TAXS730423FG8"
-    Nombre="TRANSPORTES AXEL SA DE CV"
-    RegimenFiscal="601"/>
-  <cfdi:Receptor
-    Rfc="MARG850601QX3"
-    Nombre="MARIA GARCIA RAMIREZ"
-    DomicilioFiscalReceptor="44100"
-    RegimenFiscalReceptor="612"
-    UsoCFDI="G01"/>
-  <cfdi:Conceptos>
-    <cfdi:Concepto
-      ClaveProdServ="78101800"
-      Cantidad="1"
-      ClaveUnidad="E48"
-      Descripcion="Servicio de transporte terrestre"
-      ValorUnitario="1000.00"
-      Importe="1000.00"
-      ObjetoImp="02">
-      <cfdi:Impuestos>
-        <cfdi:Traslados>
-          <cfdi:Traslado
-            Base="1000.00"
-            Impuesto="002"
-            TipoFactor="Tasa"
-            TasaOCuota="0.160000"
-            Importe="160.00"/>
-        </cfdi:Traslados>
-        <cfdi:Retenciones>
-          <cfdi:Retencion
-            Base="1000.00"
-            Impuesto="001"
-            TipoFactor="Tasa"
-            TasaOCuota="0.100000"
-            Importe="100.00"/>
-        </cfdi:Retenciones>
-      </cfdi:Impuestos>
-    </cfdi:Concepto>
-  </cfdi:Conceptos>
-  <cfdi:Impuestos
-    TotalImpuestosTrasladados="160.00"
-    TotalImpuestosRetenidos="100.00">
-    <cfdi:Traslados>
-      <cfdi:Traslado
-        Base="1000.00"
-        Impuesto="002"
-        TipoFactor="Tasa"
-        TasaOCuota="0.160000"
-        Importe="160.00"/>
-    </cfdi:Traslados>
-    <cfdi:Retenciones>
-      <cfdi:Retencion
-        Impuesto="001"
-        Importe="100.00"/>
-    </cfdi:Retenciones>
-  </cfdi:Impuestos>
-  <cfdi:Complemento>
-    <tfd:TimbreFiscalDigital
-      xmlns:tfd="http://www.sat.gob.mx/TimbreFiscalDigital"
-      Version="1.1"
-      UUID="C3D4E5F6-A7B8-9012-CDEF-123456789012"
-      NoCertificadoSAT="20001000000300022323"
-      RfcProvCertif="SAT970701NN3"
-      FechaTimbrado="2024-06-10T09:16:00"
-      SelloCFD="pqr..."
-      SelloSAT="stu..."/>
-  </cfdi:Complemento>
-</cfdi:Comprobante>`;
+const CFDI_V40_TRANSPORT_WITH_RETENCION = await CFDI.import("CFDI-v40-transport-with-retention.xml");
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 

@@ -1,0 +1,52 @@
+<?xml version="1.0"?>
+<wsdl:definitions
+        name="ConsultaCFDIService"
+        targetNamespace="http://example.com/consulta"
+        xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+        xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+        xmlns:tns="http://example.com/consulta"
+        xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+        xmlns:wsaw="http://www.w3.org/2006/05/addressing/wsdl">
+    <wsdl:types>
+        <xsd:schema targetNamespace="http://example.com/consulta">
+            <xsd:element name="Consulta" type="xsd:string"/>
+            <xsd:element name="ConsultaResponse" type="xsd:string"/>
+        </xsd:schema>
+    </wsdl:types>
+
+    <wsdl:message name="ConsultaRequest">
+        <wsdl:part name="parameters" element="tns:Consulta"/>
+    </wsdl:message>
+
+    <wsdl:message name="ConsultaResponse">
+        <wsdl:part name="parameters" element="tns:ConsultaResponse"/>
+    </wsdl:message>
+
+    <wsdl:portType name="ConsultaPortType">
+        <wsdl:operation name="Consulta">
+            <wsdl:input message="tns:ConsultaRequest"/>
+            <wsdl:output message="tns:ConsultaResponse"/>
+        </wsdl:operation>
+    </wsdl:portType>
+
+    <wsdl:binding name="ConsultaBinding" type="tns:ConsultaPortType">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+
+        <wsdl:operation name="Consulta">
+            <soap:operation soapAction="http://example.com/consulta/Consulta"/>
+            <wsdl:input>
+                <soap:body use="literal"/>
+            </wsdl:input>
+            <wsdl:output>
+                <soap:body use="literal"/>
+            </wsdl:output>
+        </wsdl:operation>
+    </wsdl:binding>
+
+    <wsdl:service name="ConsultaCFDIService">
+        <wsdl:port name="ConsultaPort" binding="tns:ConsultaBinding">
+            <soap:address location="http://localhost:3001/ConsultaCFDIService.svc"/>
+        </wsdl:port>
+    </wsdl:service>
+
+</wsdl:definitions>

@@ -126,7 +126,7 @@ const validateReceipt = async (req, res) => {
                 await ComprobantesModel.updateSatAcuseByReceiptId(receiptId, row);
                 if (acuse.estado !== "Vigente") {
                     return res.status(409).json({
-                        error: `El SAT reporta el CFDI como "${acuse.estado}". No se puede aprobar el reembolso.`,
+                        error: `El SAT reporta el CFDI como '${acuse.estado}'. No se puede aprobar el reembolso.`,
                     });
                 }
                 if (EFOS_EMISOR_BLACKLIST_APPROVAL.includes(String(acuse.validacionEFOS))) {

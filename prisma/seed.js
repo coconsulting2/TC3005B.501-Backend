@@ -13,6 +13,9 @@ import { parseCSV } from "../services/adminService.js";
 const prisma = new PrismaClient();
 const isDev = process.argv.includes("dev");
 
+/**
+ *
+ */
 async function main() {
   console.log("Seeding reference data...");
 

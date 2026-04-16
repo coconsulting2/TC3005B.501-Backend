@@ -153,3 +153,4 @@ dist
 # IDEs stuff
 .idea/
 *.local/
+*.local*

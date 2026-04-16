@@ -88,4 +88,5 @@ jobs:
           MAIL_USER: test.mail@outlook.com
           MAIL_PASSWORD: changeme
           NODE_OPTIONS: --experimental-vm-modules
+          PRISMA_DISABLE_TRIGGERS: true
         run: bun run test:e2e

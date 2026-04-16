@@ -35,6 +35,7 @@ export default [
                 clearTimeout: "readonly",
                 clearInterval: "readonly",
                 URL: "readonly",
+                URLSearchParams: "readonly",
                 atob: "readonly",
                 btoa: "readonly",
                 crypto: "readonly",
