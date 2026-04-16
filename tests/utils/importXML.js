@@ -5,7 +5,7 @@
  * Useful for loading test fixtures and data files.
  */
 
-import { readFile } from 'fs/promises';
+import { readFile } from "fs/promises";
 
 export class Importer {
     constructor(basePath, direname) {
@@ -14,6 +14,6 @@ export class Importer {
     }
 
     async import(relativePath, options = null) {
-        return String(await readFile(new URL(`./${this.basePath}/${relativePath}`, this.dirname), 'utf-8'));
+        return String(await readFile(new URL(`./${this.basePath}/${relativePath}`, this.dirname), "utf-8"));
     }
 }

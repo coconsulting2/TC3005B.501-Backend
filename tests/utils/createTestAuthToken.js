@@ -31,5 +31,5 @@ export const ROLES = {
     ADMIN: "Administrador"
 };
 
-export const LOCALHOST = '127.0.0.1';
+export const LOCALHOST = "127.0.0.1";
 

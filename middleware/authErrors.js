@@ -25,6 +25,9 @@ export class AuthError extends Error {
  * Thrown when no token is provided in the request
  */
 export class MissingTokenError extends AuthError {
+  /**
+   *
+   */
   constructor() {
     super(401, "Authentication token was not provided", "MISSING_TOKEN");
   }
@@ -34,6 +37,9 @@ export class MissingTokenError extends AuthError {
  * Thrown when the token has expired
  */
 export class ExpiredTokenError extends AuthError {
+  /**
+   *
+   */
   constructor() {
     super(401, "Authentication token has expired", "TOKEN_EXPIRED");
   }
@@ -43,6 +49,9 @@ export class ExpiredTokenError extends AuthError {
  * Thrown when the token is malformed or signature is invalid
  */
 export class InvalidTokenError extends AuthError {
+  /**
+   *
+   */
   constructor() {
     super(401, "Authentication token is invalid", "INVALID_TOKEN");
   }
@@ -52,6 +61,9 @@ export class InvalidTokenError extends AuthError {
  * Thrown when token IP does not match request IP
  */
 export class TokenMismatchError extends AuthError {
+  /**
+   *
+   */
   constructor() {
     super(403, "Token mismatch: unauthorized device", "TOKEN_MISMATCH");
   }
@@ -61,6 +73,9 @@ export class TokenMismatchError extends AuthError {
  * Thrown when the user role is not allowed for the requested resource
  */
 export class InsufficientPermissionsError extends AuthError {
+  /**
+   *
+   */
   constructor() {
     super(403, "Access denied: insufficient permissions", "INSUFFICIENT_PERMISSIONS");
   }

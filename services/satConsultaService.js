@@ -64,10 +64,20 @@ export function normalizeConsultaResult(raw) {
   };
 }
 
+/**
+ *
+ * @param ms
+ */
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+/**
+ *
+ * @param promise
+ * @param ms
+ * @param label
+ */
 function withTimeout(promise, ms, label = "SAT_TIMEOUT") {
   return new Promise((resolve, reject) => {
     const t = setTimeout(() => reject(new Error(label)), ms);

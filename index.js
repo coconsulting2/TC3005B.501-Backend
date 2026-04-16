@@ -44,7 +44,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Add CSRF middleware for security
-import csrf from 'csurf';
+import csrf from "csurf";
 const csrfProtection = csrf({ cookie: true });
 app.use(csrfProtection);
 
