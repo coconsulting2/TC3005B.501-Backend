@@ -1,23 +1,23 @@
-import express from 'express';
-import exchangeRateController from '../controllers/exchangeRateController.js';
+import express from "express";
+import exchangeRateController from "../controllers/exchangeRateController.js";
 
 const router = express.Router();
 
-router.get('/rate', 
+router.get("/rate",
   exchangeRateController.validateExchangeRate(),
   exchangeRateController.getExchangeRate.bind(exchangeRateController)
 );
 
-router.post('/convert',
+router.post("/convert",
   exchangeRateController.validateCurrencyConversion(),
   exchangeRateController.convertCurrency.bind(exchangeRateController)
 );
 
-router.get('/currencies',
+router.get("/currencies",
   exchangeRateController.getSupportedCurrencies.bind(exchangeRateController)
 );
 
-router.get('/history',
+router.get("/history",
   exchangeRateController.validateRateHistory(),
   exchangeRateController.getRateHistory.bind(exchangeRateController)
 );
