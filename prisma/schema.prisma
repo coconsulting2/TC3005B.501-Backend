@@ -77,6 +77,7 @@ model Request {
   alerts          Alert[]
   routeRequests   RouteRequest[]
   receipts        Receipt[]
+  gastoTramos     GastoTramo[]
 
   @@map("Request")
 }
@@ -128,6 +129,7 @@ model Route {
   destinationCountry   Country?       @relation("DestinationCountry", fields: [idDestinationCountry], references: [countryId])
   destinationCity      City?          @relation("DestinationCity", fields: [idDestinationCity], references: [cityId])
   routeRequests        RouteRequest[]
+  gastoTramos          GastoTramo[]
 
   @@map("Route")
 }
@@ -179,6 +181,7 @@ model Receipt {
   receiptType     ReceiptType?     @relation(fields: [receiptTypeId], references: [receiptTypeId])
   request         Request?         @relation(fields: [requestId], references: [requestId])
   cfdiComprobante CfdiComprobante?
+  gastoTramo      GastoTramo?
 
   @@map("Receipt")
 }
@@ -234,4 +237,18 @@ model CfdiComprobante {
   receipt Receipt @relation(fields: [receiptId], references: [receiptId])
 
   @@map("cfdi_comprobantes")
+}
+
+model GastoTramo {
+  gastoTramoId Int      @id @default(autoincrement()) @map("gasto_tramo_id")
+  requestId    Int      @map("viaje_id")
+  routeId      Int      @map("tramo_id")
+  receiptId    Int      @unique @map("comprobante_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  request Request @relation(fields: [requestId], references: [requestId])
+  route   Route   @relation(fields: [routeId], references: [routeId])
+  receipt Receipt @relation(fields: [receiptId], references: [receiptId])
+
+  @@map("gasto_tramo")
 }
