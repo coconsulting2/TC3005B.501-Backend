@@ -1,7 +1,15 @@
-import exchangeRateService from '../services/exchangeRateService.js';
-import { body, query, validationResult } from 'express-validator';
+import exchangeRateService from "../services/exchangeRateService.js";
+import { body, query, validationResult } from "express-validator";
 
+/**
+ *
+ */
 class ExchangeRateController {
+  /**
+   *
+   * @param req
+   * @param res
+   */
   async getExchangeRate(req, res) {
     try {
       const errors = validationResult(req);
@@ -9,25 +17,30 @@ class ExchangeRateController {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { source = 'USD', target = 'MXN' } = req.query;
-      
+      const { source = "USD", target = "MXN" } = req.query;
+
       const rateData = await exchangeRateService.getExchangeRate(source, target);
-      
+
       res.json({
         success: true,
         data: rateData,
         message: `Exchange rate from ${source} to ${target} retrieved successfully`
       });
     } catch (error) {
-      console.error('Error in getExchangeRate controller:', error);
+      console.error("Error in getExchangeRate controller:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to retrieve exchange rate',
+        message: "Failed to retrieve exchange rate",
         error: error.message
       });
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   async convertCurrency(req, res) {
     try {
       const errors = validationResult(req);
@@ -35,48 +48,58 @@ class ExchangeRateController {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { amount, source = 'USD', target = 'MXN' } = req.body;
-      
+      const { amount, source = "USD", target = "MXN" } = req.body;
+
       const conversionResult = await exchangeRateService.convertCurrency(
         parseFloat(amount),
         source,
         target
       );
-      
+
       res.json({
         success: true,
         data: conversionResult,
         message: `Currency conversion from ${source} to ${target} completed successfully`
       });
     } catch (error) {
-      console.error('Error in convertCurrency controller:', error);
+      console.error("Error in convertCurrency controller:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to convert currency',
+        message: "Failed to convert currency",
         error: error.message
       });
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   async getSupportedCurrencies(req, res) {
     try {
       const currencies = await exchangeRateService.getSupportedCurrencies();
-      
+
       res.json({
         success: true,
         data: currencies,
-        message: 'Supported currencies retrieved successfully'
+        message: "Supported currencies retrieved successfully"
       });
     } catch (error) {
-      console.error('Error in getSupportedCurrencies controller:', error);
+      console.error("Error in getSupportedCurrencies controller:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to retrieve supported currencies',
+        message: "Failed to retrieve supported currencies",
         error: error.message
       });
     }
   }
 
+  /**
+   *
+   * @param req
+   * @param res
+   */
   async getRateHistory(req, res) {
     try {
       const errors = validationResult(req);
@@ -84,70 +107,79 @@ class ExchangeRateController {
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { source = 'USD', target = 'MXN', startDate, endDate } = req.query;
-      
+      const { source = "USD", target = "MXN", startDate, endDate } = req.query;
+
       const history = await exchangeRateService.getRateHistory(source, target, startDate, endDate);
-      
+
       res.json({
         success: true,
         data: history,
         message: `Rate history from ${source} to ${target} retrieved successfully`
       });
     } catch (error) {
-      console.error('Error in getRateHistory controller:', error);
+      console.error("Error in getRateHistory controller:", error);
       res.status(500).json({
         success: false,
-        message: 'Failed to retrieve rate history',
+        message: "Failed to retrieve rate history",
         error: error.message
       });
     }
   }
 
+  /**
+   *
+   */
   validateExchangeRate() {
     return [
-      query('source')
+      query("source")
         .optional()
         .isLength({ min: 3, max: 3 })
-        .withMessage('Source currency must be a 3-letter code'),
-      query('target')
+        .withMessage("Source currency must be a 3-letter code"),
+      query("target")
         .optional()
         .isLength({ min: 3, max: 3 })
-        .withMessage('Target currency must be a 3-letter code')
+        .withMessage("Target currency must be a 3-letter code")
     ];
   }
 
+  /**
+   *
+   */
   validateCurrencyConversion() {
     return [
-      body('amount')
+      body("amount")
         .isFloat({ gt: 0 })
-        .withMessage('Amount must be a positive number'),
-      body('source')
+        .withMessage("Amount must be a positive number"),
+      body("source")
         .optional()
         .isLength({ min: 3, max: 3 })
-        .withMessage('Source currency must be a 3-letter code'),
-      body('target')
+        .withMessage("Source currency must be a 3-letter code"),
+      body("target")
         .optional()
         .isLength({ min: 3, max: 3 })
-        .withMessage('Target currency must be a 3-letter code')
+        .withMessage("Target currency must be a 3-letter code")
     ];
   }
 
+  /**
+   *
+   */
   validateRateHistory() {
     return [
-      query('source')
+      query("source")
         .optional()
         .isLength({ min: 3, max: 3 })
-        .withMessage('Source currency must be a 3-letter code'),
-      query('target')
+        .withMessage("Source currency must be a 3-letter code"),
+      query("target")
         .optional()
         .isLength({ min: 3, max: 3 })
-        .withMessage('Target currency must be a 3-letter code'),
-      query('startDate')
+        .withMessage("Target currency must be a 3-letter code"),
+      query("startDate")
         .isISO8601()
-        .withMessage('Start date must be a valid date'),
-      query('endDate')
+        .withMessage("Start date must be a valid date"),
+      query("endDate")
         .isISO8601()
-        .withMessage('End date must be a valid date')
+        .withMessage("End date must be a valid date")
     ];
   }
 }
