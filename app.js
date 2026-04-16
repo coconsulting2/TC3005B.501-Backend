@@ -36,7 +36,10 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(csrf({cookie: true}));
+
+if (process.env.NODE_ENV !== "test") {
+    app.use(csrf({cookie: true}));
+}
 
 app.use("/api/applicant", applicantRoutes);
 app.use("/api/authorizer", authorizerRoutes);
