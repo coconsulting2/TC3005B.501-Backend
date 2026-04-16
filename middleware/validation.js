@@ -34,6 +34,40 @@ export const validateId = [
 ];
 
 /*
+ * Validates :id (viaje/request) path param for gasto_tramo GET endpoints.
+ */
+export const validateViajeId = [
+  param("id")
+    .isInt({ min: 1 })
+    .toInt()
+    .withMessage("Viaje ID must be a valid positive integer"),
+];
+
+/*
+ * Validates :id (viaje/request) and :tramo_id (route) path params for gasto_tramo POST endpoint.
+ */
+export const validateViajeTramoIds = [
+  param("id")
+    .isInt({ min: 1 })
+    .toInt()
+    .withMessage("Viaje ID must be a valid positive integer"),
+  param("tramo_id")
+    .isInt({ min: 1 })
+    .toInt()
+    .withMessage("Tramo ID must be a valid positive integer"),
+];
+
+/*
+ * Validates the body for POST /viajes/:id/tramos/:tramo_id/gastos.
+ */
+export const validateGastoTramoBody = [
+  body("receipt_id")
+    .isInt({ min: 1 })
+    .toInt()
+    .withMessage("receipt_id must be a valid positive integer"),
+];
+
+/*
  * This will validate and sanitize the Department, status ID and N
  * (LuisDa)
  */
@@ -544,4 +578,7 @@ export default {
   validateDraftTravelRequest,
   validateCreateUser,
   validateCfdi,
+  validateViajeId,
+  validateViajeTramoIds,
+  validateGastoTramoBody,
 };
