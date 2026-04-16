@@ -12,6 +12,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import accountsPayableRoutes from "./routes/accountsPayableRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js";
 import comprobantesRoutes from "./routes/comprobantesRoutes.js";
+import gastoTramoRoutes from "./routes/gastoTramoRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
@@ -42,6 +43,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/accounts-payable", accountsPayableRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/comprobantes", comprobantesRoutes);
+app.use("/api/viajes", gastoTramoRoutes);
 
 // Centralized auth error handler — must be registered after all routes
 app.use(handleAuthError);
