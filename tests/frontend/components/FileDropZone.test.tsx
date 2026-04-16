@@ -2,154 +2,166 @@
  * Author: Emiliano Deyta Illescas
  *
  * Description:
- * Unit tests for the FileDropZone base component. Covers the four visual
- * states (idle, hover, error, disabled), drag/drop, click-to-select,
- * file size + extension validation and the onFilesSelected/onError callbacks.
+ * Unit tests for the FileDropZone component. Covers rendering states
+ * (idle, selected, error), file classification (PDF / XML / rejected),
+ * callbacks (onPdfChange, onXmlChange), and international mode behaviour.
+ *
+ * Note: react-dropzone is mocked so we can control the onDrop callback
+ * directly without relying on native drag-and-drop events.
  */
 
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import FileDropZone from "@components/FileDropZone";
 
-function makeFile(name: string, sizeBytes: number, type = "application/pdf") {
-  const file = new File(["x".repeat(sizeBytes)], name, { type });
-  Object.defineProperty(file, "size", { value: sizeBytes });
-  return file;
+/* ── Mock react-dropzone ── */
+
+let capturedOnDrop: ((files: File[]) => void) | null = null;
+
+vi.mock("react-dropzone", () => ({
+  useDropzone: (opts: any) => {
+    capturedOnDrop = opts.onDrop;
+    return {
+      getRootProps: () => ({ role: "button", "aria-label": "Zona de carga de archivos PDF y XML" }),
+      getInputProps: () => ({ type: "file", style: { display: "none" } }),
+      isDragActive: false,
+    };
+  },
+}));
+
+function makePdf(name = "factura.pdf"): File {
+  return new File(["pdf-content"], name, { type: "application/pdf" });
 }
 
-function getDropZone(): HTMLElement {
-  return screen.getByRole("button");
+function makeXml(name = "factura.xml"): File {
+  return new File(["xml-content"], name, { type: "application/xml" });
+}
+
+function makeTxt(name = "notas.txt"): File {
+  return new File(["text"], name, { type: "text/plain" });
 }
 
 describe("FileDropZone", () => {
-  it("renders the default label and is in idle state initially", () => {
-    render(<FileDropZone onFilesSelected={vi.fn()} />);
-    const zone = getDropZone();
-    expect(
-      screen.getByText(/arrastra archivos aquí/i)
-    ).toBeInTheDocument();
-    expect(zone.className).toMatch(/border-/);
-    expect(zone.className).not.toMatch(/opacity-60/);
+  beforeEach(() => {
+    capturedOnDrop = null;
   });
 
-  it("renders custom label and hint", () => {
+  it("renders idle state with upload instructions", () => {
+    render(<FileDropZone token="test-token" />);
+    expect(screen.getByText(/arrastra tus archivos aquí/i)).toBeInTheDocument();
+    expect(screen.getByText(/\.pdf/)).toBeInTheDocument();
+  });
+
+  it("shows XML requirement text for domestic trips", () => {
+    render(<FileDropZone token="test-token" isInternational={false} />);
+    expect(screen.getByText(/\.xml/)).toBeInTheDocument();
+  });
+
+  it("does not mention XML for international trips", () => {
+    render(<FileDropZone token="test-token" isInternational={true} />);
+    const hint = screen.getByText(/haz clic para seleccionar/i);
+    expect(hint.textContent).not.toMatch(/\.xml/);
+  });
+
+  it("transitions to selected state when a PDF is dropped", async () => {
+    render(<FileDropZone token="test-token" />);
+    expect(capturedOnDrop).toBeTruthy();
+
+    await act(async () => {
+      capturedOnDrop!([makePdf()]);
+    });
+
+    expect(screen.getByText(/factura\.pdf/)).toBeInTheDocument();
+  });
+
+  it("calls onPdfChange when a PDF is dropped", async () => {
+    const onPdfChange = vi.fn();
+    render(<FileDropZone token="test-token" onPdfChange={onPdfChange} />);
+
+    await act(async () => {
+      capturedOnDrop!([makePdf()]);
+    });
+
+    expect(onPdfChange).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "factura.pdf" }),
+    );
+  });
+
+  it("calls onXmlChange when an XML is dropped", async () => {
+    const onXmlChange = vi.fn();
+    render(<FileDropZone token="test-token" onXmlChange={onXmlChange} />);
+
+    await act(async () => {
+      capturedOnDrop!([makeXml()]);
+    });
+
+    expect(onXmlChange).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "factura.xml" }),
+    );
+  });
+
+  it("classifies both PDF and XML from a single drop", async () => {
+    const onPdfChange = vi.fn();
+    const onXmlChange = vi.fn();
     render(
       <FileDropZone
-        onFilesSelected={vi.fn()}
-        label="Subir comprobante"
-        hint="PDF o XML hasta 10MB"
-      />
+        token="test-token"
+        onPdfChange={onPdfChange}
+        onXmlChange={onXmlChange}
+      />,
     );
-    expect(screen.getByText("Subir comprobante")).toBeInTheDocument();
-    expect(screen.getByText("PDF o XML hasta 10MB")).toBeInTheDocument();
-  });
 
-  it("transitions to hover state on dragOver and back to idle on dragLeave", () => {
-    render(<FileDropZone onFilesSelected={vi.fn()} />);
-    const zone = getDropZone();
-
-    fireEvent.dragOver(zone);
-    expect(zone.className).toMatch(/border-\[var\(--color-primary-200\)\]/);
-
-    fireEvent.dragLeave(zone);
-    expect(zone.className).toMatch(/border-\[var\(--color-neutral-300\)\]/);
-  });
-
-  it("calls onFilesSelected with valid dropped files", () => {
-    const onFilesSelected = vi.fn();
-    render(<FileDropZone onFilesSelected={onFilesSelected} accept=".pdf" />);
-    const file = makeFile("doc.pdf", 1024);
-    fireEvent.drop(getDropZone(), {
-      dataTransfer: { files: [file] },
+    await act(async () => {
+      capturedOnDrop!([makePdf(), makeXml()]);
     });
-    expect(onFilesSelected).toHaveBeenCalledTimes(1);
-    expect(onFilesSelected.mock.calls[0][0][0].name).toBe("doc.pdf");
-  });
 
-  it("enters error state and calls onError when file exceeds maxSizeMB", () => {
-    const onError = vi.fn();
-    const onFilesSelected = vi.fn();
-    render(
-      <FileDropZone
-        maxSizeMB={1}
-        onFilesSelected={onFilesSelected}
-        onError={onError}
-      />
+    expect(onPdfChange).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "factura.pdf" }),
     );
-    const tooBig = makeFile("big.pdf", 2 * 1024 * 1024);
-    fireEvent.drop(getDropZone(), {
-      dataTransfer: { files: [tooBig] },
+    expect(onXmlChange).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "factura.xml" }),
+    );
+  });
+
+  it("enters error state when a non-PDF/XML file is dropped", async () => {
+    render(<FileDropZone token="test-token" />);
+
+    await act(async () => {
+      capturedOnDrop!([makeTxt()]);
     });
-    expect(onError).toHaveBeenCalled();
-    expect(onFilesSelected).not.toHaveBeenCalled();
+
+    expect(screen.getByText(/extensión no válida/i)).toBeInTheDocument();
+    expect(screen.getByText(/notas\.txt/)).toBeInTheDocument();
+  });
+
+  it("enters error state when no valid files are provided", async () => {
+    render(<FileDropZone token="test-token" />);
+
+    await act(async () => {
+      capturedOnDrop!([]);
+    });
+
+    expect(screen.getByText(/no se seleccionaron archivos válidos/i)).toBeInTheDocument();
+  });
+
+  it("shows a reset button after an error and can return to idle", async () => {
+    render(<FileDropZone token="test-token" />);
+
+    await act(async () => {
+      capturedOnDrop!([makeTxt()]);
+    });
+
+    const retryButton = screen.getByText(/intentar de nuevo/i);
+    expect(retryButton).toBeInTheDocument();
+
+    fireEvent.click(retryButton);
+    expect(screen.getByText(/arrastra tus archivos aquí/i)).toBeInTheDocument();
+  });
+
+  it("has the correct aria-label for accessibility", () => {
+    render(<FileDropZone token="test-token" />);
     expect(
-      screen.getByText(/excede el tamaño máximo/i)
+      screen.getByRole("button", { name: /zona de carga/i }),
     ).toBeInTheDocument();
-    expect(getDropZone().className).toMatch(
-      /border-\[var\(--color-warning-200\)\]/
-    );
-  });
-
-  it("rejects files whose extension is not in accept", () => {
-    const onError = vi.fn();
-    const onFilesSelected = vi.fn();
-    render(
-      <FileDropZone
-        accept=".pdf"
-        onFilesSelected={onFilesSelected}
-        onError={onError}
-      />
-    );
-    const txt = makeFile("notas.txt", 100, "text/plain");
-    fireEvent.drop(getDropZone(), {
-      dataTransfer: { files: [txt] },
-    });
-    expect(onError).toHaveBeenCalled();
-    expect(onFilesSelected).not.toHaveBeenCalled();
-    expect(
-      screen.getByText(/no es un tipo permitido/i)
-    ).toBeInTheDocument();
-  });
-
-  it("renders disabled state and ignores drops when disabled", () => {
-    const onFilesSelected = vi.fn();
-    render(<FileDropZone onFilesSelected={onFilesSelected} disabled />);
-    const zone = getDropZone();
-    expect(zone.className).toMatch(/opacity-60/);
-    fireEvent.drop(zone, {
-      dataTransfer: { files: [makeFile("a.pdf", 100)] },
-    });
-    expect(onFilesSelected).not.toHaveBeenCalled();
-  });
-
-  it("opens the file picker when clicked", () => {
-    render(<FileDropZone onFilesSelected={vi.fn()} />);
-    const zone = getDropZone();
-    const input = zone.querySelector("input[type=file]") as HTMLInputElement;
-    const clickSpy = vi.spyOn(input, "click");
-    fireEvent.click(zone);
-    expect(clickSpy).toHaveBeenCalled();
-  });
-
-  it("handles selection through the underlying file input", () => {
-    const onFilesSelected = vi.fn();
-    render(<FileDropZone onFilesSelected={onFilesSelected} />);
-    const input = getDropZone().querySelector(
-      "input[type=file]"
-    ) as HTMLInputElement;
-    const file = makeFile("via-input.pdf", 100);
-    fireEvent.change(input, { target: { files: [file] } });
-    expect(onFilesSelected).toHaveBeenCalledWith([
-      expect.objectContaining({ name: "via-input.pdf" }),
-    ]);
-  });
-
-  it("can be activated with the Enter key", () => {
-    render(<FileDropZone onFilesSelected={vi.fn()} />);
-    const zone = getDropZone();
-    const input = zone.querySelector("input[type=file]") as HTMLInputElement;
-    const clickSpy = vi.spyOn(input, "click");
-    fireEvent.keyDown(zone, { key: "Enter" });
-    expect(clickSpy).toHaveBeenCalled();
   });
 });
