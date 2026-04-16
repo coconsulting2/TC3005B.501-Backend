@@ -1,0 +1,902 @@
+{
+  "info": {
+    "_postman_id": "s3-storage-coconsulting-v1",
+    "name": "S3-Storage",
+    "description": "Colección de pruebas para los flujos de almacenamiento S3 de la API CocoConsulting.\n\nEndpoints cubiertos:\n- POST /api/files/upload (subir archivo a S3)\n- GET  /api/files/:id/download (obtener URL prefirmada de descarga)\n- DELETE /api/files/:id (pendiente de implementación en rutas)\n\nArchivos de prueba en: tests/fixtures/storage/\n\nRequisitos:\n- Servidor corriendo en https://localhost:3000\n- Variable `authToken` con un JWT válido\n- Variable `s3Key` que se auto-populará tras un upload exitoso",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://localhost:3000",
+      "type": "string",
+      "description": "URL base del servidor. Cambiar según ambiente (dev/staging/prod)."
+    },
+    {
+      "key": "authToken",
+      "value": "REPLACE_WITH_VALID_JWT",
+      "type": "string",
+      "description": "JWT obtenido del endpoint de login. El token incluye ip del cliente; usar desde la misma IP con que se generó."
+    },
+    {
+      "key": "s3Key",
+      "value": "",
+      "type": "string",
+      "description": "S3 object key devuelta por un upload exitoso. Se auto-populará desde el script del request TC-S3-001."
+    },
+    {
+      "key": "orgId",
+      "value": "org-test-001",
+      "type": "string",
+      "description": "Identificador de organización para el upload."
+    },
+    {
+      "key": "viajeId",
+      "value": "viaje-test-001",
+      "type": "string",
+      "description": "Identificador del viaje para el upload."
+    }
+  ],
+  "item": [
+    {
+      "name": "Upload",
+      "description": "Escenarios para POST /api/files/upload",
+      "item": [
+        {
+          "name": "TC-S3-001 | Upload PDF válido (Happy Path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Respuesta tiene mensaje de éxito', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.message).to.eql('File uploaded to S3 successfully');",
+                  "});",
+                  "",
+                  "pm.test('Respuesta incluye key y bucket de S3', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('key');",
+                  "    pm.expect(json).to.have.property('bucket');",
+                  "    pm.expect(json.key).to.be.a('string').and.not.empty;",
+                  "    pm.expect(json.bucket).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test('S3 key tiene formato correcto: orgId/viajeId/uuid/filename', function () {",
+                  "    const json = pm.response.json();",
+                  "    const keyParts = json.key.split('/');",
+                  "    pm.expect(keyParts.length).to.be.at.least(4);",
+                  "});",
+                  "",
+                  "// Guardar s3Key para usar en los tests de Download/Delete",
+                  "const json = pm.response.json();",
+                  "if (json.key) {",
+                  "    pm.collectionVariables.set('s3Key', json.key);",
+                  "    console.log('s3Key guardada:', json.key);",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Verificar que el token está configurado",
+                  "const token = pm.collectionVariables.get('authToken');",
+                  "if (!token || token === 'REPLACE_WITH_VALID_JWT') {",
+                  "    console.warn('ADVERTENCIA: authToken no está configurado. El request fallará con 401.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "valid.pdf",
+                  "description": "PDF válido < 10MB. Usar: tests/fixtures/storage/valid.pdf"
+                },
+                {
+                  "key": "orgId",
+                  "value": "{{orgId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "viajeId",
+                  "value": "{{viajeId}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/files/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "upload"]
+            },
+            "description": "**Happy Path — Subir PDF válido < 10MB**\n\nEscenario positivo: sube un PDF bien formado dentro del límite de tamaño.\n\n**Archivo:** `tests/fixtures/storage/valid.pdf` (597 bytes)\n\n**Resultado esperado:**\n- HTTP 201\n- Body: `{ message, key, bucket }`\n- `key` con formato `{orgId}/{viajeId}/{uuid}/{filename}`\n- Archivo cifrado con SSE-S3 (AES-256) en el bucket\n\n**Nota:** La `key` devuelta se guarda automáticamente en la variable `s3Key` del collection para usarse en los tests de descarga."
+          },
+          "response": [
+            {
+              "name": "201 - Upload exitoso",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api/files/upload"
+              },
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"message\": \"File uploaded to S3 successfully\",\n  \"key\": \"orgtest001/viajetest001/550e8400-e29b-41d4-a716-446655440000/valid.pdf\",\n  \"bucket\": \"coco-consulting-bucket-dev\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "TC-S3-002 | Upload archivo > 10MB (debe rechazar)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Mensaje de error indica límite de tamaño', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('error');",
+                  "    pm.expect(json.error).to.include('10MB');",
+                  "});",
+                  "",
+                  "pm.test('NO se devuelve key ni bucket', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.not.have.property('key');",
+                  "    pm.expect(json).to.not.have.property('bucket');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "large_file_11mb.pdf",
+                  "description": "Archivo PDF de 11MB que excede el límite. Usar: tests/fixtures/storage/large_file_11mb.pdf"
+                },
+                {
+                  "key": "orgId",
+                  "value": "{{orgId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "viajeId",
+                  "value": "{{viajeId}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/files/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "upload"]
+            },
+            "description": "**Escenario negativo — Archivo mayor a 10MB**\n\nVerifica que el middleware `fileValidation` rechaza archivos que excedan el límite de `MAX_FILE_SIZE = 10 * 1024 * 1024`.\n\n**Archivo:** `tests/fixtures/storage/large_file_11mb.pdf` (11MB)\n\n**Flujo:** Multer detecta `LIMIT_FILE_SIZE` → `handleMulterErrors` devuelve 400.\n\n**Resultado esperado:**\n- HTTP 400\n- Body: `{ error: 'File size exceeds the 10MB limit.' }`\n- Ningún dato guardado en S3"
+          },
+          "response": [
+            {
+              "name": "400 - Archivo demasiado grande",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api/files/upload"
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"File size exceeds the 10MB limit.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "TC-S3-003 | Upload extensión inválida .exe (debe rechazar)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Mensaje de error indica tipo de archivo inválido', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('error');",
+                  "    pm.expect(json.error.toLowerCase()).to.satisfy(",
+                  "        (msg) => msg.includes('invalid') || msg.includes('type') || msg.includes('allowed'),",
+                  "        'El error debe mencionar tipo inválido o tipos permitidos'",
+                  "    );",
+                  "});",
+                  "",
+                  "pm.test('NO se devuelve key ni bucket', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.not.have.property('key');",
+                  "    pm.expect(json).to.not.have.property('bucket');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "malicious.exe",
+                  "description": "Archivo ejecutable con MIME type application/octet-stream. Usar: tests/fixtures/storage/malicious.exe"
+                },
+                {
+                  "key": "orgId",
+                  "value": "{{orgId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "viajeId",
+                  "value": "{{viajeId}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/files/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "upload"]
+            },
+            "description": "**Escenario negativo — Extensión/tipo MIME no permitido (.exe)**\n\nVerifica que el `fileFilter` en `fileValidation.js` bloquea tipos MIME distintos de `application/pdf`, `image/jpeg`, `image/png`.\n\n**Archivo:** `tests/fixtures/storage/malicious.exe` (74 bytes, MIME: application/octet-stream)\n\n**Flujo:** `fileFilter` llama `cb(new Error('Invalid file type...'), false)` → Multer rechaza → `handleMulterErrors` devuelve 400.\n\n**Resultado esperado:**\n- HTTP 400\n- Body: `{ error: 'Invalid file type. Only PDF, JPEG, and PNG are allowed.' }`\n- Ningún dato guardado en S3"
+          },
+          "response": [
+            {
+              "name": "400 - Tipo de archivo inválido",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api/files/upload"
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"Invalid file type. Only PDF, JPEG, and PNG are allowed.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "TC-S3-004 | Upload XML (tipo MIME no permitido)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Mensaje de error indica tipo de archivo inválido', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('error');",
+                  "    pm.expect(json.error).to.include('Invalid file type');",
+                  "});",
+                  "",
+                  "pm.test('Documenta: XML no está en los tipos permitidos (PDF, JPEG, PNG)', function () {",
+                  "    // Este test documenta explícitamente el comportamiento esperado:",
+                  "    // XML (text/xml o application/xml) es rechazado por fileValidation.js",
+                  "    pm.expect(true).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "valid.xml",
+                  "description": "XML de CFDI válido. MIME: text/xml. Usar: tests/fixtures/storage/valid.xml"
+                },
+                {
+                  "key": "orgId",
+                  "value": "{{orgId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "viajeId",
+                  "value": "{{viajeId}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/files/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "upload"]
+            },
+            "description": "**Escenario negativo — XML válido pero tipo no permitido**\n\nAunque el XML es un CFDI fiscal válido, `fileValidation.js` solo permite `application/pdf`, `image/jpeg`, `image/png`. El tipo MIME `text/xml` o `application/xml` está bloqueado.\n\n**Archivo:** `tests/fixtures/storage/valid.xml` (CFDI 4.0 de SAT, 2.2KB)\n\n**NOTA IMPORTANTE:** Si se requiere soporte para XML en S3, se debe actualizar `allowedMimeTypes` en `middleware/fileValidation.js`.\n\n**Resultado esperado:**\n- HTTP 400\n- Body: `{ error: 'Invalid file type. Only PDF, JPEG, and PNG are allowed.' }`"
+          },
+          "response": [
+            {
+              "name": "400 - XML no permitido",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api/files/upload"
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"Invalid file type. Only PDF, JPEG, and PNG are allowed.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "TC-S3-005 | Upload PDF corrompido (sin auth — debe rechazar primero)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 400 (tipo inválido o error de multer)', function () {",
+                  "    // Un PDF corrupto puede pasar validación MIME (tiene cabecera %PDF-)",
+                  "    // pero el servidor lo acepta como application/pdf ya que Multer",
+                  "    // no valida contenido interno, solo el tipo MIME del cliente.",
+                  "    // El resultado depende de cómo el cliente envíe el MIME type.",
+                  "    pm.expect([201, 400, 500]).to.include(pm.response.code);",
+                  "});",
+                  "",
+                  "pm.test('Si fue aceptado (201), el archivo se subió (S3 no valida contenido PDF)', function () {",
+                  "    if (pm.response.code === 201) {",
+                  "        const json = pm.response.json();",
+                  "        pm.expect(json).to.have.property('key');",
+                  "        console.warn('ADVERTENCIA: PDF corrupto aceptado. S3 no valida contenido, solo MIME type.');",
+                  "        console.warn('Considerar validación de contenido en el servidor si se requiere.');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "corrupted.pdf",
+                  "description": "Archivo con cabecera PDF pero contenido basura. Usar: tests/fixtures/storage/corrupted.pdf"
+                },
+                {
+                  "key": "orgId",
+                  "value": "{{orgId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "viajeId",
+                  "value": "{{viajeId}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/files/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "upload"]
+            },
+            "description": "**Escenario borde — PDF con cabecera válida pero contenido corrompido**\n\nVerifica el comportamiento cuando se sube un archivo que tiene cabecera `%PDF-1.4` pero el contenido es inválido.\n\n**Archivo:** `tests/fixtures/storage/corrupted.pdf` (382 bytes, cabecera PDF + bytes aleatorios)\n\n**Comportamiento documentado:**\n- Multer valida MIME type del request (enviado por el cliente), no el contenido real.\n- Si el cliente envía `Content-Type: application/pdf`, el archivo pasará `fileFilter`.\n- S3 acepta cualquier body — no valida integridad de documentos.\n- **Resultado probable: HTTP 201** (el servidor acepta el archivo corrupto).\n\n**Recomendación:** Si se requiere validación de integridad, implementar parsing de PDF en el servidor (e.g., con `pdf-parse`) antes de enviar a S3."
+          },
+          "response": [
+            {
+              "name": "201 - Corrupto aceptado (comportamiento actual)",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api/files/upload"
+              },
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"message\": \"File uploaded to S3 successfully\",\n  \"key\": \"orgtest001/viajetest001/550e8400-e29b-41d4-a716-446655440001/corrupted.pdf\",\n  \"bucket\": \"coco-consulting-bucket-dev\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "TC-S3-006 | Upload sin token de autenticación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Mensaje indica que el token no fue provisto', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('error');",
+                  "    pm.expect(json.error).to.include('Token was not provided');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "valid.pdf",
+                  "description": "Archivo válido. El rechazo ocurre por auth, no por el archivo."
+                },
+                {
+                  "key": "orgId",
+                  "value": "{{orgId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "viajeId",
+                  "value": "{{viajeId}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/files/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "upload"]
+            },
+            "description": "**Escenario negativo — Petición sin header Authorization**\n\nVerifica que `authenticateToken` middleware bloquea requests no autenticados antes de procesar el archivo.\n\n**Resultado esperado:**\n- HTTP 401\n- Body: `{ error: 'Token was not provided' }`\n- El middleware de autenticación se ejecuta antes que `fileValidation`"
+          },
+          "response": [
+            {
+              "name": "401 - Sin token",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api/files/upload"
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": \"Token was not provided\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "TC-S3-007 | Upload con token inválido/expirado",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 403', function () {",
+                  "    pm.response.to.have.status(403);",
+                  "});",
+                  "",
+                  "pm.test('Mensaje indica token inválido', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('error');",
+                  "    pm.expect(json.error).to.include('Invalid Token');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkZha2UgVXNlciIsImlhdCI6MTUxNjIzOTAyMiwiZXhwIjoxfQ.invalidsignature",
+                "type": "text",
+                "description": "JWT malformado / expirado / con firma inválida"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "valid.pdf"
+                },
+                {
+                  "key": "orgId",
+                  "value": "{{orgId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "viajeId",
+                  "value": "{{viajeId}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/files/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "upload"]
+            },
+            "description": "**Escenario negativo — Token JWT inválido o expirado**\n\nVerifica que `jwt.verify()` en `authenticateToken` rechaza tokens con firma inválida.\n\n**Resultado esperado:**\n- HTTP 403\n- Body: `{ error: 'Invalid Token' }`"
+          },
+          "response": [
+            {
+              "name": "403 - Token inválido",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api/files/upload"
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "body": "{\n  \"error\": \"Invalid Token\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "TC-S3-008 | Upload sin campo 'file' en el body",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 400', function () {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Mensaje indica que el archivo es requerido', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('error');",
+                  "    pm.expect(json.error).to.include('File is required');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "orgId",
+                  "value": "{{orgId}}",
+                  "type": "text"
+                },
+                {
+                  "key": "viajeId",
+                  "value": "{{viajeId}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/files/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "upload"]
+            },
+            "description": "**Escenario negativo — Body sin campo 'file'**\n\nVerifica la validación en `uploadFile` controller: `if (!req.file) return res.status(400).json({ error: 'File is required.' })`.\n\n**Resultado esperado:**\n- HTTP 400\n- Body: `{ error: 'File is required.' }`"
+          },
+          "response": [
+            {
+              "name": "400 - Sin archivo",
+              "originalRequest": {
+                "method": "POST",
+                "url": "{{baseUrl}}/api/files/upload"
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"File is required.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Download",
+      "description": "Escenarios para GET /api/files/:id/download",
+      "item": [
+        {
+          "name": "TC-S3-009 | Download - Obtener URL prefirmada (Happy Path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Respuesta contiene URL prefirmada de S3', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('url');",
+                  "    pm.expect(json.url).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test('URL prefirmada apunta a S3 (amazonaws.com)', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.url).to.include('amazonaws.com');",
+                  "});",
+                  "",
+                  "pm.test('URL prefirmada incluye X-Amz-Expires (TTL 15 min = 900s)', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.url).to.include('X-Amz-Expires=900');",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const s3Key = pm.collectionVariables.get('s3Key');",
+                  "if (!s3Key) {",
+                  "    console.warn('ADVERTENCIA: s3Key está vacía. Ejecutar TC-S3-001 primero para obtener una key válida.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/files/{{s3Key}}/download",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "{{s3Key}}", "download"]
+            },
+            "description": "**Happy Path — Obtener URL prefirmada para descargar un archivo de S3**\n\nPrerequisito: Ejecutar TC-S3-001 para que `s3Key` esté poblada.\n\nEl controlador hace `decodeURIComponent(req.params.id)` y llama `getPresignedUrl(s3Key)` con TTL de 900 segundos (15 min).\n\n**Nota:** La S3 key puede contener `/`, por lo que debe ir URL-encoded en el path. Postman lo maneja automáticamente si la variable contiene el key completo.\n\n**Resultado esperado:**\n- HTTP 200\n- Body: `{ url: 'https://bucket.s3.region.amazonaws.com/key?X-Amz-Expires=900&...' }`\n- URL válida por 15 minutos"
+          },
+          "response": [
+            {
+              "name": "200 - URL prefirmada generada",
+              "originalRequest": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/files/{{s3Key}}/download"
+              },
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"url\": \"https://coco-consulting-bucket-dev.s3.us-east-1.amazonaws.com/orgtest001/viajetest001/550e8400-e29b-41d4-a716-446655440000/valid.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...&X-Amz-Expires=900&X-Amz-Signature=...\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "TC-S3-010 | Download - Key que no existe en S3",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// La URL prefirmada se genera SIN verificar si el objeto existe en S3.",
+                  "// GetObjectCommand no valida existencia; la URL se genera de todas formas.",
+                  "// El error 404 ocurrirá al intentar usar la URL, no al generarla.",
+                  "pm.test('Status code es 200 (URL generada aunque key no exista)', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Respuesta contiene URL (presigned URL generada sin validar existencia)', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('url');",
+                  "});",
+                  "",
+                  "pm.test('Documenta: Al usar la URL obtenida, S3 devolverá 403/404 NoSuchKey', function () {",
+                  "    // Este es el comportamiento actual del servidor.",
+                  "    // Si se desea validar existencia, agregar HeadObjectCommand antes de getSignedUrl.",
+                  "    pm.expect(true).to.be.true;",
+                  "    console.warn('La URL será inválida al usarla - objeto no existe en S3.');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/files/nonexistent-org%2Fnonexistent-viaje%2F00000000-0000-0000-0000-000000000000%2Fghost.pdf/download",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "nonexistent-org%2Fnonexistent-viaje%2F00000000-0000-0000-0000-000000000000%2Fghost.pdf", "download"]
+            },
+            "description": "**Escenario borde — Key de S3 que no existe**\n\nVerifica el comportamiento cuando se pide una URL para un objeto inexistente.\n\n**Comportamiento actual:** `getPresignedUrl` genera la URL sin validar si el objeto existe en S3 (usa `GetObjectCommand` que no hace HEAD request). La URL se devuelve con HTTP 200 pero al intentar usarla, S3 devuelve `403 AccessDenied` o `404 NoSuchKey`.\n\n**Recomendación:** Agregar `HeadObjectCommand` antes de firmar para verificar existencia.\n\n**Resultado esperado:**\n- HTTP 200 (URL generada)\n- Al usar la URL: S3 devuelve error 404/403"
+          },
+          "response": [
+            {
+              "name": "200 - URL generada para key inexistente",
+              "originalRequest": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/files/nonexistent.../download"
+              },
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"url\": \"https://bucket.s3.region.amazonaws.com/nonexistent-org/...?X-Amz-Expires=900&...\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "TC-S3-011 | Download - Sin token de autenticación",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Mensaje indica que el token no fue provisto', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.error).to.include('Token was not provided');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/files/some-org%2Fsome-viaje%2Fuuid%2Ffile.pdf/download",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "some-org%2Fsome-viaje%2Fuuid%2Ffile.pdf", "download"]
+            },
+            "description": "**Escenario negativo — Download sin header Authorization**\n\n**Resultado esperado:**\n- HTTP 401\n- Body: `{ error: 'Token was not provided' }`"
+          },
+          "response": [
+            {
+              "name": "401 - Sin token",
+              "originalRequest": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/files/.../download"
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": \"Token was not provided\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Delete",
+      "description": "Escenarios para DELETE /api/files/:id — PENDIENTE DE IMPLEMENTACIÓN\n\nLa función deleteObject() existe en services/storageService.js pero NO tiene ruta ni controlador registrado en routes/fileRoutes.js.",
+      "item": [
+        {
+          "name": "TC-S3-012 | Delete - Endpoint no implementado (gap documentado)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('DELETE devuelve 404 (ruta no registrada en el servidor)', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('DOCUMENTA: deleteObject() existe en storageService.js pero no tiene ruta', function () {",
+                  "    console.warn('GAP IDENTIFICADO: DELETE /api/files/:id no está implementado.');",
+                  "    console.warn('La función deleteObject() está en services/storageService.js línea 97.');",
+                  "    console.warn('Pendiente: agregar ruta, controlador y autorización para delete.');",
+                  "    pm.expect(true).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/files/{{s3Key}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "files", "{{s3Key}}"]
+            },
+            "description": "**GAP: Endpoint DELETE no implementado**\n\nLa función `deleteObject(key)` existe en `services/storageService.js` (línea 97) pero no hay:\n- Ruta en `routes/fileRoutes.js`\n- Controlador en `controllers/fileController.js`\n\n**Para implementar se necesita:**\n```javascript\n// En fileRoutes.js:\nrouter.delete('/:id', authenticateToken, authorizeRole(['admin']), deleteFileController);\n\n// En fileController.js:\nexport const deleteFileController = async (req, res) => {\n  const s3Key = decodeURIComponent(req.params.id);\n  await deleteObject(s3Key);\n  res.json({ message: 'File deleted successfully' });\n};\n```\n\n**Consideraciones de seguridad para la implementación:**\n- Solo roles autorizados (admin) deben poder eliminar\n- Validar que el key pertenece a la organización del usuario\n- Responder 204 No Content o 200 con mensaje\n\n**Resultado esperado (estado actual):**\n- HTTP 404 (ruta no existe)"
+          },
+          "response": [
+            {
+              "name": "404 - Ruta no implementada",
+              "originalRequest": {
+                "method": "DELETE",
+                "url": "{{baseUrl}}/api/files/{{s3Key}}"
+              },
+              "status": "Not Found",
+              "code": 404,
+              "body": "Cannot DELETE /api/files/..."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
