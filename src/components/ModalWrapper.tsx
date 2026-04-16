@@ -16,7 +16,7 @@ import { getButtonClasses } from "@type/button";
 interface ModalWrapperProps {
   title: string;
   message: string;
-  button_type: "success" | "warning" | "primary" | "secondary";
+  button_type: "success" | "danger" | "primary" | "accent";
   modal_type: "confirm" | "warning" | "error" | "success";
   variant?: "filled" | "border" | "empty";
   disabled?: boolean;

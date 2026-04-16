@@ -53,7 +53,7 @@ export async function submitTravelExpense({
   const expenses = res.Expenses ?? [];
   const count = expenses.length;
 
-  expenses.sort((a, b) => b.receipt_id - a.receipt_id);
+  expenses.sort((a: { receipt_id: number }, b: { receipt_id: number }) => b.receipt_id - a.receipt_id);
   const lastReceiptId = count > 0 ? expenses[0].receipt_id : null;
 
   //alert(`Comprobante enviado exitosamente.`);

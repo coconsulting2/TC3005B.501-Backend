@@ -47,7 +47,7 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
   const inputStyle = 'border border-gray-300 p-2 rounded w-full bg-white';
   useEffect(() => {
     if (data) {
-      const transformedRoutes = data.routes.map(route => ({
+      const transformedRoutes = data.routes.map((route: any) => ({
         ...route,
         origin_country_name: route.origin_country,
         origin_city_name: route.origin_city,

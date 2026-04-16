@@ -10,10 +10,11 @@ import EditorialHeader from "@components/EditorialHeader.astro";
 import AstroButton from "@components/Button.astro";
 import Button from "@components/Button.tsx";
 import { getCookie } from "@data/cookies";
+import type { UserRole } from "@type/roles";
 import ValidateReceiptStatus from "@components/ValidateReceiptStatus.tsx";
 
 const userName = getCookie("username", Astro.cookies);
-const role = getCookie("role", Astro.cookies);
+const role = getCookie("role", Astro.cookies) as UserRole;
 const buttonLabel = role;
 
 import { apiRequest } from "@/utils/apiClient";
@@ -24,7 +25,6 @@ try {
   request = await apiRequest(`/accounts-payable/get-expense-validations/${id}`, { cookies: Astro.cookies });
 } catch (error) {
   request = null;
-  throw new Error(`No request found with ID ${id}`);
   return Astro.redirect('/404');
 }
 
@@ -97,7 +97,7 @@ const StateColors: Record<string, string> = {
   <div class="fixed bottom-6 right-6 z-50">
     <ValidateReceiptStatus
       client:only="react"
-      request_id={id}
+      request_id={Number(id)}
       title="Confirmar envío"
       message="¿Está seguro de que desea mandar estos comprobantes?"
       redirection="/dashboard"

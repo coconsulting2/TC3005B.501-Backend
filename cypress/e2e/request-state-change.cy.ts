@@ -55,7 +55,7 @@ describe('Proceso de autorización de una solicitud desde PRIMERA REVISIÓN hast
       .parents('div')
       .first()
       .within(() => {
-        cy.contains(/^#\d+$/).then(($id) => {
+        (cy.contains(/^#\d+$/) as any).then(($id: any) => {
           const idText = $id.text().replace('#', '').trim();
           Cypress.env('request_id', idText);
         });

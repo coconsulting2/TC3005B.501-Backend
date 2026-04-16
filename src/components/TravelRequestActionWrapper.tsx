@@ -57,7 +57,7 @@ export default function TravelRequestActionWrapper({
       <ModalWrapper
         title={title}
         message={message}
-        button_type={modal_type}
+        button_type={modal_type === "warning" ? "danger" : modal_type}
         modal_type={modal_type}
         onConfirm={handleConfirm}
       >

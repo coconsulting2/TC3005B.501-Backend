@@ -6,8 +6,9 @@ import RejectReceipStatus from "@components/RejectReceiptsModal";
 interface ReceiptProps {
   receipt_id: number;
   disabled: boolean;
-  onApprove: (id: number) => void;
-  onReject: (id: number) => void;
+  expense_status?: string;
+  onApprove?: (id: number) => void;
+  onReject?: (id: number) => void;
   token: string;
 }
 
@@ -47,7 +48,7 @@ export default function ReceiptActions({
       const data = await res.json();
 
       if (res.ok) {
-        approval === 1 ? onApprove(receipt_id) : onReject(receipt_id);
+        approval === 1 ? onApprove?.(receipt_id) : onReject?.(receipt_id);
       } else {
         alert(data.error || "No se pudo actualizar.");
       }

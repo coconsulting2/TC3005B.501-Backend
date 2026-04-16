@@ -67,8 +67,8 @@ export default function CreateUserForm({ mode, user_data, redirectTo,token }: Cr
   useEffect(() => {
     if (mode === 'edit' && user_data) {
       setFormData({
-        role_id: roles.find(role => role.name === user_data.role_name)?.id,
-        department_id: departments.find(dep => dep.name === user_data.department_name)?.id,
+        role_id: roles.find(role => role.name === user_data.role_name)?.id ?? '',
+        department_id: departments.find(dep => dep.name === user_data.department_name)?.id ?? '',
         user_name: user_data.user_name,
         password: '', // Password should not be pre-filled
         workstation: user_data.workstation,

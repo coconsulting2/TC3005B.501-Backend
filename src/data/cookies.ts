@@ -66,6 +66,6 @@ export function getSession(cookies?: APIContext["cookies"]): Session {
 
 type CookieKey = keyof Session;
 
-export function getCookie(key: CookieKey, cookies?: APIContext["cookies"]): string | UserRole {
-  return getSession(cookies)[key];
+export function getCookie(key: CookieKey, cookies?: APIContext["cookies"]): string {
+  return getSession(cookies)[key] ?? '';
 }

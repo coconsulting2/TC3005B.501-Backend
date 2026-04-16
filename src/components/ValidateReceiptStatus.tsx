@@ -8,7 +8,7 @@ interface Props {
   message: string;
   redirection: string;
   modal_type: "success" | "warning";
-  variant?: "primary" | "secondary";
+  variant?: "filled" | "border" | "empty";
   children: React.ReactNode;
   token: string;
 }
@@ -46,7 +46,7 @@ export default function ValidateReceiptStatus({
     <ModalWrapper
       title={title}
       message={message}
-      button_type={modal_type}
+      button_type={modal_type === "warning" ? "danger" : modal_type}
       modal_type={modal_type}
       onConfirm={handleConfirm}
       variant={variant}

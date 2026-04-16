@@ -23,8 +23,8 @@ export default function RequestActions({
   };
 
   const confirmAction = () => {
-    if (action === "approve") onApprove(request_id);
-    if (action === "reject") onReject(request_id);
+    if (action === "approve") onApprove(Number(request_id));
+    if (action === "reject") onReject(Number(request_id));
     setShowModal(false);
     setAction(null);
   };
