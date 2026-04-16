@@ -36,6 +36,11 @@ const IMPUESTO_NOMBRES = {
  * @property {string} code - Machine-readable error code
  */
 export class CfdiParseError extends Error {
+  /**
+   *
+   * @param message
+   * @param code
+   */
   constructor(message, code) {
     super(message);
     this.name = "CfdiParseError";

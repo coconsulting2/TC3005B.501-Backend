@@ -9,7 +9,7 @@ import { parseCFDI, CfdiParseError } from "../../../services/cfdiParserService.j
 import { Importer } from "../../utils/importXML.js";
 
 
-const CFDI = new Importer('./tax_invoices(CFDIs)', import.meta.url);
+const CFDI = new Importer("./tax_invoices(CFDIs)", import.meta.url);
 
 // ─── CFDI Fixtures ────────────────────────────────────────────────────────────
 
@@ -18,21 +18,21 @@ const CFDI = new Importer('./tax_invoices(CFDIs)', import.meta.url);
  * Emisor: EKU9003173C9, Receptor: XAXX010101000 (público en general)
  * Total: MXN 1,160.00 (Subtotal 1,000 + IVA 160)
  */
-const CFDI_V40_RESTAURANT = await CFDI.import('CFDI-v40-restaurant.xml');
+const CFDI_V40_RESTAURANT = await CFDI.import("CFDI-v40-restaurant.xml");
 
 /**
  * Fixture 2: CFDI v3.3 – Hotel receipt with IVA 16%
  * Emisor: AAA010101AAA, Receptor: JUFA7509103S4
  * Total: MXN 3,480.00 (Subtotal 3,000 + IVA 480)
  */
-const CFDI_V33_HOTEL = await CFDI.import('CFDI-v33-hotel.xml');
+const CFDI_V33_HOTEL = await CFDI.import("CFDI-v33-hotel.xml");
 
 /**
  * Fixture 3: CFDI v4.0 – Transport with IVA traslado + ISR retencion
  * Emisor: TAXS730423FG8, Receptor: MARG850601QX3
  * SubTotal: 1,000 | IVA 16%: 160 | ISR 10% retencion: 100 | Total: 1,060
  */
-const CFDI_V40_TRANSPORT_WITH_RETENCION = await CFDI.import('CFDI-v40-transport-with-retention.xml');
+const CFDI_V40_TRANSPORT_WITH_RETENCION = await CFDI.import("CFDI-v40-transport-with-retention.xml");
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 

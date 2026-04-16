@@ -10,9 +10,9 @@ import { loadInvoiceFixtures } from "./invoiceFixtures.js";
 
 const app = express();
 app.use(express.text({ type: "*/*" }));
-app.set('trust proxy', true);
+app.set("trust proxy", true);
 
-const WSDL = await readFile(new URL('./wsdl.xml', import.meta.url), 'utf-8');
+const WSDL = await readFile(new URL("./wsdl.xml", import.meta.url), "utf-8");
 
 const parser = new XMLParser({
     ignoreAttributes: false
@@ -115,13 +115,13 @@ function responseByScenario(scenario, fixture) {
     }
 }
 
-app.get('/', (_, res) => {
+app.get("/", (_, res) => {
     res.status(200).send("Mock serve running OK\n");
 });
 
-app.get('/ConsultaCFDIService.svc', (_, res) => {
+app.get("/ConsultaCFDIService.svc", (_, res) => {
     res
-        .type('text/xml')
+        .type("text/xml")
         .send(WSDL);
 });
 
@@ -130,7 +130,7 @@ app.post("/ConsultaCFDIService.svc", (req, res) => {
     const body = json?.["soap:Envelope"]?.["soap:Body"]?.["tns:Consulta"];
     const args = parseExpresionImpresa(body?.expresionImpresa);
 
-    const required = ['re', 'rr', 'tt', 'id'];
+    const required = ["re", "rr", "tt", "id"];
     const missing = required.some(param => !args.get(param));
 
     const re = String(args.get("re") || "").trim();
@@ -150,13 +150,13 @@ app.post("/ConsultaCFDIService.svc", (req, res) => {
 
     if (malformed) {
         return res
-            .type('text/xml')
+            .type("text/xml")
             .send(RESPONSE_N601);
     }
 
     const fixture = UUID_MAP.get(id.toLowerCase());
     if (!fixture) {
-        return res.type('text/xml').send(RESPONSE_N602);
+        return res.type("text/xml").send(RESPONSE_N602);
     }
 
     const expectedRe = String(fixture.rfc_emisor || "").trim();
@@ -171,11 +171,11 @@ app.post("/ConsultaCFDIService.svc", (req, res) => {
         (fe !== null && fe.toUpperCase() !== expectedFe.toUpperCase());
 
     if (mismatched) {
-        return res.type('text/xml').send(RESPONSE_N602);
+        return res.type("text/xml").send(RESPONSE_N602);
     }
 
     res
-        .type('text/xml')
+        .type("text/xml")
         .send(responseByScenario(fixture.satScenario, fixture));
 });
 

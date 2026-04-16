@@ -22,11 +22,11 @@ import { createTestJWT, LOCALHOST, ROLES } from "../../utils/createTestAuthToken
 
 const INVOICE_FIXTURES = await loadInvoiceFixtures();
 const HEADERS = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${createTestJWT(ROLES.ACCOUNTS_PAYABLE, { IP: LOCALHOST })}`,
-    'x-forwarded-for': LOCALHOST
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${createTestJWT(ROLES.ACCOUNTS_PAYABLE, { IP: LOCALHOST })}`,
+    "x-forwarded-for": LOCALHOST
 };
-app.set('trust proxy', 'loopback');
+app.set("trust proxy", "loopback");
 
 const setupDBs = async () => {
     try {
@@ -39,7 +39,7 @@ const setupDBs = async () => {
         console.error(`[ E2E TESTS FAILED ] - Could not Connect to Database\n${err.message}`);
         throw new Error();
     }
-}
+};
 
 const startMockServer = async () => { // TODO: logs server logs to a file
     try {
@@ -53,7 +53,7 @@ const startMockServer = async () => { // TODO: logs server logs to a file
         console.error(`[ E2E TESTS FAILED ] - Could not initialize mock server "SAT CDFI Verification service"\n${err.message}`);
         throw new Error();
     }
-}
+};
 
 /**
  *
