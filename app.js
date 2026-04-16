@@ -13,12 +13,14 @@ import accountsPayableRoutes from "./routes/accountsPayableRoutes.js";
 import fileRoutes from "./routes/fileRoutes.js";
 import comprobantesRoutes from "./routes/comprobantesRoutes.js";
 import gastoTramoRoutes from "./routes/gastoTramoRoutes.js";
+import exchangeRateRoutes from "./routes/exchangeRateRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import csrf from "csurf";
 
 const app = express();
 
@@ -34,6 +36,7 @@ app.use(cors({
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(csrf({cookie: true}));
 
 app.use("/api/applicant", applicantRoutes);
 app.use("/api/authorizer", authorizerRoutes);
@@ -44,6 +47,7 @@ app.use("/api/accounts-payable", accountsPayableRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/comprobantes", comprobantesRoutes);
 app.use("/api/viajes", gastoTramoRoutes);
+app.use("/api/exchange-rate", exchangeRateRoutes);
 
 // Centralized auth error handler — must be registered after all routes
 app.use(handleAuthError);
