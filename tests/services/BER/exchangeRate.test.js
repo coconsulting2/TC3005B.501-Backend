@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
-import exchangeRateService from "../services/exchangeRateService.js";
+import exchangeRateService from "../../../services/exchangeRateService.js";
 
 describe("ExchangeRateService", () => {
   beforeEach(() => {
