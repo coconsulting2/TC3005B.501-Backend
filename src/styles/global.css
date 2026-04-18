@@ -161,6 +161,11 @@ body {
   .content-wrapper:hover {
     border-color: var(--color-neutral-400);
   }
+
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
 
 /* ── Money display — serif + tabular nums ── */

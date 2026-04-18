@@ -109,8 +109,8 @@ export default function DataTable({
   }
 
   return (
-    <div className="w-full">
-      <div className="card-editorial overflow-x-auto">
+    <div className="w-full overflow-x-auto">
+      <div className="card-editorial min-w-[480px]">
         <table className="min-w-full">
           <TableHeader
             columns={columns}
