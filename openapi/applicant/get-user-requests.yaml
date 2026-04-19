@@ -17,7 +17,7 @@ paths:
         - TokenAuth: []
       responses:
         "200":
-          description: List of travel requests
+          description: List of travel requests (array vacío si el usuario no tiene solicitudes activas)
           content:
             application/json:
               schema:
@@ -54,17 +54,6 @@ paths:
                     type: string
               example:
                 error: "Unauthorized access"
-        "404":
-          description: No user requests found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-              example:
-                error: "No user requests found"
         "500":
           description: Internal server error
           content:

@@ -4,6 +4,7 @@
  */
 import prisma from "../database/config/prisma.js";
 import { formatRoutes, getRequestDays, getCountryId, getCityId } from "../services/applicantService.js";
+import { createRequestInsertAlert } from "../services/createRequestInsertAlert.js";
 
 const Applicant = {
   /**
@@ -108,6 +109,7 @@ const Applicant = {
           requestDays: request_days,
         },
       });
+      await createRequestInsertAlert(tx, request);
 
       for (const route of allRoutes) {
         const originCountryId = await getCountryId(tx, route.origin_country_name);
@@ -509,6 +511,7 @@ const Applicant = {
           requestDays: request_days,
         },
       });
+      await createRequestInsertAlert(tx, request);
 
       for (const route of allRoutes) {
         const originCountryId = await getCountryId(tx, route.origin_country_name);
