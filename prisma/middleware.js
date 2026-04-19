@@ -2,7 +2,7 @@
  * @file prisma/middleware.js
  * @description Prisma client extension replicating the 5 MariaDB triggers:
  *   1. DeactivateRequest (BEFORE UPDATE Request)
- *   2. CreateAlert (AFTER INSERT Request)
+ *   2. CreateAlert (AFTER INSERT Request) — aplicado en applicantModel + mismo `tx`
  *   3. ManageAlertAfterRequestUpdate (AFTER UPDATE Request)
  *   4. DeductFromWalletOnFeeImposed (AFTER UPDATE Request)
  *   5. AddToWalletOnReceiptApproved (AFTER UPDATE Receipt)
@@ -17,22 +17,11 @@ export const triggerExtension = Prisma.defineExtension((client) =>
     name: "cocoscheme-triggers",
     query: {
       request: {
-        // --- Trigger 2: CreateAlert (AFTER INSERT) ---
+        // CreateAlert (AFTER INSERT) se hace en el mismo tx en applicantModel/seed;
+        // aquí solo delegamos: client.alert.create con el cliente raíz rompe FK
+        // dentro de prisma.$transaction (Request aún no visible en otra conexión).
         async create({ args, query }) {
-          const result = await query(args);
-          const statusId = result.requestStatusId;
-          const alertMessage = await client.alertMessage.findUnique({
-            where: { messageId: statusId },
-          });
-          if (alertMessage) {
-            await client.alert.create({
-              data: {
-                requestId: result.requestId,
-                messageId: statusId,
-              },
-            });
-          }
-          return result;
+          return query(args);
         },
 
         async update({ args, query }) {
