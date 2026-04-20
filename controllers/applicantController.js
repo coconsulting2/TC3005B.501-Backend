@@ -328,8 +328,10 @@ export const sendExpenseValidation = async (req, res) => {
 
   try {
     const result = await sendReceiptsForValidation(requestId);
-    const { user_email, user_name, request_id, status } = await mailData(requestId);
-    await Mail(user_email, user_name, requestId, status);
+    if (!result.already_submitted) {
+      const { user_email, user_name, request_id, status } = await mailData(requestId);
+      await Mail(user_email, user_name, requestId, status);
+    }
     return res.status(200).json(result);
   } catch (error) {
     if (error.status) {

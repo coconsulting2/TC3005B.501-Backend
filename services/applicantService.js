@@ -185,7 +185,8 @@ export const getCityId = async (tx, cityName) => {
  * @throws {Error} If request is not found (404) or not in status 6 (400)
  */
 export const sendReceiptsForValidation = async (requestId) => {
-    const currentStatus = await Applicant.getRequestStatus(requestId);
+    const rawStatus = await Applicant.getRequestStatus(requestId);
+    const currentStatus = rawStatus == null ? null : Number(rawStatus);
 
     if (currentStatus === null) {
         const err = new Error(`No request found with id ${requestId}`);
@@ -193,9 +194,19 @@ export const sendReceiptsForValidation = async (requestId) => {
         throw err;
     }
 
+    // Ya enviada: respuesta idempotente (evita 400 en doble clic o recarga).
+    if (currentStatus === 7) {
+        return {
+            request_id: Number(requestId),
+            updated_status: 7,
+            message: "La solicitud ya está en validación de comprobantes.",
+            already_submitted: true,
+        };
+    }
+
     if (currentStatus !== 6) {
         const err = new Error(
-            "Request must be in status 6 (Comprobación gastos del viaje) to send for validation"
+            `La solicitud debe estar en estado 6 (Comprobación gastos del viaje) para enviarla a revisión. Estado actual: ${currentStatus}.`
         );
         err.status = 400;
         throw err;

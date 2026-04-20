@@ -39,8 +39,12 @@ const authorizeTravelRequest = async (req, res) => {
 
   try {
     const { new_status } = await authorizerServices.authorizeRequest(Number(request_id), Number(user_id));
-    const { user_email, user_name, status } = await mailData(request_id);
-    await Mail(user_email, user_name, request_id, status);
+    try {
+      const { user_email, user_name, status } = await mailData(request_id);
+      await Mail(user_email, user_name, request_id, status);
+    } catch (mailErr) {
+      console.error("authorizeTravelRequest: correo no enviado (solicitud ya actualizada):", mailErr);
+    }
     return res.status(200).json({
       message: "Request status updated successfully",
       new_status
@@ -65,8 +69,12 @@ const declineTravelRequest = async (req, res) => {
 
   try {
     const result = await authorizerServices.declineRequest(Number(request_id), Number(user_id));
-    const { user_email, user_name, status } = await mailData(request_id);
-    await Mail(user_email, user_name, request_id, status);
+    try {
+      const { user_email, user_name, status } = await mailData(request_id);
+      await Mail(user_email, user_name, request_id, status);
+    } catch (mailErr) {
+      console.error("declineTravelRequest: correo no enviado (solicitud ya actualizada):", mailErr);
+    }
     return res.status(200).json(result);
   } catch (error) {
     if (error.status) {
