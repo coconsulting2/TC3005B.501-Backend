@@ -7,7 +7,7 @@
 import { ObjectId } from "mongodb";
 import { uploadFile, getFile, db, bucket } from "./fileStorage.js";
 import prisma from "../database/config/prisma.js";
-import { parseCFDI, CfdiParseError } from "./cfdiParserService.js";
+import { parseCFDI, buildComprobanteRegistroBodyFromXml, CfdiParseError } from "./cfdiParserService.js";
 import CfdiModel from "../models/cfdiModel.js";
 
 export { CfdiParseError };
@@ -31,6 +31,13 @@ export { CfdiParseError };
 export async function uploadReceiptFiles(receiptId, pdfFile, xmlFile) {
   const xmlContent = xmlFile.buffer.toString("utf-8");
   const cfdiData = parseCFDI(xmlContent);
+
+  let registroSugerido = null;
+  try {
+    registroSugerido = buildComprobanteRegistroBodyFromXml(xmlContent);
+  } catch {
+    registroSugerido = null;
+  }
 
   const existing = await CfdiModel.findByCfdiUuid(cfdiData.uuid);
   if (existing) {
@@ -69,7 +76,7 @@ export async function uploadReceiptFiles(receiptId, pdfFile, xmlFile) {
 
     // Los datos fiscales completos se persisten en cfdi_comprobantes vía POST /api/comprobantes/:receipt_id
 
-    return { pdf: pdfResult, xml: xmlResult, cfdi: cfdiData };
+    return { pdf: pdfResult, xml: xmlResult, cfdi: cfdiData, registroSugerido };
   } catch (error) {
     console.error("Error uploading receipt files:", error);
     throw error;
