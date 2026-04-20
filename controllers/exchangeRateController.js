@@ -28,7 +28,14 @@ class ExchangeRateController {
         message: `Exchange rate from ${source} to ${target} retrieved successfully`
       });
     } catch (error) {
-      console.error("Error in getExchangeRate controller:", error);
+      if (/CODE: 62$/.test(error.message.split("|").at(0))) {
+        res.status(400).json({
+          success: false,
+          errors: error
+        });
+        return;
+      }
+
       res.status(500).json({
         success: false,
         message: "Failed to retrieve exchange rate",

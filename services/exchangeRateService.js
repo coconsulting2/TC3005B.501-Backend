@@ -1,6 +1,7 @@
 import axios from "axios";
 import { MongoClient } from "mongodb";
 import fs from "fs";
+import path from "path";
 import https from "https";
 
 /**
@@ -223,11 +224,17 @@ class ExchangeRateService {
 
   /**
    * Tipo de cambio USD/MXN desde Banxico (serie SF43718).
+   * @param source
+   * @param target
    * @returns {Promise<Object>} Rate payload with rate, source, date, fromCache.
    */
-  async getDOFRate() {
+  async getDOFRate(source = "USD", target = "MXN") {
     try {
-      const response = await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos", {
+      // Guard because serie SF43718 is for USD to MXN,
+      // we would have to make a map table to translate from src trg
+      // to bmx series id
+      if (source !== "USD" || target !== "MXN") throw new Error("CODE: 62|BMX support only is for UDS to MXN");
+      const response = await axios.get(`${process.env.BMX_API_URL}/series/SF43718/datos`, {
         headers: {
           "Bmx-Token": process.env.BANXICO_API_KEY,
           "Content-Type": "application/json"
@@ -273,9 +280,9 @@ class ExchangeRateService {
       } catch {
         console.warn("Wise API failed, falling back to DOF");
         try {
-          rateData = await this.getDOFRate();
-        } catch {
-          throw new Error("Both Wise and DOF APIs failed");
+          rateData = await this.getDOFRate(source, target);
+        } catch (dofError) {
+          throw new Error(`Both Wise and DOF APIs failed: ${dofError.message}`);
         }
       }
 
@@ -348,14 +355,6 @@ class ExchangeRateService {
         }
       }
 
-      // Fallback to Banxico catalog
-      await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/catalogoSeries", {
-        headers: {
-          "Bmx-Token": process.env.BANXICO_API_KEY,
-          "Content-Type": "application/json"
-        }
-      });
-
       // Return common currencies based on Banxico data
       return [
         { code: "MXN", name: "Mexican Peso", symbol: "$", supportsDecimals: true },
@@ -394,33 +393,26 @@ class ExchangeRateService {
         throw new Error("Historical rates only available for USD to MXN with Banxico");
       }
 
-      // Format dates for Banxico API (dd/mm/yyyy)
-      const formatDate = (date) => {
-        const d = new Date(date);
-        return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
-      };
-
-      const formattedStartDate = formatDate(startDate);
-      const formattedEndDate = formatDate(endDate);
-
       // Try the main endpoint first
       let response;
+      let retry = false;
       try {
-        response = await axios.get(`https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos/${formattedStartDate}/${formattedEndDate}`, {
+        response = await axios.get(`${process.env.BMX_API_URL}/series/SF43718/datos/${startDate}/${endDate}`, {
           headers: {
             "Bmx-Token": process.env.BANXICO_API_KEY,
             "Content-Type": "application/json"
           }
         });
-      } catch {
+      } catch (error) {
         // If main endpoint fails, try without date range (get all data)
-        console.warn("Date range endpoint failed, trying full data endpoint");
-        response = await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos", {
+        console.log("Date range endpoint failed, trying full data endpoint");
+        response = await axios.get(`${process.env.BMX_API_URL}/series/SF43718/datos`, {
           headers: {
             "Bmx-Token": process.env.BANXICO_API_KEY,
             "Content-Type": "application/json"
           }
         });
+        retry = true;
       }
 
       if (response.data && response.data.bmx && response.data.bmx.series && response.data.bmx.series.length > 0) {
@@ -432,7 +424,7 @@ class ExchangeRateService {
         }));
 
         // Filter by date range if we got all data
-        if (startDate && endDate) {
+        if (retry && startDate && endDate) {
           const start = new Date(startDate);
           const end = new Date(endDate);
           historicalRates = historicalRates.filter(rate => {
