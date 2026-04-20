@@ -7,7 +7,7 @@
  *
  * Backend contract: POST /api/files/upload-receipt-files/:receipt_id
  *   - Multipart form with fields "pdf" and "xml" (both required).
- *   - Response: { message, pdf: { fileId, fileName }, xml: { fileId, fileName } }
+ *   - Response: { message, pdf, xml, cfdi?, registro_sugerido? }
  *
  * For international trips (isInternational=true), XML is optional —
  * a default.xml placeholder is fetched from /default.xml before upload.
@@ -22,15 +22,29 @@ import { useDropzone } from "react-dropzone";
 
 type DropZoneState = "idle" | "dragging" | "selected" | "uploading" | "done" | "error";
 
-interface UploadResponse {
+/** Resumen fiscal devuelto por el backend tras parsear el XML (GridFS). */
+export interface ReceiptUploadCfdiSummary {
+  uuid: string;
+  version: string;
+  rfcEmisor: string;
+  rfcReceptor: string | null;
+  fecha: string;
+  total: number;
+  selloUltimos8: string | null;
+  taxes: unknown;
+}
+
+export interface ReceiptUploadResponse {
   message: string;
   pdf: { fileId: string; fileName: string };
   xml: { fileId: string; fileName: string };
+  cfdi?: ReceiptUploadCfdiSummary;
+  registro_sugerido?: Record<string, unknown> | null;
 }
 
 export interface FileDropZoneHandle {
   /** Trigger upload programmatically (for deferred upload flow) */
-  upload: (url: string) => Promise<UploadResponse>;
+  upload: (url: string) => Promise<ReceiptUploadResponse>;
   /** Get currently selected files */
   getFiles: () => { pdf: File | null; xml: File | null };
   /** Reset to idle */
@@ -49,7 +63,7 @@ interface FileDropZoneProps {
   /** Upload endpoint URL — if provided, files upload automatically on drop */
   uploadUrl?: string;
   /** Called with server response on successful upload (auto-upload mode) */
-  onUploadComplete?: (response: UploadResponse) => void;
+  onUploadComplete?: (response: ReceiptUploadResponse) => void;
   /** Called on upload error */
   onUploadError?: (error: string) => void;
   className?: string;
@@ -68,6 +82,36 @@ const ACCEPT_MAP: Record<string, string[]> = {
 function getExtension(name: string): string {
   const idx = name.lastIndexOf(".");
   return idx >= 0 ? name.slice(idx).toLowerCase() : "";
+}
+
+function apiOriginFromUploadUrl(uploadUrl: string): string {
+  try {
+    return new URL(uploadUrl).origin;
+  } catch {
+    return "";
+  }
+}
+
+/** Misma cookie de sesión `_csrf` que usa `apiClient` para POST JSON. */
+async function fetchCsrfToken(apiOrigin: string): Promise<string> {
+  const res = await fetch(`${apiOrigin}/api/user/csrf-token`, {
+    method: "GET",
+    credentials: "include",
+  });
+  const bodyText = await res.text();
+  if (!res.ok) {
+    throw new Error(`CSRF ${res.status}: ${bodyText.slice(0, 120)}`);
+  }
+  let data: { csrfToken?: string };
+  try {
+    data = bodyText ? JSON.parse(bodyText) : {};
+  } catch {
+    throw new Error("Respuesta CSRF no es JSON");
+  }
+  if (!data?.csrfToken) {
+    throw new Error("Token CSRF ausente");
+  }
+  return data.csrfToken;
 }
 
 function classifyFiles(files: File[]): {
@@ -104,38 +148,49 @@ function uploadWithProgress(
   xml: File,
   token: string,
   onProgress: (pct: number) => void
-): Promise<UploadResponse> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    const formData = new FormData();
-    formData.append("pdf", pdf);
-    formData.append("xml", xml);
+): Promise<ReceiptUploadResponse> {
+  return (async () => {
+    const origin = apiOriginFromUploadUrl(url);
+    if (!origin) {
+      throw new Error("URL de subida inválida");
+    }
+    const csrfToken = await fetchCsrfToken(origin);
 
-    xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
-      }
-    });
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append("pdf", pdf);
+      formData.append("xml", xml);
 
-    xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText));
-        } catch {
-          reject(new Error("Respuesta inesperada del servidor"));
+      xhr.withCredentials = true;
+
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
         }
-      } else {
-        reject(new Error(`Error ${xhr.status}: ${xhr.statusText}`));
-      }
+      });
+
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch {
+            reject(new Error("Respuesta inesperada del servidor"));
+          }
+        } else {
+          reject(new Error(`Error ${xhr.status}: ${xhr.statusText}`));
+        }
+      });
+
+      xhr.addEventListener("error", () => reject(new Error("Error de red al subir archivos")));
+      xhr.addEventListener("abort", () => reject(new Error("Subida cancelada")));
+
+      xhr.open("POST", url);
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.setRequestHeader("csrf-token", csrfToken);
+      xhr.send(formData);
     });
-
-    xhr.addEventListener("error", () => reject(new Error("Error de red al subir archivos")));
-    xhr.addEventListener("abort", () => reject(new Error("Subida cancelada")));
-
-    xhr.open("POST", url);
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    xhr.send(formData);
-  });
+  })();
 }
 
 /* ── Component ── */
@@ -175,7 +230,7 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
 
   /** Core upload logic — used by both auto-upload and imperative trigger */
   const doUpload = useCallback(
-    async (url: string, pdf: File, xml: File | null): Promise<UploadResponse> => {
+    async (url: string, pdf: File, xml: File | null): Promise<ReceiptUploadResponse> => {
       setState("uploading");
       setProgress(0);
       setErrorMsg("");
@@ -280,7 +335,7 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
       <div
         {...getRootProps()}
         className={`
-          relative flex flex-col items-center justify-center gap-3
+          relative flex flex-col items-stretch justify-center gap-3
           border-2 border-dashed rounded-[var(--radius-lg)] p-6
           transition-all duration-200 cursor-pointer min-h-[160px]
           ${stateStyles[displayState]}
@@ -336,7 +391,7 @@ const stateStyles: Record<DropZoneState, string> = {
 
 function IdleContent({ isInternational }: { isInternational: boolean }) {
   return (
-    <>
+    <div className="w-full flex flex-col items-center">
       <UploadIcon className="w-8 h-8 text-[var(--color-ink-muted)]" />
       <div className="text-center">
         <p className="text-sm font-medium text-[var(--color-ink-secondary)]">
@@ -347,16 +402,16 @@ function IdleContent({ isInternational }: { isInternational: boolean }) {
           {!isInternational && <> y <strong>.xml</strong></>}
         </p>
       </div>
-    </>
+    </div>
   );
 }
 
 function DraggingContent() {
   return (
-    <>
+    <div className="w-full flex flex-col items-center">
       <UploadIcon className="w-8 h-8 text-primary-400 animate-bounce" />
       <p className="text-sm font-medium text-primary-500">Suelta los archivos aquí</p>
-    </>
+    </div>
   );
 }
 
@@ -374,20 +429,20 @@ function SelectedContent({
   isInternational: boolean;
 }) {
   return (
-    <div className="w-full max-w-sm">
-      <div className="flex flex-col gap-2">
+    <div className="w-full max-w-none mx-auto px-0 sm:px-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 items-start">
         <FileChip label="PDF" fileName={pdfName} missing={needsPdf} />
         {!isInternational && (
           <FileChip label="XML" fileName={xmlName} missing={needsXml} />
         )}
         {isInternational && !xmlName && (
-          <p className="text-xs text-[var(--color-ink-muted)] text-center mt-1">
+          <p className="text-xs text-[var(--color-ink-muted)] text-center mt-1 sm:col-span-2">
             Viaje internacional — se usará XML por defecto
           </p>
         )}
       </div>
       {(needsPdf || needsXml) && (
-        <p className="text-xs text-[var(--color-ink-muted)] text-center mt-3">
+        <p className="text-sm text-[var(--color-ink-muted)] text-center mt-2 leading-relaxed sm:col-span-2 max-w-none">
           Arrastra o haz clic para agregar{needsPdf ? " el PDF" : ""}{needsPdf && needsXml ? " y" : ""}{needsXml ? " el XML" : ""} faltante
         </p>
       )}
@@ -398,7 +453,7 @@ function SelectedContent({
 function FileChip({ label, fileName, missing }: { label: string; fileName: string | null; missing: boolean }) {
   return (
     <div
-      className={`flex items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] border text-sm ${
+      className={`w-full grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] border text-sm min-w-0 ${
         missing
           ? "border-dashed border-[var(--color-neutral-300)] text-[var(--color-ink-muted)]"
           : "border-success-200 bg-success-50/50 text-success-500"
@@ -409,8 +464,8 @@ function FileChip({ label, fileName, missing }: { label: string; fileName: strin
       ) : (
         <CheckIcon className="w-4 h-4" />
       )}
-      <span className="font-medium">{label}:</span>
-      <span className="truncate">{fileName ?? `Falta archivo .${label.toLowerCase()}`}</span>
+      <span className="font-medium whitespace-nowrap">{label}:</span>
+      <span className="min-w-0 truncate">{fileName ?? `Falta archivo .${label.toLowerCase()}`}</span>
     </div>
   );
 }
@@ -438,7 +493,7 @@ function UploadingContent({ progress }: { progress: number }) {
 
 function DoneContent({ files }: { files: string[] }) {
   return (
-    <>
+    <div className="w-full flex flex-col items-center">
       <CheckIcon className="w-8 h-8 text-success-400" />
       <div className="text-center">
         <p className="text-sm font-medium text-success-500">Archivos subidos correctamente</p>
@@ -446,19 +501,19 @@ function DoneContent({ files }: { files: string[] }) {
           <p className="text-xs text-[var(--color-ink-muted)] mt-1">{files.join(", ")}</p>
         )}
       </div>
-    </>
+    </div>
   );
 }
 
 function ErrorContent({ message }: { message: string }) {
   return (
-    <>
+    <div className="w-full flex flex-col items-center">
       <ErrorIcon className="w-8 h-8 text-accent-400" />
       <div className="text-center">
         <p className="text-sm font-medium text-accent-500">Error</p>
         <p className="text-xs text-accent-400 mt-1">{message}</p>
       </div>
-    </>
+    </div>
   );
 }
 

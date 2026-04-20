@@ -49,8 +49,10 @@ export default function ModalWrapper({
   return (
     <>
       <button
-        onClick={() => setIsOpen(true)}
-        className={buttonClassName + "pointer-events-auto hover:scale-115 transform transition-transform duration-200"}
+        onClick={() => {
+          if (!disabled) setIsOpen(true);
+        }}
+        className={`${buttonClassName} pointer-events-auto transition-transform duration-200 hover:scale-105`}
         style={disabled ? { opacity: 0.5, pointerEvents: "none" } : undefined}
       >
         {children}

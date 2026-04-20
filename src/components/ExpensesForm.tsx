@@ -1,11 +1,31 @@
 import React, { useState, useRef } from "react";
 import FileDropZone from "@components/FileDropZone";
-import type { FileDropZoneHandle } from "@components/FileDropZone";
+import type { FileDropZoneHandle, ReceiptUploadResponse } from "@components/FileDropZone";
+import CfdiDevPreview, { isDevTaxPreviewEnabled } from "@components/CfdiDevPreview";
 import Button from "@components/Button.tsx";
 import { submitTravelExpense } from "@components/SubmitTravelWarper";
 import ModalWrapper from "@components/ModalWrapper.tsx";
+import { apiRequest } from "@utils/apiClient";
 
 const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL;
+
+function formatRegistroError(err: unknown): string {
+  if (err && typeof err === "object" && "detail" in err) {
+    const d = (err as { detail?: unknown }).detail;
+    if (d && typeof d === "object" && "response" in d) {
+      const r = (d as { response?: { error?: string; details?: string; message?: string } }).response;
+      if (r && typeof r === "object") {
+        if (typeof r.error === "string") return r.error;
+        if (typeof r.details === "string") return r.details;
+        if (typeof r.message === "string") return r.message;
+      }
+    }
+    if (d && typeof d === "object" && "status" in d) {
+      return `Error HTTP ${(d as { status: number }).status} al registrar CFDI`;
+    }
+  }
+  return "No se pudo registrar el CFDI (SAT o validación en servidor)";
+}
 
 interface Props {
   requestId: number;
@@ -20,12 +40,21 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [isInternational, setIsInternational] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [devUploadResult, setDevUploadResult] = useState<ReceiptUploadResponse | null>(null);
+  const [devReceiptId, setDevReceiptId] = useState<number | null>(null);
+  const [devRegistroResponse, setDevRegistroResponse] = useState<unknown | null>(null);
+  const [devRegistroError, setDevRegistroError] = useState<string | null>(null);
 
   const dropZoneRef = useRef<FileDropZoneHandle>(null);
+  const showDevPanel = isDevTaxPreviewEnabled();
 
   const handleSubmit = async () => {
     try {
       setSubmitting(true);
+      setDevUploadResult(null);
+      setDevReceiptId(null);
+      setDevRegistroResponse(null);
+      setDevRegistroError(null);
 
       if (!concepto || !monto || isNaN(parseFloat(monto)) || !pdfFile || (!isInternational && !xmlFile)) {
         alert("Por favor, completa todos los campos correctamente.");
@@ -50,7 +79,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
       // 2. If replacing an old receipt, delete it first
       if (receiptToReplace) {
         try {
-          await fetch(`${API_BASE_URL}/applicant/delete-receipt/${receiptToReplace}`, {
+          await apiRequest(`/applicant/delete-receipt/${receiptToReplace}`, {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` },
           });
@@ -61,9 +90,40 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
 
       // 3. Upload files via FileDropZone's imperative handle (real progress bar)
       const uploadUrl = `${API_BASE_URL}/files/upload-receipt-files/${lastReceiptId}`;
-      await dropZoneRef.current!.upload(uploadUrl);
+      const uploadRes = await dropZoneRef.current!.upload(uploadUrl);
 
-      // 4. Done — redirect
+      // 4. Persistir CFDI en cfdi_comprobantes + SAT cuando el XML permitió armar el cuerpo
+      if (uploadRes.registro_sugerido && typeof uploadRes.registro_sugerido === "object") {
+        try {
+          const regRes = await apiRequest(`/comprobantes/${lastReceiptId}`, {
+            method: "POST",
+            data: uploadRes.registro_sugerido,
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (showDevPanel) {
+            setDevRegistroResponse(regRes);
+          }
+        } catch (regErr) {
+          console.error(regErr);
+          const msg = formatRegistroError(regErr);
+          setDevRegistroError(msg);
+          alert(msg);
+          if (showDevPanel) {
+            setDevUploadResult(uploadRes);
+            setDevReceiptId(lastReceiptId);
+          }
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      if (showDevPanel) {
+        setDevUploadResult(uploadRes);
+        setDevReceiptId(lastReceiptId);
+        setSubmitting(false);
+        return;
+      }
+
       window.location.href = `/comprobar-solicitud/${requestId}`;
     } catch (err) {
       console.error(err);
@@ -138,6 +198,17 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         onXmlChange={setXmlFile}
       />
 
+      {showDevPanel && devReceiptId != null && devUploadResult != null && (
+        <CfdiDevPreview
+          requestId={requestId}
+          receiptId={devReceiptId}
+          apiBaseUrl={API_BASE_URL}
+          upload={devUploadResult}
+          registroResponse={devRegistroResponse}
+          registroError={devRegistroError}
+        />
+      )}
+
       {/* ── Actions ── */}
       <div className="flex justify-end gap-4 pt-4">
         <a href={`/comprobar-solicitud/${requestId}`}>
@@ -151,6 +222,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
           modal_type="confirm"
           button_type="primary"
           variant="filled"
+          disabled={submitting}
           onConfirm={handleSubmit}
         >
           Subir Comprobante

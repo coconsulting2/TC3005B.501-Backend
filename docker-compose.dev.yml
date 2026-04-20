@@ -27,6 +27,8 @@ services:
       # re-evaluates them on each reload, so the value the browser sees
       # matches whatever's set when the dev server starts.
       PUBLIC_API_BASE_URL: https://localhost:3000/api
+      # SSR (apiClient en el contenedor): localhost sería el propio frontend; usar el host.
+      API_URL_SSR: https://host.docker.internal:3000/api
       PUBLIC_IS_DEV: "true"
     ports:
       - "4321:4321"

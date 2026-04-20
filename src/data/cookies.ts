@@ -22,35 +22,44 @@ export type Session = {
   token: string;
 };
 
-const mockSession: Session = {
-  username: "John Doe",
-  id: "1",
-  department_id: "1",
-  role: "Solicitante" as UserRole, // 'Solicitante' | 'Agencia de viajes' | 'Cuentas por pagar' | 'N1' | 'N2' | 'Administrador'
-  token: "token",
-};
-
+function emptySession(): Session {
+  return {
+    username: "",
+    id: "",
+    department_id: "",
+    role: "" as UserRole,
+    token: "",
+  };
+}
 
 function resolveCookies(): APIContext["cookies"] | null {
+  // En el navegador (p. ej. islas React) no existe Astro.cookies; es normal.
+  if (typeof globalThis.window !== "undefined") {
+    return null;
+  }
   const astro = (globalThis as any).Astro;
   if (astro && astro.cookies && typeof astro.cookies.get === "function") {
     return astro.cookies;
   }
-  console.warn("[WARN] resolveCookies(): Astro.cookies is not available in this context.");
+  if (import.meta.env.DEV) {
+    console.warn("[WARN] resolveCookies(): Astro.cookies no disponible en este contexto SSR.");
+  }
   return null;
 }
-
 
 export function getSession(cookies?: APIContext["cookies"]): Session {
   const realCookies = cookies || resolveCookies();
 
   if (!realCookies) {
-    console.warn("[WARN] No cookies available, returning mock session");
-    return mockSession;
+    return emptySession();
   }
 
   const username = realCookies.get("username")?.value || "";
-  const id = realCookies.get("user_id")?.value || "";
+  // Login API (httpOnly) usa cookie `id`; el formulario cliente también setea `user_id`.
+  const id =
+    realCookies.get("id")?.value ||
+    realCookies.get("user_id")?.value ||
+    "";
   const department_id = realCookies.get("department_id")?.value || "";
   const role = realCookies.get("role")?.value || "";
   const token = realCookies.get("token")?.value || ""; 

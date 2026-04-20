@@ -75,7 +75,7 @@ export default function Modal({
     >
       <div
         ref={dialogRef}
-        className={`bg-[var(--color-surface-white)] border rounded-[var(--radius-lg)] p-6 w-full max-w-md ${MODAL_STYLES[type]}`}
+        className={`bg-[var(--color-surface-white)] border rounded-[var(--radius-lg)] p-6 w-full max-w-md min-w-[320px] ${MODAL_STYLES[type]}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
@@ -83,11 +83,14 @@ export default function Modal({
       >
         <h2
           id="modal-title"
-          className="font-editorial text-xl font-normal text-[var(--color-ink)] mb-2"
+          className="font-editorial text-xl font-normal text-[var(--color-ink)] mb-2 leading-tight whitespace-normal break-words"
         >
           {title}
         </h2>
-        <p id="modal-message" className="mb-4 text-sm text-[var(--color-ink-secondary)]">
+        <p
+          id="modal-message"
+          className="mb-4 text-sm text-[var(--color-ink-secondary)] leading-relaxed whitespace-normal break-words"
+        >
           {message}
         </p>
         {children}

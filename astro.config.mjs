@@ -19,6 +19,11 @@ export default defineConfig({
   integrations: [react()],
   vite: {
     plugins: [tailwindcss(), basicSsl()],
+    // basic-ssl + HMR por WebSocket en el mismo puerto HTTPS suele cerrar el WS
+    // ("closed without opened"). Desactivar HMR evita ruido en consola; recarga manual.
+    server: {
+      hmr: false,
+    },
   },
   env: {
     schema: {

@@ -20,17 +20,74 @@
 
 import { getSession } from "@data/cookies";
 
+const DEFAULT_API = "https://localhost:3000/api";
+
+/**
+ * URL base del API. En el navegador: PUBLIC_API_BASE_URL (localhost).
+ * En SSR dentro de Docker: `API_URL_SSR` apunta al backend en el host (p. ej. host.docker.internal).
+ */
+function resolveApiBaseUrl(): string {
+  const isBrowser = typeof window !== "undefined";
+  if (!isBrowser && typeof process !== "undefined" && process.env.API_URL_SSR) {
+    return String(process.env.API_URL_SSR).replace(/\/$/, "");
+  }
+  return (import.meta.env.PUBLIC_API_BASE_URL || DEFAULT_API).replace(/\/$/, "");
+}
+
+/** Origen (scheme + host + port) para CSRF u otras rutas absolutas. */
+function apiOriginFromEnv(): string {
+  try {
+    return new URL(resolveApiBaseUrl()).origin;
+  } catch {
+    return "https://localhost:3000";
+  }
+}
+
+let csrfTokenPromise: Promise<string> | null = null;
+
+/**
+ * Obtiene token CSRF (cookie `_csrf` + valor para header). Reutiliza una petición en curso.
+ */
+async function getCsrfToken(): Promise<string> {
+  if (!csrfTokenPromise) {
+    const origin = apiOriginFromEnv();
+    csrfTokenPromise = fetch(`${origin}/api/user/csrf-token`, {
+      method: "GET",
+      credentials: "include",
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error(t || `CSRF fetch failed: ${res.status}`);
+        }
+        const data = await res.json();
+        if (!data?.csrfToken) {
+          throw new Error("CSRF response missing csrfToken");
+        }
+        return data.csrfToken as string;
+      })
+      .finally(() => {
+        csrfTokenPromise = null;
+      });
+  }
+  return csrfTokenPromise;
+}
+
 // Handle SSL certificate validation for server-side (Node.js) environment
 // This is needed for Astro SSR to work with self-signed certificates
 const isServer = typeof window === 'undefined';
-const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development';
+// `astro dev` → DEV true; build + preview o SSR en Docker puede tener DEV false pero NODE_ENV=development.
+const isDevelopment =
+  import.meta.env.DEV ||
+  import.meta.env.MODE === "development" ||
+  (typeof process !== "undefined" && process.env.NODE_ENV === "development");
 
 // In development server environment, disable certificate validation
-if (isServer && isDevelopment && typeof process !== 'undefined') {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+if (isServer && isDevelopment && typeof process !== "undefined") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
 
-type HTTP = 'GET' | 'POST' | 'PUT';
+type HTTP = "GET" | "POST" | "PUT" | "DELETE";
 
 interface ApiOptions {
   method?: HTTP;
@@ -43,7 +100,7 @@ export async function apiRequest<T = any>(
   path: string,
   options: ApiOptions = {}
 ): Promise<T> {
-  const baseUrl = import.meta.env.PUBLIC_API_BASE_URL;
+  const baseUrl = resolveApiBaseUrl();
   const { method = 'GET', data, headers = {}, cookies } = options;
 
   let token = "";
@@ -54,12 +111,27 @@ export async function apiRequest<T = any>(
     console.warn("[WARN] No se pudo obtener sesión en apiRequest", e);
   }
 
+  const needsCsrf =
+    method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE";
+  /** El backend excluye CSRF solo en POST /api/user/login. */
+  const skipCsrfForThisCall =
+    method === "POST" && (path === "/user/login" || path.endsWith("/user/login"));
+  let csrfToken: string | undefined;
+  if (needsCsrf && !skipCsrfForThisCall) {
+    try {
+      csrfToken = await getCsrfToken();
+    } catch (e) {
+      console.warn("[WARN] No se pudo obtener CSRF token", e);
+    }
+  }
+
   const config: RequestInit = {
     method,
     credentials: "include",
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(csrfToken ? { "csrf-token": csrfToken } : {}),
       ...headers,
     },
     ...(data && { body: JSON.stringify(data) }),
@@ -71,10 +143,16 @@ export async function apiRequest<T = any>(
     const res = await fetch(`${baseUrl}${path}`, config);
 
     if (!res.ok) {
-      const errorJson = await res.json().catch(() => null);
+      const bodyText = await res.text();
+      let response: unknown = bodyText;
+      try {
+        response = bodyText ? JSON.parse(bodyText) : null;
+      } catch {
+        /* cuerpo no JSON */
+      }
       throw {
         status: res.status,
-        response: errorJson || await res.text()
+        response,
       };
     }
 
