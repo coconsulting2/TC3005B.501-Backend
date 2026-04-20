@@ -9,11 +9,20 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 const storage = multer.memoryStorage();
 
 const fileFilter = (req, file, cb) => {
-  const allowedMimeTypes = ["application/pdf", "image/jpeg", "image/png"];
+  const allowedMimeTypes = [
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "application/xml",
+    "text/xml",
+  ];
   if (allowedMimeTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Invalid file type. Only PDF, JPEG, and PNG are allowed."), false);
+    cb(
+      new Error("Invalid file type. Only PDF, JPEG, PNG, and XML are allowed."),
+      false,
+    );
   }
 };
 

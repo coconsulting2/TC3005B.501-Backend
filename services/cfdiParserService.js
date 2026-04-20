@@ -58,6 +58,40 @@ const parser = new XMLParser({
 });
 
 /**
+ * @param {Record<string, unknown>} parsed
+ * @returns {Object|null}
+ */
+function getComprobanteRoot(parsed) {
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+  return parsed.Comprobante || parsed.comprobante || parsed["cfdi:Comprobante"] || null;
+}
+
+/**
+ * Suma importes de traslado IVA (impuesto 002) en el nodo Impuestos del comprobante.
+ * @param {Object|undefined} impuestos
+ * @returns {number}
+ */
+function sumIvaTrasladosFromImpuestos(impuestos) {
+  if (!impuestos?.Traslados?.Traslado) {
+    return 0;
+  }
+  const raw = impuestos.Traslados.Traslado;
+  const list = Array.isArray(raw) ? raw : [raw];
+  let sum = 0;
+  for (const t of list) {
+    if (String(t["@_Impuesto"] ?? "") === "002") {
+      const imp = parseFloat(t["@_Importe"]);
+      if (!Number.isNaN(imp)) {
+        sum += imp;
+      }
+    }
+  }
+  return sum;
+}
+
+/**
  * Parses a CFDI XML string and returns extracted fiscal data.
  *
  * @param {string} xmlString - Raw XML content of the CFDI
@@ -91,7 +125,7 @@ export function parseCFDI(xmlString) {
     throw new CfdiParseError(`XML malformado: ${err.message}`, "INVALID_XML");
   }
 
-  const comprobante = parsed.Comprobante;
+  const comprobante = getComprobanteRoot(parsed);
   if (!comprobante) {
     throw new CfdiParseError(
       "Nodo cfdi:Comprobante no encontrado. Verifique que el XML sea un CFDI válido.",
@@ -245,4 +279,183 @@ function extractTaxes(impuestos) {
   }));
 
   return { totalTrasladados, totalRetenidos, traslados, retenciones };
+}
+
+/**
+ * Construye el cuerpo JSON esperado por POST /api/comprobantes/:receipt_id (validateCfdi + insertarCfdi)
+ * a partir del XML timbrado. El PDF no interviene (solo respaldo).
+ *
+ * @param {string} xmlString
+ * @returns {Record<string, unknown>} Campos en snake_case listos para el API
+ * @throws {CfdiParseError}
+ */
+export function buildComprobanteRegistroBodyFromXml(xmlString) {
+  if (!xmlString || typeof xmlString !== "string" || !xmlString.trim()) {
+    throw new CfdiParseError("El contenido XML está vacío", "EMPTY_XML");
+  }
+
+  let parsed;
+  try {
+    parsed = parser.parse(xmlString);
+  } catch (err) {
+    throw new CfdiParseError(`XML malformado: ${err.message}`, "INVALID_XML");
+  }
+
+  const comprobante = getComprobanteRoot(parsed);
+  if (!comprobante) {
+    throw new CfdiParseError(
+      "Nodo Comprobante no encontrado",
+      "MISSING_COMPROBANTE",
+    );
+  }
+
+  const version = comprobante["@_Version"];
+  if (!version || !SUPPORTED_VERSIONS.includes(String(version))) {
+    throw new CfdiParseError(
+      `Versión CFDI no soportada para registro: ${version}`,
+      "UNSUPPORTED_VERSION",
+    );
+  }
+
+  const emisor = comprobante.Emisor;
+  const receptor = comprobante.Receptor;
+  if (!emisor?.["@_Rfc"] || !receptor?.["@_Rfc"]) {
+    throw new CfdiParseError("Emisor o Receptor sin RFC", "MISSING_RFC");
+  }
+
+  const complemento = comprobante.Complemento;
+  const timbre = complemento?.TimbreFiscalDigital;
+  if (!timbre?.["@_UUID"] || !timbre["@_FechaTimbrado"] || !timbre["@_RfcProvCertif"]) {
+    throw new CfdiParseError(
+      "TimbreFiscalDigital incompleto (UUID, FechaTimbrado o RfcProvCertif)",
+      "MISSING_TIMBRE_FIELDS",
+    );
+  }
+
+  const uuid = String(timbre["@_UUID"]).toUpperCase().trim();
+  const fechaTimbrado = String(timbre["@_FechaTimbrado"]).trim();
+  const rfcPac = String(timbre["@_RfcProvCertif"]).trim().toUpperCase();
+
+  const fechaEmision = comprobante["@_Fecha"];
+  if (!fechaEmision) {
+    throw new CfdiParseError("Falta Fecha del comprobante", "MISSING_FECHA");
+  }
+
+  const tipoComprobante = comprobante["@_TipoDeComprobante"];
+  if (!tipoComprobante) {
+    throw new CfdiParseError("Falta TipoDeComprobante", "MISSING_TIPO_COMPROBANTE");
+  }
+
+  const lugarExp = comprobante["@_LugarExpedicion"];
+  if (!lugarExp || !/^\d{5}$/.test(String(lugarExp).trim())) {
+    throw new CfdiParseError(
+      "LugarExpedicion debe ser CP de 5 dígitos",
+      "INVALID_LUGAR_EXPEDICION",
+    );
+  }
+
+  const metodoPago = comprobante["@_MetodoPago"];
+  if (!metodoPago || !["PUE", "PPD"].includes(String(metodoPago))) {
+    throw new CfdiParseError("MetodoPago debe ser PUE o PPD", "INVALID_METODO_PAGO");
+  }
+
+  const formaPago = comprobante["@_FormaPago"];
+  if (!formaPago || String(formaPago).trim().length !== 2) {
+    throw new CfdiParseError("FormaPago debe ser código de 2 caracteres", "INVALID_FORMA_PAGO");
+  }
+
+  const moneda = (comprobante["@_Moneda"] || "MXN").toString().trim().toUpperCase();
+  if (moneda.length !== 3) {
+    throw new CfdiParseError("Moneda inválida", "INVALID_MONEDA");
+  }
+
+  const subtotal = parseFloat(comprobante["@_SubTotal"]);
+  const total = parseFloat(comprobante["@_Total"]);
+  if (Number.isNaN(subtotal) || Number.isNaN(total)) {
+    throw new CfdiParseError("SubTotal o Total inválidos", "INVALID_TOTALES");
+  }
+
+  const descRaw = comprobante["@_Descuento"];
+  const descuento = descRaw !== undefined && descRaw !== "" ? parseFloat(descRaw) : 0;
+  const tipoCambioRaw = comprobante["@_TipoCambio"];
+  const tipoCambio =
+    tipoCambioRaw !== undefined && tipoCambioRaw !== ""
+      ? parseFloat(tipoCambioRaw)
+      : 1.0;
+
+  const iva = sumIvaTrasladosFromImpuestos(comprobante.Impuestos);
+
+  const nombreEmisor = String(emisor["@_Nombre"] || "").trim();
+  const nombreReceptor = String(receptor["@_Nombre"] || "").trim();
+  if (!nombreEmisor || !nombreReceptor) {
+    throw new CfdiParseError("Nombre emisor o receptor vacío", "MISSING_NOMBRE");
+  }
+
+  const regFisEm = String(emisor["@_RegimenFiscal"] || "").trim();
+  const regFisRec = String(receptor["@_RegimenFiscalReceptor"] || "").trim();
+  if (regFisEm.length !== 3 || regFisRec.length !== 3) {
+    throw new CfdiParseError("Régimen fiscal emisor/receptor debe ser 3 dígitos", "INVALID_REGIMEN");
+  }
+
+  const domFiscal = String(receptor["@_DomicilioFiscalReceptor"] || "").trim();
+  if (!/^\d{5}$/.test(domFiscal)) {
+    throw new CfdiParseError("DomicilioFiscalReceptor debe ser CP de 5 dígitos", "INVALID_DOM_FISCAL");
+  }
+
+  const usoCfdi = String(receptor["@_UsoCFDI"] || "").trim();
+  if (usoCfdi.length < 2 || usoCfdi.length > 4) {
+    throw new CfdiParseError("UsoCFDI inválido", "INVALID_USO_CFDI");
+  }
+
+  const selloRaw = comprobante["@_Sello"];
+  const selloEmisor =
+    selloRaw != null && String(selloRaw).trim().length >= 8 ? String(selloRaw).trim() : undefined;
+
+  const exportacion = (comprobante["@_Exportacion"] || "01").toString().trim();
+  const serie = comprobante["@_Serie"] != null ? String(comprobante["@_Serie"]).trim() : undefined;
+  const folio = comprobante["@_Folio"] != null ? String(comprobante["@_Folio"]).trim() : undefined;
+
+  const fechaEmisionIso = new Date(fechaEmision).toISOString();
+  let fechaTimbradoIso;
+  try {
+    fechaTimbradoIso = new Date(fechaTimbrado).toISOString();
+  } catch {
+    throw new CfdiParseError("FechaTimbrado inválida", "INVALID_FECHA_TIMBRADO");
+  }
+
+  /** @type {Record<string, unknown>} */
+  const body = {
+    uuid,
+    fecha_timbrado: fechaTimbradoIso,
+    rfc_pac: rfcPac,
+    version: String(version),
+    serie: serie || undefined,
+    folio: folio || undefined,
+    fecha_emision: fechaEmisionIso,
+    tipo_comprobante: String(tipoComprobante).trim(),
+    lugar_expedicion: String(lugarExp).trim(),
+    exportacion,
+    metodo_pago: String(metodoPago).trim(),
+    forma_pago: String(formaPago).trim(),
+    moneda,
+    tipo_cambio: tipoCambio,
+    subtotal,
+    descuento: Number.isNaN(descuento) ? 0 : descuento,
+    iva,
+    total,
+    rfc_emisor: String(emisor["@_Rfc"]).toUpperCase().trim(),
+    nombre_emisor: nombreEmisor,
+    regimen_fiscal_emisor: regFisEm,
+    rfc_receptor: String(receptor["@_Rfc"]).toUpperCase().trim(),
+    nombre_receptor: nombreReceptor,
+    domicilio_fiscal_receptor: domFiscal,
+    regimen_fiscal_receptor: regFisRec,
+    uso_cfdi: usoCfdi,
+  };
+
+  if (selloEmisor) {
+    body.sello_emisor = selloEmisor;
+  }
+
+  return body;
 }
