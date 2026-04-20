@@ -37,9 +37,14 @@ export default function AssignBudget({ request_id, token }: Props) {
       window.location.href = "/dashboard";
     } catch (error) {
       console.error("Error al asignar presupuesto:", error);
-      alert("Ocurrió un error al enviar la información.");
+      const wrapped = error as { detail?: { status?: number; response?: { error?: string } } };
+      const msg =
+        wrapped?.detail?.response && typeof wrapped.detail.response === "object"
+          ? (wrapped.detail.response as { error?: string }).error
+          : undefined;
+      alert(msg || "Ocurrió un error al enviar la información.");
     }
-  }, [imposedFee, request_id]);
+  }, [imposedFee, request_id, token]);
 
   return (
     <div className="w-full p-6 bg-white rounded border border-gray-300">

@@ -6,7 +6,8 @@ import Toast from "@components/Toast";
 interface Props {
   request_id: number;
   endpoint: string;
-  role: number;
+  /** ID del usuario autenticado (misma cookie `id` / sesión); la API usa :user_id, no role_id. */
+  user_id: string;
   title: string;
   message: string;
   redirection: string;
@@ -18,7 +19,7 @@ interface Props {
 export default function TravelRequestActionWrapper({
   request_id,
   endpoint,
-  role,
+  user_id,
   title,
   message,
   redirection,
@@ -29,7 +30,7 @@ export default function TravelRequestActionWrapper({
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const handleConfirm = useCallback(async () => {
     try {
-      const url = `${endpoint}/${request_id}/${role}`;
+      const url = `${endpoint}/${request_id}/${user_id}`;
       await apiRequest(url, { 
         method: "PUT",
         headers: { Authorization: `Bearer ${token}` }
@@ -49,8 +50,16 @@ export default function TravelRequestActionWrapper({
       }
     } catch (error) {
       console.error("Error en la solicitud:", error);
+      const detail = error && typeof error === "object" && "detail" in error
+        ? (error as { detail?: { response?: { error?: string } } }).detail
+        : undefined;
+      const msg =
+        detail?.response && typeof detail.response.error === "string"
+          ? detail.response.error
+          : "No se pudo completar la acción. Intenta de nuevo.";
+      setToast({ message: msg, type: "error" });
     }
-  }, [request_id, endpoint, redirection, role]);
+  }, [request_id, endpoint, redirection, user_id, token]);
 
   return (
     <>

@@ -33,6 +33,9 @@ const StateColors: Record<string, string> = {
   'Rechazado': 'status-pill--rejected',
   'Pendiente': 'status-pill--pending',
 };
+
+/** Solo en estado 6 (Comprobación gastos del viaje) se puede enviar a validación (PUT send-expense-validation). */
+const canSendForValidation = Number(request?.request_status_id) === 6;
 ---
 
 <MainLayout title={`Comprobantes de la solicitud #${id}`} data={{ userName, role, buttonLabel }}>
@@ -94,7 +97,15 @@ const StateColors: Record<string, string> = {
     </section>
   </main>
 
-  <div class="fixed bottom-6 right-6 z-50">
+  <div class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 max-w-sm">
+    {!canSendForValidation && (
+      <p class="text-xs text-[var(--color-ink-muted)] text-right bg-[var(--color-surface-white)] border border-[var(--color-neutral-200)] rounded-[var(--radius-md)] px-3 py-2 shadow-sm">
+        Solo puedes mandar a validar cuando la solicitud está en <strong>Comprobación gastos del viaje</strong>.
+        {request?.request_status_name && (
+          <> Estado actual: <strong>{request.request_status_name}</strong>.</>
+        )}
+      </p>
+    )}
     <ValidateReceiptStatus
       client:only="react"
       request_id={Number(id)}
@@ -103,6 +114,7 @@ const StateColors: Record<string, string> = {
       redirection="/dashboard"
       modal_type="success"
       variant="filled"
+      disabled={!canSendForValidation}
       token={getCookie("token", Astro.cookies)}
     >
       Mandar a validar

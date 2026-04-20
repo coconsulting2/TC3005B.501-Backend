@@ -34,24 +34,16 @@ function resolveApiBaseUrl(): string {
   return (import.meta.env.PUBLIC_API_BASE_URL || DEFAULT_API).replace(/\/$/, "");
 }
 
-/** Origen (scheme + host + port) para CSRF u otras rutas absolutas. */
-function apiOriginFromEnv(): string {
-  try {
-    return new URL(resolveApiBaseUrl()).origin;
-  } catch {
-    return "https://localhost:3000";
-  }
-}
-
 let csrfTokenPromise: Promise<string> | null = null;
 
 /**
  * Obtiene token CSRF (cookie `_csrf` + valor para header). Reutiliza una petición en curso.
+ * Usa la misma base que `apiRequest` (`PUBLIC_API_BASE_URL` / default) para no desincronizar orígenes.
  */
 async function getCsrfToken(): Promise<string> {
   if (!csrfTokenPromise) {
-    const origin = apiOriginFromEnv();
-    csrfTokenPromise = fetch(`${origin}/api/user/csrf-token`, {
+    const base = resolveApiBaseUrl();
+    csrfTokenPromise = fetch(`${base}/user/csrf-token`, {
       method: "GET",
       credentials: "include",
     })
@@ -159,9 +151,35 @@ export async function apiRequest<T = any>(
     return await res.json();
   } catch (error) {
     console.error("API request failed:", error);
+    if (
+      error &&
+      typeof error === "object" &&
+      "status" in error &&
+      "response" in error
+    ) {
+      throw {
+        message: "Network or fetch error",
+        detail: error as { status: number; response: unknown },
+      };
+    }
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const lower = errMsg.toLowerCase();
+    const isUnreachable =
+      error instanceof TypeError ||
+      lower.includes("failed to fetch") ||
+      lower.includes("networkerror") ||
+      errMsg.includes("ERR_CONNECTION_REFUSED");
+    const baseHint = resolveApiBaseUrl();
     throw {
-      message: 'Network or fetch error',
-      detail: error
+      message: "Network or fetch error",
+      detail: {
+        response: {
+          error: isUnreachable
+            ? `No hay conexión con la API (${baseHint}). Inicia el backend en ese host/puerto y revisa PUBLIC_API_BASE_URL si usas otro origen.`
+            : errMsg,
+        },
+        raw: error,
+      },
     };
   }
 }
