@@ -43,7 +43,8 @@ export const getApplicantRequests = async (req, res) => {
     const applicantRequests = await Applicant.getApplicantRequests(userId);
 
     if (!applicantRequests || applicantRequests.length === 0) {
-      return res.status(404).json({ error: "No user requests found" });
+      // 200 + [] evita que el cliente SSR trate "sin solicitudes" como error HTTP (antes 404).
+      return res.json([]);
     }
 
     const formattedRequests = applicantRequests.map((request) => ({
@@ -151,8 +152,12 @@ export const createTravelRequest = async (req, res) => {
       applicantId,
       travelDetails,
     );
-    const { user_email, user_name, requestId, status } = await mailData(travelRequest.requestId);
-    await Mail(user_email, user_name, travelRequest.requestId, status);
+    try {
+      const { user_email, user_name, request_id, status } = await mailData(travelRequest.requestId);
+      await Mail(user_email, user_name, request_id, status);
+    } catch (mailErr) {
+      console.error("createTravelRequest: correo no enviado (solicitud ya creada):", mailErr);
+    }
     res.status(201).json(travelRequest);
   } catch (error) {
     console.error("Error in createTravelRequest controller:", error);
@@ -192,7 +197,7 @@ export const cancelTravelRequest = async (req, res) => {
 
   try {
     const result = await cancelTravelRequestValidation(Number(request_id));
-    const { user_email, user_name, requestId, status } = await mailData(request_id);
+    const { user_email, user_name, status } = await mailData(request_id);
     await Mail(user_email, user_name, request_id, status);
     return res.status(200).json(result);
   } catch (error) {

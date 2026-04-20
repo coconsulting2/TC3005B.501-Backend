@@ -5,7 +5,11 @@
  * invalid XML, missing required nodes, unsupported version, and malformed UUID.
  */
 import { describe, it, expect } from "@jest/globals";
-import { parseCFDI, CfdiParseError } from "../../../services/cfdiParserService.js";
+import {
+  parseCFDI,
+  CfdiParseError,
+  buildComprobanteRegistroBodyFromXml,
+} from "../../../services/cfdiParserService.js";
 import { Importer } from "../../utils/importXML.js";
 
 
@@ -278,6 +282,23 @@ describe("parseCFDI", () => {
         expect(e).toBeInstanceOf(CfdiParseError);
         expect(e.code).toBe("MISSING_FECHA");
       }
+    });
+  });
+
+  describe("buildComprobanteRegistroBodyFromXml", () => {
+    it("builds snake_case body with timbre and comprobante fields (v4.0 restaurant)", () => {
+      const body = buildComprobanteRegistroBodyFromXml(CFDI_V40_RESTAURANT);
+      expect(body.uuid).toBe("A1B2C3D4-E5F6-7890-ABCD-EF1234567890");
+      expect(body.rfc_emisor).toBe("EKU9003173C9");
+      expect(body.rfc_receptor).toBe("XAXX010101000");
+      expect(body.total).toBe(1160);
+      expect(body.moneda).toBe("MXN");
+      expect(body.tipo_comprobante).toBe("I");
+      expect(body.version).toBe("4.0");
+      expect(body.rfc_pac).toBe("SAT970701NN3");
+      // Sello del fixture es demasiado corto (< 8) — no se incluye sello_emisor
+      expect(body.sello_emisor).toBeUndefined();
+      expect(body.iva).toBe(160);
     });
   });
 

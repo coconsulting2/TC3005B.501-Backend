@@ -288,7 +288,7 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "files", "upload"]
             },
-            "description": "**Escenario negativo — Extensión/tipo MIME no permitido (.exe)**\n\nVerifica que el `fileFilter` en `fileValidation.js` bloquea tipos MIME distintos de `application/pdf`, `image/jpeg`, `image/png`.\n\n**Archivo:** `tests/fixtures/storage/malicious.exe` (74 bytes, MIME: application/octet-stream)\n\n**Flujo:** `fileFilter` llama `cb(new Error('Invalid file type...'), false)` → Multer rechaza → `handleMulterErrors` devuelve 400.\n\n**Resultado esperado:**\n- HTTP 400\n- Body: `{ error: 'Invalid file type. Only PDF, JPEG, and PNG are allowed.' }`\n- Ningún dato guardado en S3"
+            "description": "**Escenario negativo — Extensión/tipo MIME no permitido (.exe)**\n\nVerifica que el `fileFilter` en `fileValidation.js` bloquea tipos MIME distintos de PDF, imágenes y XML.\n\n**Archivo:** `tests/fixtures/storage/malicious.exe` (74 bytes, MIME: application/octet-stream)\n\n**Flujo:** `fileFilter` llama `cb(new Error('Invalid file type...'), false)` → Multer rechaza → `handleMulterErrors` devuelve 400.\n\n**Resultado esperado:**\n- HTTP 400\n- Body: `{ error: 'Invalid file type. Only PDF, JPEG, PNG, and XML are allowed.' }`\n- Ningún dato guardado en S3"
           },
           "response": [
             {
@@ -299,32 +299,26 @@
               },
               "status": "Bad Request",
               "code": 400,
-              "body": "{\n  \"error\": \"Invalid file type. Only PDF, JPEG, and PNG are allowed.\"\n}"
+              "body": "{\n  \"error\": \"Invalid file type. Only PDF, JPEG, PNG, and XML are allowed.\"\n}"
             }
           ]
         },
         {
-          "name": "TC-S3-004 | Upload XML (tipo MIME no permitido)",
+          "name": "TC-S3-004 | Upload XML (CFDI — permitido en S3)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status code es 400', function () {",
-                  "    pm.response.to.have.status(400);",
+                  "pm.test('Status code es 201', function () {",
+                  "    pm.response.to.have.status(201);",
                   "});",
                   "",
-                  "pm.test('Mensaje de error indica tipo de archivo inválido', function () {",
+                  "pm.test('Respuesta incluye key y bucket', function () {",
                   "    const json = pm.response.json();",
-                  "    pm.expect(json).to.have.property('error');",
-                  "    pm.expect(json.error).to.include('Invalid file type');",
-                  "});",
-                  "",
-                  "pm.test('Documenta: XML no está en los tipos permitidos (PDF, JPEG, PNG)', function () {",
-                  "    // Este test documenta explícitamente el comportamiento esperado:",
-                  "    // XML (text/xml o application/xml) es rechazado por fileValidation.js",
-                  "    pm.expect(true).to.be.true;",
+                  "    pm.expect(json).to.have.property('key');",
+                  "    pm.expect(json).to.have.property('bucket');",
                   "});"
                 ]
               }
@@ -365,20 +359,9 @@
               "host": ["{{baseUrl}}"],
               "path": ["api", "files", "upload"]
             },
-            "description": "**Escenario negativo — XML válido pero tipo no permitido**\n\nAunque el XML es un CFDI fiscal válido, `fileValidation.js` solo permite `application/pdf`, `image/jpeg`, `image/png`. El tipo MIME `text/xml` o `application/xml` está bloqueado.\n\n**Archivo:** `tests/fixtures/storage/valid.xml` (CFDI 4.0 de SAT, 2.2KB)\n\n**NOTA IMPORTANTE:** Si se requiere soporte para XML en S3, se debe actualizar `allowedMimeTypes` en `middleware/fileValidation.js`.\n\n**Resultado esperado:**\n- HTTP 400\n- Body: `{ error: 'Invalid file type. Only PDF, JPEG, and PNG are allowed.' }`"
+            "description": "**Escenario positivo — XML (CFDI) en bucket S3**\n\n`fileValidation.js` permite `text/xml` y `application/xml` además de PDF e imágenes, para alinear el módulo S3 con comprobantes fiscales.\n\n**Archivo:** `tests/fixtures/storage/valid.xml` (CFDI 4.0 de SAT, 2.2KB)\n\n**Resultado esperado:**\n- HTTP 201\n- Body: `{ message, key, bucket }`"
           },
-          "response": [
-            {
-              "name": "400 - XML no permitido",
-              "originalRequest": {
-                "method": "POST",
-                "url": "{{baseUrl}}/api/files/upload"
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "body": "{\n  \"error\": \"Invalid file type. Only PDF, JPEG, and PNG are allowed.\"\n}"
-            }
-          ]
+          "response": []
         },
         {
           "name": "TC-S3-005 | Upload PDF corrompido (sin auth — debe rechazar primero)",

@@ -48,8 +48,10 @@ export const uploadReceiptFilesController = async (req, res) => {
         rfcReceptor: result.cfdi.rfcReceptor,
         fecha: result.cfdi.fecha,
         total: result.cfdi.total,
+        selloUltimos8: result.cfdi.selloUltimos8,
         taxes: result.cfdi.taxes,
       },
+      registro_sugerido: result.registroSugerido,
     });
   } catch (error) {
     if (error instanceof CfdiParseError) {
@@ -141,13 +143,15 @@ export const uploadFile = async (req, res) => {
 
     const orgId = req.body.orgId || req.user?.orgId || "defaultOrg";
     const viajeId = req.body.viajeId || "defaultViaje";
+    const receiptId = req.body.receiptId;
 
     const { key, bucket } = await upload({
       body: req.file.buffer,
       orgId,
       viajeId,
       fileName: req.file.originalname,
-      contentType: req.file.mimetype
+      contentType: req.file.mimetype,
+      receiptId,
     });
 
     res.status(201).json({

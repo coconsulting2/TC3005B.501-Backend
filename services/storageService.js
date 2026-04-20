@@ -1,7 +1,7 @@
 /**
  * @module storageService
  * @description AWS S3 storage for trip files: upload with SSE-S3 (AES-256), pre-signed GET URLs (15 min), and delete.
- * Object keys: `{orgId}/{viajeId}/{uuid}/{filename}`.
+ * Object keys: `{orgId}/{viajeId}/[{receiptId}/]{uuid}/{filename}` cuando `receiptId` se envía en el body del upload.
  */
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -15,12 +15,26 @@ dotenv.config();
 const PRESIGNED_TTL_SECONDS = 15 * 60;
 
 /**
+ * Cliente S3: AWS real por defecto; con `AWS_S3_ENDPOINT` (p. ej. LocalStack en dev)
+ * se usa endpoint + credenciales explícitas y path-style.
  * @returns {S3Client}
  */
 function createS3Client() {
   const region = process.env.AWS_REGION;
   if (!region) {
     throw new Error("AWS_REGION is required for S3");
+  }
+  const endpoint = process.env.AWS_S3_ENDPOINT?.trim();
+  if (endpoint) {
+    return new S3Client({
+      region,
+      endpoint,
+      forcePathStyle: process.env.AWS_S3_FORCE_PATH_STYLE !== "false",
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID || "test",
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "test",
+      },
+    });
   }
   return new S3Client({ region });
 }
@@ -43,12 +57,15 @@ function getBucketName() {
  * @param {string} fileName
  * @returns {string}
  */
-function buildObjectKey(orgId, viajeId, fileName) {
+function buildObjectKey(orgId, viajeId, fileName, receiptId) {
   const safeOrg = String(orgId).replace(/[^a-zA-Z0-9-_]/g, "");
   const safeViaje = String(viajeId).replace(/[^a-zA-Z0-9-_]/g, "");
   const base = path.basename(String(fileName) || "file").replace(/[^a-zA-Z0-9._-]/g, "_");
   const id = randomUUID();
-  return `${safeOrg}/${safeViaje}/${id}/${base}`;
+  const receiptRaw = receiptId != null && String(receiptId).trim() !== "" ? String(receiptId).trim() : "";
+  const safeReceipt = receiptRaw.replace(/[^a-zA-Z0-9-_]/g, "");
+  const mid = safeReceipt ? `${safeReceipt}/${id}` : id;
+  return `${safeOrg}/${safeViaje}/${mid}/${base}`;
 }
 
 /**
@@ -59,12 +76,13 @@ function buildObjectKey(orgId, viajeId, fileName) {
  * @param {string|number} params.viajeId - Trip identifier
  * @param {string} params.fileName - Original file name (basename is used)
  * @param {string} [params.contentType] - MIME type; defaults to application/octet-stream
+ * @param {string|number} [params.receiptId] - Opcional: segmento de clave S3 alineado con comprobantes
  * @returns {Promise<{ key: string, bucket: string }>}
  */
-async function upload({ body, orgId, viajeId, fileName, contentType }) {
+async function upload({ body, orgId, viajeId, fileName, contentType, receiptId }) {
   const client = createS3Client();
   const bucket = getBucketName();
-  const key = buildObjectKey(orgId, viajeId, fileName);
+  const key = buildObjectKey(orgId, viajeId, fileName, receiptId);
   await client.send(
     new PutObjectCommand({
       Bucket: bucket,

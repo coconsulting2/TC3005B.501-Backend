@@ -24,7 +24,7 @@
 | Archivo               | Tamaño  | MIME type            | Propósito                                |
 |-----------------------|---------|----------------------|------------------------------------------|
 | `valid.pdf`           | 597 B   | application/pdf      | Upload happy path                        |
-| `valid.xml`           | 2.2 KB  | text/xml             | Verificar rechazo de XML (no permitido)  |
+| `valid.xml`           | 2.2 KB  | text/xml             | Upload XML / CFDI a S3 (TC-S3-004)       |
 | `large_file_11mb.pdf` | 11 MB   | application/pdf      | Verificar rechazo por tamaño > 10MB      |
 | `malicious.exe`       | 74 B    | application/octet-stream | Verificar rechazo de extensión inválida |
 | `corrupted.pdf`       | 382 B   | application/pdf      | Verificar comportamiento con contenido corrupto |
@@ -38,7 +38,7 @@
 | TC-S3-001  | Upload PDF válido                        | POST /upload          | Positivo | 201           |
 | TC-S3-002  | Upload archivo > 10MB                    | POST /upload          | Negativo | 400           |
 | TC-S3-003  | Upload extensión inválida (.exe)          | POST /upload          | Negativo | 400           |
-| TC-S3-004  | Upload XML (tipo MIME no permitido)       | POST /upload          | Negativo | 400           |
+| TC-S3-004  | Upload XML (CFDI permitido)               | POST /upload          | Positivo | 201           |
 | TC-S3-005  | Upload PDF corrompido                    | POST /upload          | Borde    | 201 (ver nota)|
 | TC-S3-006  | Upload sin token de autenticación         | POST /upload          | Negativo | 401           |
 | TC-S3-007  | Upload con token inválido/expirado        | POST /upload          | Negativo | 403           |
@@ -119,7 +119,7 @@ HTTP 400
 **Flujo técnico:**
 ```
 fileFilter recibe file con mimetype = "application/octet-stream"
-  → cb(new Error("Invalid file type. Only PDF, JPEG, and PNG are allowed."), false)
+  → cb(new Error("Invalid file type. Only PDF, JPEG, PNG, and XML are allowed."), false)
   → handleMulterErrors → HTTP 400
 ```
 
@@ -127,25 +127,25 @@ fileFilter recibe file con mimetype = "application/octet-stream"
 ```json
 HTTP 400
 {
-  "error": "Invalid file type. Only PDF, JPEG, and PNG are allowed."
+  "error": "Invalid file type. Only PDF, JPEG, PNG, and XML are allowed."
 }
 ```
 
 ---
 
-### TC-S3-004 — Upload XML (tipo MIME no permitido)
+### TC-S3-004 — Upload XML (CFDI permitido en S3)
 
-**Descripción:** El XML (`valid.xml`) es un CFDI 4.0 del SAT estructuralmente válido, pero su MIME type (`text/xml`) no está en la lista de tipos permitidos.
+**Descripción:** El XML (`valid.xml`) es un CFDI 4.0 del SAT; `text/xml` / `application/xml` están en `allowedMimeTypes` para el módulo S3.
 
 **Resultado esperado:**
 ```json
-HTTP 400
+HTTP 201
 {
-  "error": "Invalid file type. Only PDF, JPEG, and PNG are allowed."
+  "message": "File uploaded to S3 successfully",
+  "key": "...",
+  "bucket": "..."
 }
 ```
-
-**Nota de diseño:** Si el sistema necesita almacenar XMLs de CFDI en S3, se debe agregar `text/xml` y `application/xml` a `allowedMimeTypes` en `middleware/fileValidation.js`.
 
 ---
 
@@ -329,7 +329,7 @@ export const deleteFileController = async (req, res) => {
 | 1 | **DELETE endpoint no implementado**             | Alta      | `routes/fileRoutes.js`, `controllers/fileController.js` |
 | 2 | PDF corrupto se acepta sin validar contenido    | Media     | `middleware/fileValidation.js`|
 | 3 | Download de key inexistente devuelve URL inválida (no 404) | Media | `controllers/fileController.js`, `services/storageService.js` |
-| 4 | XML no está en tipos permitidos (si se necesita)| Baja      | `middleware/fileValidation.js`|
+| 4 | ~~XML en S3~~ (resuelto: `text/xml` / `application/xml`) | — | `middleware/fileValidation.js` |
 | 5 | No hay validación de que el key pertenece al org del usuario en download | Alta | `controllers/fileController.js` |
 
 ---

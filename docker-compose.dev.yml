@@ -24,8 +24,10 @@ services:
       POSTGRES_USER: cocoscheme
       POSTGRES_PASSWORD: cocoscheme_dev
       POSTGRES_DB: CocoScheme
+    # Host 5432 suele chocar con Postgres nativo de Windows (:: + 0.0.0.0).
+    # DBeaver / herramientas en el PC: 127.0.0.1:5434 (contenedor sigue en 5432).
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -54,6 +56,43 @@ services:
     # on the backend instead of being drowned in connection-open/close noise.
     logging:
       driver: none
+    networks:
+      - cocoscheme
+
+  # S3 API compatible (LocalStack). El backend usa el mismo código que en AWS;
+  # en dev: AWS_S3_ENDPOINT apunta aquí; en prod: sin endpoint (SDK regional).
+  localstack:
+    image: localstack/localstack:3.5
+    restart: unless-stopped
+    environment:
+      SERVICES: s3
+      DEBUG: "0"
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    networks:
+      - cocoscheme
+
+  s3-init:
+    image: amazon/aws-cli:2.17.54
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        aws --endpoint-url=http://localstack:4566 s3 mb s3://coco-consulting-local 2>/dev/null || true
     networks:
       - cocoscheme
 
@@ -115,6 +154,11 @@ services:
       JWT_SECRET: dev_jwt_secret_change_me
       MAIL_USER: test.mail@outlook.com
       MAIL_PASSWORD: changeme
+      AWS_REGION: us-east-1
+      AWS_S3_BUCKET: coco-consulting-local
+      AWS_S3_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
     ports:
       - "3000:3000"
     volumes:
@@ -148,6 +192,8 @@ services:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
+      s3-init:
+        condition: service_completed_successfully
     networks:
       - cocoscheme
 
@@ -156,6 +202,7 @@ volumes:
   mongodata:
   certs:
   node_modules_dev:
+  localstack_data:
 
 networks:
   cocoscheme:
