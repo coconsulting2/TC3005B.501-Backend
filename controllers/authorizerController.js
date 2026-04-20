@@ -39,7 +39,7 @@ const authorizeTravelRequest = async (req, res) => {
 
   try {
     const { new_status } = await authorizerServices.authorizeRequest(Number(request_id), Number(user_id));
-    const { user_email, user_name, requestId, status } = await mailData(request_id);
+    const { user_email, user_name, status } = await mailData(request_id);
     await Mail(user_email, user_name, request_id, status);
     return res.status(200).json({
       message: "Request status updated successfully",
@@ -65,7 +65,7 @@ const declineTravelRequest = async (req, res) => {
 
   try {
     const result = await authorizerServices.declineRequest(Number(request_id), Number(user_id));
-    const { user_email, user_name, requestId, status } = await mailData(request_id);
+    const { user_email, user_name, status } = await mailData(request_id);
     await Mail(user_email, user_name, request_id, status);
     return res.status(200).json(result);
   } catch (error) {

@@ -92,7 +92,11 @@ export const authenticateToken = async (req, res, next) => {
     const decoded = await verifyToken(token);
 
     const requestIp = req.headers["x-forwarded-for"] || req.ip;
-    if (decoded.ip !== requestIp) {
+    // En desarrollo, el SSR (p. ej. Astro en Docker) llama al API con otra IP que el login en el navegador.
+    const skipIpCheck =
+      process.env.NODE_ENV === "development" ||
+      process.env.JWT_SKIP_IP_CHECK === "true";
+    if (!skipIpCheck && decoded.ip !== requestIp) {
       throw new TokenMismatchError();
     }
 

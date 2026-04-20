@@ -38,7 +38,22 @@ app.use(express.json());
 app.use(cookieParser());
 
 if (process.env.NODE_ENV !== "test") {
-    app.use(csrf({cookie: true}));
+    const csrfProtection = csrf({ cookie: true });
+    /**
+     * CSRF en JSON + SPA: el login no puede enviar token antes de existir sesión.
+     * Excluimos solo POST /api/user/login; el resto de mutaciones siguen protegidas.
+     */
+    app.use((req, res, next) => {
+        const pathOnly = (req.originalUrl || req.url || "").split("?")[0];
+        if (req.method === "POST" && pathOnly === "/api/user/login") {
+            return next();
+        }
+        return csrfProtection(req, res, next);
+    });
+    // Ruta explícita y temprana (otros POST/PUT siguen necesitando header csrf-token).
+    app.get("/api/user/csrf-token", (req, res) => {
+        res.json({ csrfToken: req.csrfToken() });
+    });
 }
 
 app.use("/api/applicant", applicantRoutes);

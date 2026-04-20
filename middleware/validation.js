@@ -523,7 +523,7 @@ export const validateCfdi = [
   // Path param
   param("receipt_id").isInt({ min: 1 }).toInt().withMessage("receipt_id debe ser entero positivo"),
   // --- TimbreFiscalDigital ---
-  body("uuid").isUUID(4).withMessage("uuid debe ser UUID v4 (Folio Fiscal del SAT)"),
+  body("uuid").isUUID().withMessage("uuid debe ser UUID válido (Folio Fiscal del SAT)"),
   body("fecha_timbrado").isISO8601().withMessage("fecha_timbrado debe ser fecha ISO 8601"),
   body("rfc_pac").isString().trim().notEmpty().withMessage("rfc_pac es requerido (RFC del PAC)"),
   // --- Comprobante ---
