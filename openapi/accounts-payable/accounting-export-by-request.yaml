@@ -1,0 +1,147 @@
+paths:
+  /accounting-export/{request_id}:
+    get:
+      summary: Export accounting polizas (AV/GV) for a finalized travel request
+      description: |
+        Returns the accounting journal entries (polizas contables) for the given
+        travel Request. Output mirrors the SAP-style structure from
+        "Polizas contables gastos de Viaje.xlsx":
+          - Poliza Anticipo de Viaje (DOC_TYPE=AV)  if the request had an imposed_fee > 0
+          - Poliza Comprobacion de Viaje (DOC_TYPE=GV) aggregating approved receipts
+        Format is JSON by default; pass `?format=xml` or `Accept: application/xml` for XML.
+        Restricted to role "Cuentas por pagar".
+      security:
+        - TokenAuth: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          description: ID of the travel request to export
+          schema:
+            type: integer
+        - name: format
+          in: query
+          required: false
+          description: Output format override
+          schema:
+            type: string
+            enum: [json, xml]
+      responses:
+        "200":
+          description: Polizas exported successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  polizas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        header:
+                          type: object
+                          properties:
+                            ID_VIAJE: { type: string }
+                            DOC_TYPE: { type: string, enum: [AV, GV] }
+                            HEADER_TXT: { type: string }
+                            COMP_CODE: { type: string }
+                            PSTNG_DATE: { type: string, example: "20/04/2026" }
+                            CURRENCY: { type: string, example: "MXN" }
+                            EXCH_RATE: { type: number, example: 1 }
+                        detalles:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              ITEMNO_ACC: { type: integer }
+                              SHKZG: { type: string, enum: [S, H] }
+                              GL_ACCOUNT: { type: string }
+                              VENDOR_NO: { type: string, nullable: true }
+                              COSTCENTER: { type: string, nullable: true }
+                              ITEM_TEXT: { type: string }
+                              AMT_DOCCUR: { type: number }
+              examples:
+                anticipoYComprobacion:
+                  summary: Viaje con anticipo y gastos comprobados
+                  value:
+                    polizas:
+                      - header:
+                          ID_VIAJE: "222"
+                          DOC_TYPE: AV
+                          HEADER_TXT: "Anticipo Viaje # 222"
+                          COMP_CODE: "1000"
+                          PSTNG_DATE: "20/04/2026"
+                          CURRENCY: MXN
+                          EXCH_RATE: 1
+                        detalles:
+                          - ITEMNO_ACC: 1
+                            SHKZG: S
+                            GL_ACCOUNT: "1000"
+                            VENDOR_NO: "20000000012"
+                            ITEM_TEXT: "Anticipo Viaje # 222 #Emp005"
+                            AMT_DOCCUR: 1000
+                          - ITEMNO_ACC: 2
+                            SHKZG: H
+                            GL_ACCOUNT: "1001"
+                            VENDOR_NO: "20000000012"
+                            ITEM_TEXT: "Anticipo Viaje # 222 #Emp005"
+                            AMT_DOCCUR: 1000
+            application/xml:
+              schema:
+                type: string
+              example: |
+                <?xml version="1.0" encoding="UTF-8"?>
+                <Polizas>
+                  <Poliza>
+                    <Cabecera>
+                      <ID_VIAJE>222</ID_VIAJE>
+                      <DOC_TYPE>AV</DOC_TYPE>
+                      <HEADER_TXT>Anticipo Viaje # 222</HEADER_TXT>
+                      <COMP_CODE>1000</COMP_CODE>
+                      <PSTNG_DATE>20/04/2026</PSTNG_DATE>
+                      <CURRENCY>MXN</CURRENCY>
+                      <EXCH_RATE>1</EXCH_RATE>
+                    </Cabecera>
+                    <Detalles>
+                      <Detalle>
+                        <ITEMNO_ACC>1</ITEMNO_ACC>
+                        <SHKZG>S</SHKZG>
+                        <GL_ACCOUNT>1000</GL_ACCOUNT>
+                        <VENDOR_NO>20000000012</VENDOR_NO>
+                        <ITEM_TEXT>Anticipo Viaje # 222 #Emp005</ITEM_TEXT>
+                        <AMT_DOCCUR>1000</AMT_DOCCUR>
+                      </Detalle>
+                    </Detalles>
+                  </Poliza>
+                </Polizas>
+        "404":
+          description: Travel request not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+              example:
+                error: "Travel request not found"
+        "409":
+          description: Request not in finalized state
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+              example:
+                error: "Request not finalized. Accounting export is only available once the request is in status 'Finalizado'."
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+              example:
+                error: "Internal server error"
