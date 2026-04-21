@@ -13,23 +13,26 @@ import MaterialIcon from "@components/MaterialIcon.astro";
 const isCurrentRoute = Astro.url.pathname === "/perfil-usuario";
 ---
 
-<header class="flex justify-between items-center bg-[var(--color-surface-white)] border-b border-[var(--color-neutral-200)] px-6 h-14">
-  <!-- Left: Logo + Brand -->
+<header class="flex justify-between items-center bg-[var(--color-surface-white)] border-b border-[var(--color-neutral-200)] px-4 md:px-6 h-14">
+  <!-- Left: Hamburger (mobile) + Logo + Brand -->
   <div class="flex items-center gap-3">
+    <button id="menu-btn" class="md:hidden flex items-center justify-center w-11 h-11 rounded-[var(--radius-md)] hover:bg-[var(--color-surface-secondary)] transition-colors">
+      <MaterialIcon icon="menu" color="currentColor" />
+    </button>
     <a href="/dashboard" class="flex items-center gap-2.5">
       <img
         src="/Logo.svg"
         class="w-9 h-9"
         alt="CocoAPI"
       />
-      <span class="eyebrow text-[var(--color-ink)] tracking-widest font-semibold">COCOAPI</span>
+      <span class="eyebrow text-[var(--color-ink)] tracking-widest font-semibold hidden sm:block">COCOAPI</span>
     </a>
   </div>
 
   <!-- Right: Role + Actions + User -->
   <div class="flex items-center gap-3">
     <!-- User Role Badge -->
-    <span class="status-pill bg-[var(--color-surface-secondary)] text-[var(--color-ink-secondary)] border border-[var(--color-neutral-200)]">
+    <span class="status-pill bg-[var(--color-surface-secondary)] text-[var(--color-ink-secondary)] border border-[var(--color-neutral-200)] hidden sm:inline-flex">
       {buttonLabel}
     </span>
 
@@ -44,7 +47,7 @@ const isCurrentRoute = Astro.url.pathname === "/perfil-usuario";
 
     <!-- User Info -->
     <div class="flex items-center gap-3 pl-2 border-l border-[var(--color-neutral-200)]">
-      <span class="text-sm font-medium text-[var(--color-ink)]">
+      <span class="text-sm font-medium text-[var(--color-ink)] hidden md:block">
         {userName}
       </span>
       <a href="/perfil-usuario" class={isCurrentRoute ? "pointer-events-none" : ""}>
