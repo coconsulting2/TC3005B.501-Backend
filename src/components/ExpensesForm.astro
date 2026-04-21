@@ -2,9 +2,9 @@
 import ExpensesFormClient from "@components/ExpensesForm.tsx"; // Ajusta la ruta si cambia
 import { getCookie } from "@data/cookies";
 import { apiRequest } from "@utils/apiClient";
+import { requestAllowsReceiptUpload } from "@utils/receiptUploadAccess";
 
 const { id } = Astro.params;
-const user_id = getCookie("id", Astro.cookies);
 
 const travelData = await (async () => {
   try {
@@ -12,9 +12,32 @@ const travelData = await (async () => {
   } catch (error) {
     return {};
   }
-})()
+})();
+
+const canUploadReceipts =
+  travelData?.request_id != null && requestAllowsReceiptUpload(travelData.request_status_id);
 ---
 
+{!travelData?.request_id ? (
+  <section class="bg-white p-6 rounded-lg shadow-md">
+    <p class="text-sm text-gray-600">No se encontró la solicitud o no tienes permiso para verla.</p>
+  </section>
+) : !canUploadReceipts ? (
+  <section class="bg-white p-6 rounded-lg shadow-md space-y-4">
+    <h2 class="text-xl font-bold text-primary-500">Comprobación de gastos</h2>
+    <p class="text-sm text-gray-700">
+      Aún no puedes subir comprobantes. La solicitud debe haber sido <strong>aprobada por N2</strong>
+      y seguir en flujo activo (desde <em>Cotización del Viaje</em> hasta <em>Validación de comprobantes</em>).
+      Cuentas por pagar y anticipos se gestionan después de esas aprobaciones.
+    </p>
+    <p class="text-sm text-gray-600">
+      Estado actual: <strong>{travelData.request_status ?? "—"}</strong>
+    </p>
+    <p>
+      <a class="text-primary-600 underline text-sm" href={`/detalles-solicitud/${id}`}>Volver al detalle de la solicitud</a>
+    </p>
+  </section>
+) : (
 <section class="bg-white p-6 rounded-lg shadow-md space-y-6">
   <div class="flex items-center justify-between">
     <h2 class="text-xl font-bold text-primary-500">Generar Comprobación de Gastos del viaje</h2>
@@ -36,4 +59,5 @@ const travelData = await (async () => {
     receiptToReplace={Astro.props.receiptToReplace}
   />
 </section>
+)}
 
