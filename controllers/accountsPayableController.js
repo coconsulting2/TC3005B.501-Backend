@@ -60,7 +60,7 @@ const attendTravelRequest = async (req, res) => {
         }
 
         try {
-            const { user_email, user_name, request_id, status } = await mailData(requestId);
+            const { user_email, user_name, status } = await mailData(requestId);
             await Mail(user_email, user_name, requestId, status);
         } catch (mailErr) {
             console.warn("[attendTravelRequest] Estado actualizado; correo no enviado:", mailErr?.message || mailErr);
@@ -89,7 +89,7 @@ const validateReceiptsHandler = async (req, res) => {
 
     try {
         const result = await AccountsPayableService.validateReceiptsAndUpdateStatus(requestId);
-        const { user_email, user_name, request_id, status } = await mailData(requestId);
+        const { user_email, user_name, status } = await mailData(requestId);
         await Mail(user_email, user_name, requestId, status);
         res.status(200).json(result);
     } catch (error) {

@@ -91,7 +91,7 @@ export const cancelTravelRequestValidation = async (request_id) => {
                 message:
                     "Request cannot be cancelled after reaching 'Atención Agencia de Viajes'",
             };
-        } else if (status_id == 9) {
+        } else if (status_id === 9) {
             throw {
                 status: 400,
                 message: "Request has already been cancelled.",
@@ -247,7 +247,7 @@ export const getCityId = async (tx, cityName) => {
  */
 export const sendReceiptsForValidation = async (requestId) => {
     const rawStatus = await Applicant.getRequestStatus(requestId);
-    const currentStatus = rawStatus == null ? null : Number(rawStatus);
+    const currentStatus = rawStatus === null || rawStatus === undefined ? null : Number(rawStatus);
 
     if (currentStatus === null) {
         const err = new Error(`No request found with id ${requestId}`);

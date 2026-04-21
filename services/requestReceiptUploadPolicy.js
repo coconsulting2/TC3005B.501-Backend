@@ -8,6 +8,10 @@ import Applicant from "../models/applicantModel.js";
 export const MIN_STATUS_FOR_RECEIPT_UPLOAD = 4;
 export const MAX_STATUS_FOR_RECEIPT_UPLOAD = 7;
 
+/**
+ * @param {number|string} statusId
+ * @returns {boolean}
+ */
 export function requestAllowsReceiptUpload(statusId) {
   const n = Number(statusId);
   return Number.isFinite(n) && n >= MIN_STATUS_FOR_RECEIPT_UPLOAD && n <= MAX_STATUS_FOR_RECEIPT_UPLOAD;
@@ -19,7 +23,7 @@ export function requestAllowsReceiptUpload(statusId) {
  */
 export async function assertRequestAllowsReceiptUpload(requestId) {
   const status = await Applicant.getRequestStatus(Number(requestId));
-  if (status == null) {
+  if (status === null || status === undefined) {
     const err = new Error(`No request found with id ${requestId}`);
     err.status = 404;
     throw err;

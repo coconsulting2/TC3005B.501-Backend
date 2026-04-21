@@ -13,7 +13,7 @@ export class Importer {
         this.dirname = direname || import.meta.url;
     }
 
-    async import(relativePath, options = null) {
+    async import(relativePath, _options = null) {
         return String(await readFile(new URL(`./${this.basePath}/${relativePath}`, this.dirname), "utf-8"));
     }
 }
