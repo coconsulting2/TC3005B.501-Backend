@@ -5,6 +5,8 @@
  */
 
 import Applicant from "../models/applicantModel.js";
+import CfdiModel from "../models/cfdiModel.js";
+import prisma from "../database/config/prisma.js";
 
 /**
  * @param {Object} mainRoute - Primary route with origin/destination and schedule fields
@@ -117,10 +119,13 @@ export const cancelTravelRequestValidation = async (request_id) => {
  * @param {number} receipts[].receipt_type_id - Type identifier for the receipt
  * @param {number} receipts[].request_id - Associated travel request ID
  * @param {number} receipts[].amount - Receipt amount
+ * @param {{ allow_missing_cfdi_uuid?: boolean }} [options] - Solo viaje internacional (sin XML real): no exige UUID ni anti-duplicado.
  * @returns {Promise<number>} Number of successfully inserted receipts
  * @throws {Error} If receipts is not a non-empty array or items lack required numeric fields
  */
-export const createExpenseValidationBatch = async (receipts) => {
+export const createExpenseValidationBatch = async (receipts, options = {}) => {
+    const allowMissingCfdiUuid = Boolean(options.allow_missing_cfdi_uuid);
+
     if (!Array.isArray(receipts) || receipts.length === 0) {
         const err = new Error('The "receipts" field must be a non-empty array');
         err.code = "BAD_REQUEST";
@@ -137,6 +142,62 @@ export const createExpenseValidationBatch = async (receipts) => {
                 'Each receipt must include "receipt_type_id", "request_id", and "amount" (all as numbers)'
             );
             err.code = "BAD_REQUEST";
+            throw err;
+        }
+    }
+
+    const { assertRequestAllowsReceiptUpload } = await import("./requestReceiptUploadPolicy.js");
+    const uniqueRequestIds = [...new Set(receipts.map((r) => Number(r.request_id)))];
+    for (const rid of uniqueRequestIds) {
+        await assertRequestAllowsReceiptUpload(rid);
+    }
+
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const uuidsInBatch = new Set();
+
+    for (const r of receipts) {
+        const rawUuid = typeof r.cfdi_uuid === "string" ? r.cfdi_uuid.trim() : "";
+        if (!rawUuid) {
+            if (!allowMissingCfdiUuid) {
+                const err = new Error(
+                    "cfdi_uuid es obligatorio: debe extraerse del XML antes de crear el comprobante, para validar duplicados y evitar filas huérfanas en Receipt."
+                );
+                err.code = "BAD_REQUEST";
+                throw err;
+            }
+            continue;
+        }
+        if (!uuidRegex.test(rawUuid)) {
+            const err = new Error("cfdi_uuid no tiene formato de UUID (CFDI) válido.");
+            err.code = "BAD_REQUEST";
+            throw err;
+        }
+        const normalized = rawUuid.toLowerCase();
+        if (uuidsInBatch.has(normalized)) {
+            const err = new Error("La misma petición incluye el mismo cfdi_uuid más de una vez.");
+            err.code = "BAD_REQUEST";
+            throw err;
+        }
+        uuidsInBatch.add(normalized);
+        const dupCfdi = await CfdiModel.findByCfdiUuidInsensitive(normalized);
+        if (dupCfdi) {
+            const err = new Error(
+                "Este CFDI (UUID) ya está registrado en el sistema. No se creó un nuevo comprobante."
+            );
+            err.status = 409;
+            err.code = "DUPLICATE_CFDI_UUID";
+            throw err;
+        }
+        const dupReceipt = await prisma.receipt.findFirst({
+            where: { cfdiUuid: { equals: normalized, mode: "insensitive" } },
+            select: { receiptId: true },
+        });
+        if (dupReceipt) {
+            const err = new Error(
+                "Este UUID ya está asociado a otro comprobante. No se creó un duplicado."
+            );
+            err.status = 409;
+            err.code = "DUPLICATE_CFDI_UUID";
             throw err;
         }
     }

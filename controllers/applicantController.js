@@ -83,6 +83,7 @@ export const getApplicantRequest = async (req, res) => {
 
     const response = {
       request_id: baseData.request_id,
+      request_status_id: baseData.request_status_id,
       request_status: baseData.request_status,
       notes: baseData.notes,
       requested_fee: baseData.requested_fee,
@@ -217,7 +218,9 @@ export const cancelTravelRequest = async (req, res) => {
  */
 export const createExpenseValidationHandler = async (req, res) => {
   try {
-    const count = await createExpenseValidationBatch(req.body.receipts);
+    const count = await createExpenseValidationBatch(req.body.receipts, {
+      allow_missing_cfdi_uuid: Boolean(req.body.allow_missing_cfdi_uuid),
+    });
     return res.status(201).json({
       count,
       message: "Expense receipts created successfully",
@@ -225,6 +228,9 @@ export const createExpenseValidationHandler = async (req, res) => {
   } catch (error) {
     if (error.code === "BAD_REQUEST") {
       return res.status(400).json({ error: error.message });
+    }
+    if (error.status) {
+      return res.status(error.status).json({ error: error.message });
     }
     console.error("Error in createExpenseValidationHandler:", error);
     return res.status(500).json({ error: "Internal server error" });
@@ -352,6 +358,17 @@ export const deleteReceipt = async (req, res) => {
   const { receipt_id } = req.params;
 
   try {
+    const { assertRequestAllowsReceiptUpload } = await import("../services/requestReceiptUploadPolicy.js");
+    const prisma = (await import("../database/config/prisma.js")).default;
+    const rec = await prisma.receipt.findUnique({
+      where: { receiptId: Number(receipt_id) },
+      select: { requestId: true },
+    });
+    if (!rec?.requestId) {
+      return res.status(404).json({ error: "Receipt not found" });
+    }
+    await assertRequestAllowsReceiptUpload(rec.requestId);
+
     const { deleteReceiptFiles } = await import("../services/receiptFileService.js");
     await deleteReceiptFiles(Number(receipt_id));
     await Applicant.deleteReceipt(Number(receipt_id));
@@ -361,6 +378,9 @@ export const deleteReceipt = async (req, res) => {
       receipt_id: Number(receipt_id)
     });
   } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ error: error.message });
+    }
     if (error.message === "Receipt not found") {
       return res.status(404).json({ error: "Receipt not found" });
     }
