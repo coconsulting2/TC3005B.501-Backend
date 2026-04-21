@@ -6,6 +6,7 @@ import Button from "@components/Button.tsx";
 import { submitTravelExpense } from "@components/SubmitTravelWarper";
 import ModalWrapper from "@components/ModalWrapper.tsx";
 import { apiRequest } from "@utils/apiClient";
+import { extractCfdiUuidFromXml } from "@utils/cfdiXml";
 
 const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL;
 
@@ -27,6 +28,18 @@ function formatRegistroError(err: unknown): string {
   return "No se pudo registrar el CFDI (SAT o validación en servidor)";
 }
 
+function formatCreateReceiptError(err: unknown): string {
+  if (err && typeof err === "object" && "detail" in err) {
+    const d = (err as { detail?: { response?: unknown; status?: number } }).detail;
+    const r = d?.response;
+    if (r && typeof r === "object" && r !== null && "error" in r && typeof (r as { error: string }).error === "string") {
+      return (r as { error: string }).error;
+    }
+    if (typeof d?.status === "number") return `Error ${d.status} al crear el comprobante.`;
+  }
+  return "No se pudo crear el comprobante. Revisa la conexión o vuelve a intentar.";
+}
+
 interface Props {
   requestId: number;
   token: string;
@@ -44,6 +57,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
   const [devReceiptId, setDevReceiptId] = useState<number | null>(null);
   const [devRegistroResponse, setDevRegistroResponse] = useState<unknown | null>(null);
   const [devRegistroError, setDevRegistroError] = useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
 
   const dropZoneRef = useRef<FileDropZoneHandle>(null);
   const showDevPanel = isDevTaxPreviewEnabled();
@@ -62,13 +76,33 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         return;
       }
 
-      // 1. Create the receipt record
-      const { lastReceiptId } = await submitTravelExpense({
-        requestId,
-        concepto,
-        monto: parseFloat(monto),
-        token,
-      });
+      let cfdiUuid: string | null = null;
+      if (!isInternational && xmlFile) {
+        const xmlText = await xmlFile.text();
+        cfdiUuid = extractCfdiUuidFromXml(xmlText);
+        if (!cfdiUuid) {
+          alert("No se pudo leer el UUID del XML. Verifica que sea un CFDI con TimbreFiscalDigital válido.");
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      let lastReceiptId: number | null = null;
+      try {
+        const res = await submitTravelExpense({
+          requestId,
+          concepto,
+          monto: parseFloat(monto),
+          token,
+          cfdiUuid: cfdiUuid ?? undefined,
+          allowMissingCfdiUuid: isInternational,
+        });
+        lastReceiptId = res.lastReceiptId;
+      } catch (createErr) {
+        alert(formatCreateReceiptError(createErr));
+        setSubmitting(false);
+        return;
+      }
 
       if (!lastReceiptId) {
         alert("No se pudo crear el comprobante.");
@@ -120,16 +154,55 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
       if (showDevPanel) {
         setDevUploadResult(uploadRes);
         setDevReceiptId(lastReceiptId);
+        setUploadSuccess(true);
         setSubmitting(false);
         return;
       }
 
-      window.location.href = `/comprobar-solicitud/${requestId}`;
+      setUploadSuccess(true);
+      setSubmitting(false);
     } catch (err) {
       console.error(err);
       setSubmitting(false);
     }
   };
+
+  if (uploadSuccess) {
+    return (
+      <div className="space-y-6 rounded-[var(--radius-md)] border border-[var(--color-neutral-200)] bg-[var(--color-surface-secondary)] p-6">
+        <p className="text-sm font-medium text-[var(--color-ink)]">
+          Comprobante registrado correctamente.
+        </p>
+        <p className="text-xs text-[var(--color-ink-muted)]">
+          Ya puedes revisar tus comprobantes o volver al inicio. No es necesario volver a subir el mismo archivo.
+        </p>
+        <div className="flex flex-wrap gap-3 pt-2">
+          <a
+            href="/dashboard"
+            className="inline-flex items-center justify-center rounded-[var(--radius-md)] bg-primary-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-600 transition-colors"
+          >
+            Ir al dashboard
+          </a>
+          <a
+            href={`/comprobar-solicitud/${requestId}`}
+            className="inline-flex items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-neutral-300)] bg-[var(--color-surface-white)] px-4 py-2.5 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface-secondary)] transition-colors"
+          >
+            Volver a comprobantes
+          </a>
+        </div>
+        {showDevPanel && devReceiptId != null && devUploadResult != null && (
+          <CfdiDevPreview
+            requestId={requestId}
+            receiptId={devReceiptId}
+            apiBaseUrl={API_BASE_URL}
+            upload={devUploadResult}
+            registroResponse={devRegistroResponse}
+            registroError={devRegistroError}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -197,17 +270,6 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         onPdfChange={setPdfFile}
         onXmlChange={setXmlFile}
       />
-
-      {showDevPanel && devReceiptId != null && devUploadResult != null && (
-        <CfdiDevPreview
-          requestId={requestId}
-          receiptId={devReceiptId}
-          apiBaseUrl={API_BASE_URL}
-          upload={devUploadResult}
-          registroResponse={devRegistroResponse}
-          registroError={devRegistroError}
-        />
-      )}
 
       {/* ── Actions ── */}
       <div className="flex justify-end gap-4 pt-4">

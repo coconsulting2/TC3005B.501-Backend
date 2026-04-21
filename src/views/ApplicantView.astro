@@ -101,7 +101,13 @@ const toVerify = requests.filter((r: any) =>
         {requests.map((request: any, index: number) => {
           const isEditable = request.status === "Primera Revisión";
           const isNotCancelable = request.status === "Comprobación gastos del viaje" || request.status === "Validación de comprobantes";
-          const mustBeChecked = request.status === "Comprobación gastos del viaje";
+          /** Comprobantes/gastos: tras N2 (cotización en adelante hasta validación). */
+          const canOpenComprobaciones = [
+            "Cotización del Viaje",
+            "Atención Agencia de Viajes",
+            "Comprobación gastos del viaje",
+            "Validación de comprobantes",
+          ].includes(request.status);
           const isLast = index === requests.length - 1;
 
           return (
@@ -135,7 +141,7 @@ const toVerify = requests.filter((r: any) =>
                     </Button>
                   </a>
                 )}
-                {mustBeChecked && (
+                {canOpenComprobaciones && (
                   <a href={`/comprobar-solicitud/${request.request_id}`}>
                     <Button variant="filled" color="primary" size="small">
                       Comprobar

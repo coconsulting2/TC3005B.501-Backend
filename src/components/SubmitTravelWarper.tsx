@@ -15,6 +15,10 @@ interface SubmitExpenseParams {
   concepto: string;
   monto: number;
   token: string;
+  /** UUID del TimbreFiscalDigital (obligatorio salvo viaje internacional sin XML real). */
+  cfdiUuid?: string | null;
+  /** Viaje internacional con XML sustituto: el backend no exige cfdi_uuid ni anti-duplicado por UUID. */
+  allowMissingCfdiUuid?: boolean;
 }
 
 export async function submitTravelExpense({
@@ -22,19 +26,35 @@ export async function submitTravelExpense({
   concepto,
   monto,
   token,
+  cfdiUuid,
+  allowMissingCfdiUuid = false,
 }: SubmitExpenseParams): Promise<{ count: number; lastReceiptId: number | null }> {
   const receipt_type_id = receiptTypeMap[concepto];
   if (!receipt_type_id) throw new Error(`Concepto inválido: ${concepto}`);
 
-  const payload = {
-    receipts: [
-      {
-        receipt_type_id,
-        request_id: requestId,
-        amount: monto,
-      },
-    ],
+  const receiptRow: {
+    receipt_type_id: number;
+    request_id: number;
+    amount: number;
+    cfdi_uuid?: string;
+  } = {
+    receipt_type_id,
+    request_id: requestId,
+    amount: monto,
   };
+  if (cfdiUuid && cfdiUuid.trim()) {
+    receiptRow.cfdi_uuid = cfdiUuid.trim().toLowerCase();
+  }
+
+  const payload: {
+    receipts: typeof receiptRow[];
+    allow_missing_cfdi_uuid?: boolean;
+  } = {
+    receipts: [receiptRow],
+  };
+  if (allowMissingCfdiUuid) {
+    payload.allow_missing_cfdi_uuid = true;
+  }
 
   await apiRequest("/applicant/create-expense-validation", {
     method: "POST",

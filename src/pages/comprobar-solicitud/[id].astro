@@ -18,6 +18,7 @@ const role = getCookie("role", Astro.cookies) as UserRole;
 const buttonLabel = role;
 
 import { apiRequest } from "@/utils/apiClient";
+import { requestAllowsReceiptUpload } from "@utils/receiptUploadAccess";
 
 const { id } = Astro.params;
 let request = null;
@@ -36,6 +37,7 @@ const StateColors: Record<string, string> = {
 
 /** Solo en estado 6 (Comprobación gastos del viaje) se puede enviar a validación (PUT send-expense-validation). */
 const canSendForValidation = Number(request?.request_status_id) === 6;
+const canUploadReceipts = requestAllowsReceiptUpload(request?.request_status_id);
 ---
 
 <MainLayout title={`Comprobantes de la solicitud #${id}`} data={{ userName, role, buttonLabel }}>
@@ -45,11 +47,17 @@ const canSendForValidation = Number(request?.request_status_id) === 6;
       title={`Comprobantes de la solicitud #${id}`}
       subtitle="Comprobantes de gasto asociados"
     >
-      <a href={`/subir-comprobante/${id}`}>
-        <AstroButton variant="filled" color="primary">
-          + Agregar comprobante
-        </AstroButton>
-      </a>
+      {canUploadReceipts ? (
+        <a href={`/subir-comprobante/${id}`}>
+          <AstroButton variant="filled" color="primary">
+            + Agregar comprobante
+          </AstroButton>
+        </a>
+      ) : (
+        <p class="text-xs text-[var(--color-ink-muted)] max-w-md text-right">
+          Los comprobantes se pueden agregar cuando la solicitud vaya en <strong>Cotización del Viaje</strong> o fases posteriores (tras aprobación N2).
+        </p>
+      )}
     </EditorialHeader>
 
     <section class="card-editorial overflow-hidden">
@@ -75,7 +83,7 @@ const canSendForValidation = Number(request?.request_status_id) === 6;
                   <span class={`status-pill ${StateColors[expense.validation] || 'status-pill--review'}`}>
                     {expense.validation}
                   </span>
-                  {expense.validation === 'Rechazado' && (
+                  {expense.validation === 'Rechazado' && canUploadReceipts && (
                     <a href={`/resubir-comprobante/${id}?replace=${expense.receipt_id}`}>
                       <AstroButton variant="border" color="accent">
                         Resubir
