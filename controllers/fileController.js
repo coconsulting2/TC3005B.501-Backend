@@ -69,6 +69,9 @@ export const uploadReceiptFilesController = async (req, res) => {
         existingReceiptId: error.receiptId,
       });
     }
+    if (error.status) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error("Error uploading files:", error);
     res.status(500).json({ error: "Internal server error" });
   }
