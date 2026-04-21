@@ -41,7 +41,7 @@ export async function insertarCfdi(receiptId, cfdiData) {
     throw { status: 404, message: `Receipt ${receiptId} not found` };
   }
 
-  if (receipt.requestId == null) {
+  if (receipt.requestId === null || receipt.requestId === undefined) {
     throw { status: 400, message: "El recibo no está ligado a una solicitud de viaje" };
   }
   await assertRequestAllowsReceiptUpload(receipt.requestId);
