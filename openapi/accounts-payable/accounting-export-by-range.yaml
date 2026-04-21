@@ -1,0 +1,73 @@
+paths:
+  /accounting-export:
+    get:
+      summary: Export accounting polizas for all finalized travel requests in a date range
+      description: |
+        Batch export endpoint for the ERP. Returns all applicable polizas (AV and/or GV)
+        for every travel Request that is "Finalizado" (request_status_id=8) AND has at least
+        one Aprobado receipt with validation_date in [from, to].
+        Restricted to role "Cuentas por pagar".
+      security:
+        - TokenAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: Start date (inclusive), ISO YYYY-MM-DD
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          description: End date (inclusive), ISO YYYY-MM-DD
+          schema:
+            type: string
+            format: date
+        - name: format
+          in: query
+          required: false
+          description: Output format (JSON default)
+          schema:
+            type: string
+            enum: [json, xml]
+      responses:
+        "200":
+          description: Polizas exported successfully (possibly empty list)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  polizas:
+                    type: array
+                    items:
+                      type: object
+            application/xml:
+              schema:
+                type: string
+        "400":
+          description: Invalid or missing query params
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+              examples:
+                missing:
+                  value:
+                    error: "Query params 'from' and 'to' (YYYY-MM-DD) are required"
+                badRange:
+                  value:
+                    error: "'from' must be on or before 'to'"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+              example:
+                error: "Internal server error"
