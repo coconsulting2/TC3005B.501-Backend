@@ -5,10 +5,11 @@
  * Validates and parses CFDI XML before storage; UUID duplicado se valida contra cfdi_comprobantes.
  */
 import { ObjectId } from "mongodb";
-import { uploadFile, getFile, db, bucket } from "./fileStorage.js";
+import { uploadFile, getFile, bucket } from "./fileStorage.js";
 import prisma from "../database/config/prisma.js";
 import { parseCFDI, buildComprobanteRegistroBodyFromXml, CfdiParseError } from "./cfdiParserService.js";
 import CfdiModel from "../models/cfdiModel.js";
+import { assertRequestAllowsReceiptUpload } from "./requestReceiptUploadPolicy.js";
 
 export { CfdiParseError };
 
@@ -29,6 +30,17 @@ export { CfdiParseError };
  * @throws {Error} With code 'DUPLICATE_UUID' if the UUID already exists in the database
  */
 export async function uploadReceiptFiles(receiptId, pdfFile, xmlFile) {
+  const receiptRow = await prisma.receipt.findUnique({
+    where: { receiptId: Number(receiptId) },
+    select: { requestId: true },
+  });
+  if (!receiptRow?.requestId) {
+    const err = new Error("Receipt not found or has no associated request");
+    err.status = 404;
+    throw err;
+  }
+  await assertRequestAllowsReceiptUpload(receiptRow.requestId);
+
   const xmlContent = xmlFile.buffer.toString("utf-8");
   const cfdiData = parseCFDI(xmlContent);
 
