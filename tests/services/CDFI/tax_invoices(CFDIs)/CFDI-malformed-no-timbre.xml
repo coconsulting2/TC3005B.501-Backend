@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--Malformed fixture 2: Complemento has an unrelated child but no TimbreFiscalDigital-->
+<cfdi:Comprobante
+        xmlns:cfdi="http://www.sat.gob.mx/cfd/4"
+        Version="4.0"
+        Fecha="2024-03-15T14:30:00"
+        Total="100.00"
+        Sello="ABC123">
+    <cfdi:Emisor Rfc="EKU9003173C9" Nombre="EMISOR DE PRUEBA" RegimenFiscal="601"/>
+    <cfdi:Receptor Rfc="XAXX010101000" Nombre="PUBLICO EN GENERAL" UsoCFDI="G03"/>
+    <cfdi:Complemento>
+        <otra:Extension xmlns:otra="http://example.com/otra" Valor="x"/>
+    </cfdi:Complemento>
+</cfdi:Comprobante>
