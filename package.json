@@ -30,6 +30,8 @@
     "docker:dev:build": "docker compose -f docker-compose.dev.yml up --build --watch",
     "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
     "docker:dev:clean": "docker compose -f docker-compose.dev.yml down -v",
+    "docker:data:reset": "docker compose -f docker-compose.dev.yml exec -T backend sh -c 'bunx prisma db push --force-reset && node prisma/seed.js dev'",
+    "docker:permissions:sync": "docker compose -f docker-compose.dev.yml exec -T backend node prisma/seed.js",
     "seed": "node prisma/seed-orgs.js"
   },
   "repository": {

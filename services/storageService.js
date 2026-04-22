@@ -55,7 +55,7 @@ function getBucketName() {
  * @param {string|number} orgId
  * @param {string|number} viajeId
  * @param {string} fileName
- * @param receiptId
+ * @param {string|number|null} [receiptId]
  * @returns {string}
  */
 function buildObjectKey(orgId, viajeId, fileName, receiptId) {
