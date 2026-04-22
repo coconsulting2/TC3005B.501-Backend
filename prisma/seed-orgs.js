@@ -132,6 +132,33 @@ async function setupTables() {
       CONSTRAINT proveedores_org_nombre_key UNIQUE (org_id, nombre)
     )
   `);
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "User"
+      ADD COLUMN IF NOT EXISTS org_id BIGINT REFERENCES organizaciones(id)
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    ALTER TABLE "Request"
+      ADD COLUMN IF NOT EXISTS workflow_pre_snapshot JSONB,
+      ADD COLUMN IF NOT EXISTS workflow_post_snapshot JSONB
+  `);
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS workflow_rules (
+      id             BIGSERIAL PRIMARY KEY,
+      org_id         BIGINT NOT NULL REFERENCES organizaciones(id) ON DELETE CASCADE,
+      rule_type      VARCHAR(10) NOT NULL CHECK (rule_type IN ('pre', 'post')),
+      param_type     VARCHAR(20) NOT NULL CHECK (param_type IN ('importe', 'nivel', 'gasto', 'destino', 'moneda')),
+      threshold      NUMERIC(18, 4),
+      param_value    VARCHAR(100),
+      approval_level INT NOT NULL CHECK (approval_level >= 1 AND approval_level <= 2),
+      skip_if_below  NUMERIC(18, 4),
+      priority       INT NOT NULL DEFAULT 0,
+      active         BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
 }
 
 // ── Seed functions ────────────────────────────────────────────────────────────
@@ -199,8 +226,9 @@ async function seedDepartments() {
  *
  * @param roleMap
  * @param orgDepts
+ * @param orgIds
  */
-async function seedUsers(roleMap, orgDepts) {
+async function seedUsers(roleMap, orgDepts, orgIds) {
   for (let orgIdx = 0; orgIdx < ORGS.length; orgIdx++) {
     const { prefix, shortName } = ORGS[orgIdx];
     const depts = orgDepts[orgIdx];
@@ -214,9 +242,11 @@ async function seedUsers(roleMap, orgDepts) {
       const deptId    = depts[i % 2].departmentId;
       const password  = await bcrypt.hash(`Pass${firstName}2024!`, SALT_ROUNDS);
 
+      const oid = BigInt(orgIds[Number(orgIdx)]);
+
       await prisma.user.upsert({
         where: { userName },
-        update: {},
+        update: { orgId: oid },
         create: {
           userName,
           password,
@@ -226,10 +256,87 @@ async function seedUsers(roleMap, orgDepts) {
           wallet:       0.0,
           roleId:       roleMap[roleName],
           departmentId: deptId,
+          orgId:        oid,
           active:       true,
         },
       });
     }
+  }
+}
+
+/**
+ *
+ * @param orgIds
+ */
+/**
+ * Reglas demo: bandas por importe + salto de nivel si importe &lt; umbral (pre/post).
+ * @param {number[]} orgIds
+ */
+async function seedWorkflowRules(orgIds) {
+  for (const oid of orgIds) {
+    const org = BigInt(oid);
+    await prisma.workflowRule.deleteMany({ where: { orgId: org } });
+
+    await prisma.workflowRule.createMany({
+      data: [
+        {
+          orgId: org,
+          ruleType: "pre",
+          paramType: "importe",
+          threshold: 5000,
+          approvalLevel: 1,
+          priority: 10,
+          active: true,
+        },
+        {
+          orgId: org,
+          ruleType: "pre",
+          paramType: "importe",
+          threshold: 999999999,
+          approvalLevel: 2,
+          priority: 20,
+          active: true,
+        },
+        {
+          orgId: org,
+          ruleType: "pre",
+          paramType: "importe",
+          threshold: 999999999,
+          approvalLevel: 2,
+          skipIfBelow: 3500,
+          priority: 5,
+          active: true,
+        },
+        {
+          orgId: org,
+          ruleType: "post",
+          paramType: "importe",
+          threshold: 5000,
+          approvalLevel: 1,
+          priority: 10,
+          active: true,
+        },
+        {
+          orgId: org,
+          ruleType: "post",
+          paramType: "importe",
+          threshold: 999999999,
+          approvalLevel: 2,
+          priority: 20,
+          active: true,
+        },
+        {
+          orgId: org,
+          ruleType: "post",
+          paramType: "importe",
+          threshold: 999999999,
+          approvalLevel: 2,
+          skipIfBelow: 3500,
+          priority: 5,
+          active: true,
+        },
+      ],
+    });
   }
 }
 
@@ -354,7 +461,10 @@ async function main() {
   const orgDepts = await seedDepartments();
 
   console.log("Seeding users (10 per org)...");
-  await seedUsers(roleMap, orgDepts);
+  await seedUsers(roleMap, orgDepts, orgIds);
+
+  console.log("Seeding workflow rules (M2-004)...");
+  await seedWorkflowRules(orgIds);
 
   console.log("Seeding suppliers...");
   await seedSuppliers(orgIds);
@@ -370,6 +480,7 @@ async function main() {
   console.log("  Users         : 20 (10 per org, roles: 1 admin · 2 N1 · 2 N2 · 2 contabilidad · 3 solicitante)");
   console.log("  Suppliers     : 5  (RFCs: XAXX010101000, XEXX010101000)");
   console.log("  MongoDB cfg   : 2  (1 per org in orgConfig.org_settings)");
+  console.log("  Workflow rules: 6 por org (importe + skip_if_below pre/post)");
 }
 
 main()
