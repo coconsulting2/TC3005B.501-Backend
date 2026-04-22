@@ -12,6 +12,7 @@
 import ComprobantesModel from "../models/comprobantesModel.js";
 import { selloUltimos8FromSello } from "./cfdiParserService.js";
 import { consultarCfdiWithRetries, acuseToCfdiRow } from "./satConsultaService.js";
+import { assertRequestAllowsReceiptUpload } from "./requestReceiptUploadPolicy.js";
 
 /**
  * EFOS codes where the RFC Emisor itself appears in the blacklist.
@@ -39,6 +40,11 @@ export async function insertarCfdi(receiptId, cfdiData) {
   if (!receipt) {
     throw { status: 404, message: `Receipt ${receiptId} not found` };
   }
+
+  if (receipt.requestId === null || receipt.requestId === undefined) {
+    throw { status: 400, message: "El recibo no está ligado a una solicitud de viaje" };
+  }
+  await assertRequestAllowsReceiptUpload(receipt.requestId);
 
   // 2. Verificar unicidad del UUID antes de llamar al SAT
   const existing = await ComprobantesModel.findByUUID(cfdiRest.uuid);
