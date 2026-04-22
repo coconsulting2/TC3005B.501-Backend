@@ -1,4 +1,14 @@
-describe('Proceso de autorización de una solicitud desde PRIMERA REVISIÓN hasta SEGUNDA REVISIÓN', () => {
+/**
+ * End-to-end del flujo Primera Revisión → Segunda Revisión:
+ *   1. Como Solicitante: toma el id de una solicitud en "Primera Revisión".
+ *   2. Como N2: navega a /autorizaciones, encuentra esa solicitud, la aprueba.
+ *   3. Como Solicitante: verifica que la misma solicitud está ahora en "Segunda Revisión".
+ *
+ * Nota: el test depende de que haya datos dummy con una solicitud en estado
+ * "Primera Revisión". Si fallase por ausencia de datos, corre
+ * `bun run docker:dev:clean && bun run docker:dev` para re-seedear.
+ */
+describe('Proceso de autorización de una solicitud desde Primera Revisión hasta Segunda Revisión', () => {
   function buscarSolicitud(id: string) {
     cy.document().then((doc) => {
       const links = [...doc.querySelectorAll('a[href^="/autorizar-solicitud/"]')];
@@ -15,7 +25,7 @@ describe('Proceso de autorización de una solicitud desde PRIMERA REVISIÓN hast
   }
 
   function avanzarPagina(id: string) {
-    cy.get('div.flex.justify-center.items-center.gap-2.mt-8 > button')
+    cy.get('div.flex.justify-center.items-center.gap-1\\.5.mt-6 > button')
       .filter((_, el) => /^\d+$/.test(el.textContent || ''))
       .then(($pageButtons) => {
         const currentBtn = $pageButtons.filter((_, el) =>
@@ -29,7 +39,7 @@ describe('Proceso de autorización de una solicitud desde PRIMERA REVISIÓN hast
           cy.wrap(nextPageBtn).click();
           buscarSolicitud(id);
         } else {
-          cy.get('div.flex.justify-center.items-center.gap-2.mt-8 > button')
+          cy.get('div.flex.justify-center.items-center.gap-1\\.5.mt-6 > button')
             .contains('»')
             .then(($nextBtn) => {
               if (!$nextBtn.prop('disabled')) {
@@ -37,7 +47,7 @@ describe('Proceso de autorización de una solicitud desde PRIMERA REVISIÓN hast
                 cy.wait(500);
                 buscarSolicitud(id);
               } else {
-                throw new Error(`❌ No se encontró la solicitud con ID: ${id}`);
+                throw new Error(`No se encontró la solicitud con ID: ${id}`);
               }
             });
         }
@@ -48,34 +58,35 @@ describe('Proceso de autorización de una solicitud desde PRIMERA REVISIÓN hast
     cy.logout();
   });
 
-  it('debe obtener el ID de la primera solicitud en estado PRIMERA REVISIÓN desde el perfil del solicitante', () => {
+  it('debe obtener el ID de la primera solicitud en estado "Primera Revisión" desde el perfil del solicitante', () => {
     cy.login(Cypress.env('SOLICITANTE_USER'), Cypress.env('SOLICITANTE_PASSWORD'));
 
-    cy.contains('a[href^="/detalles-solicitud/"]', 'PRIMERA REVISIÓN')
-      .parents('div')
+    cy.contains('.status-pill', 'Primera Revisión')
       .first()
+      .closest('div.flex')
       .within(() => {
-        (cy.contains(/^#\d+$/) as any).then(($id: any) => {
-          const idText = $id.text().replace('#', '').trim();
-          Cypress.env('request_id', idText);
-        });
+        cy.get('a[href^="/detalles-solicitud/"]')
+          .first()
+          .invoke('attr', 'href')
+          .then((href) => {
+            const id = (href || '').replace('/detalles-solicitud/', '').trim();
+            Cypress.env('request_id', id);
+          });
       });
   });
 
-  it('debe autorizar la solicitud identificada y cambia su estado a SEGUNDA REVISIÓN', () => {
+  it('debe autorizar la solicitud identificada y cambiar su estado a Segunda Revisión', () => {
     cy.login(Cypress.env('N2_USER'), Cypress.env('N2_PASSWORD'));
 
     cy.get('li').contains('AUTORIZACIONES').click();
     buscarSolicitud(Cypress.env('request_id'));
   });
 
-  it('debe mostrar que la solicitud haya cambiado a estado SEGUNDA REVISIÓN desde el perfil del solicitante', () => {
+  it('debe mostrar que la solicitud haya cambiado a estado "Segunda Revisión" desde el perfil del solicitante', () => {
     cy.login(Cypress.env('SOLICITANTE_USER'), Cypress.env('SOLICITANTE_PASSWORD'));
 
-    cy.contains(Cypress.env('request_id'))
-      .parents('div')
-      .first()
-      .should('contain.text', 'SEGUNDA REVISIÓN');
+    cy.contains(`#${Cypress.env('request_id')}`)
+      .closest('div.flex')
+      .should('contain.text', 'Segunda Revisión');
   });
 });
-

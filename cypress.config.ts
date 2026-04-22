@@ -6,7 +6,11 @@ export default defineConfig({
     supportFile: 'cypress/support/e2e.ts',
     baseUrl: 'https://localhost:4321',
     chromeWebSecurity: false,
-    screenshotsFolder: false,
+    // Hard ceilings so a runaway spec can't hang the whole suite (as happened
+    // with request-state-change's recursive pagination search).
+    defaultCommandTimeout: 6000,
+    pageLoadTimeout: 15000,
+    retries: { runMode: 0, openMode: 0 },
     env: {
       SOLICITANTE_USER: process.env.CYPRESS_SOLICITANTE_USER,
       SOLICITANTE_PASSWORD: process.env.CYPRESS_SOLICITANTE_PASSWORD,

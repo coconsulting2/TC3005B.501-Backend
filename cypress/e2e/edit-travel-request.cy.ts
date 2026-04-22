@@ -17,9 +17,9 @@ describe('Edit Travel Request', () => {
     cy.get('input[name="destination_city_name"]').first().clear().type('Nueva York');
 
     // Update the travel dates and times
-    cy.get('input[name="beginning_date"]').first().clear().type('2025-07-01');
+    cy.get('input[name="beginning_date"]').first().clear().type('2026-07-01');
     cy.get('input[name="beginning_time"]').first().clear().type('08:00');
-    cy.get('input[name="ending_date"]').first().clear().type('2025-07-10');
+    cy.get('input[name="ending_date"]').first().clear().type('2026-07-10');
     cy.get('input[name="ending_time"]').first().clear().type('18:00');
 
     // Update the requested fee
@@ -34,9 +34,9 @@ describe('Edit Travel Request', () => {
     cy.get('input[name="origin_city_name"]').last().type('Ciudad de México');
     cy.get('input[name="destination_country_name"]').last().type('Canadá');
     cy.get('input[name="destination_city_name"]').last().type('Toronto');
-    cy.get('input[name="beginning_date"]').last().type('2025-07-15');
+    cy.get('input[name="beginning_date"]').last().type('2026-07-15');
     cy.get('input[name="beginning_time"]').last().type('09:00');
-    cy.get('input[name="ending_date"]').last().type('2025-07-20');
+    cy.get('input[name="ending_date"]').last().type('2026-07-20');
     cy.get('input[name="ending_time"]').last().type('17:00');
 
     // Save the changes

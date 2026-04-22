@@ -28,3 +28,8 @@ package-lock.json
 
 # jetbrains setting folder
 .idea/
+
+# cypress artefacts
+cypress/screenshots
+cypress/videos
+cypress/downloads

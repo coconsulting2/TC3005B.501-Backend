@@ -20,6 +20,7 @@ export type Session = {
   role: UserRole;
   department_id?: string;
   token: string;
+  permissions?: string[];
 };
 
 function emptySession(): Session {
@@ -73,7 +74,7 @@ export function getSession(cookies?: APIContext["cookies"]): Session {
   return session;
 }
 
-type CookieKey = keyof Session;
+type CookieKey = Exclude<keyof Session, "permissions">;
 
 export function getCookie(key: CookieKey, cookies?: APIContext["cookies"]): string {
   return getSession(cookies)[key] ?? '';
