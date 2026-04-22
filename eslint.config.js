@@ -62,9 +62,18 @@ export default [
                 },
             }],
             "jsdoc/require-param": "warn",
-            "jsdoc/require-returns": "warn",
-            "jsdoc/require-param-type": "warn",
-            "jsdoc/require-returns-type": "warn",
+            // Tipos y @returns: ruido alto en JS sin TS; se mantiene require-jsdoc + require-param.
+            "jsdoc/require-returns": "off",
+            "jsdoc/require-param-type": "off",
+            "jsdoc/require-returns-type": "off",
+        },
+    },
+    {
+        files: ["prisma/**/*.js", "scripts/**/*.js"],
+        rules: {
+            "no-console": "off",
+            "jsdoc/require-jsdoc": "off",
+            "jsdoc/require-param": "off",
         },
     },
     {
@@ -84,7 +93,7 @@ export default [
         },
     },
     {
-        files: ["tests/**/*.js", "**/*.test.js", "**/*.spec.js"],
+        files: ["tests/**/*.js", "**/*.test.js", "**/*.spec.js", "**/*.e2e.test.js"],
         languageOptions: {
             globals: {
                 describe: "readonly",
@@ -103,6 +112,7 @@ export default [
             "jsdoc/require-param-type": "off",
             "jsdoc/require-returns-type": "off",
             "no-constant-binary-expression": "off",
+            "no-console": "off",
         },
     },
     ...tseslint.config(
