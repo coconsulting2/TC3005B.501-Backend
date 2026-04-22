@@ -65,18 +65,20 @@ export function normalizeConsultaResult(raw) {
 }
 
 /**
- *
- * @param ms
+ * Resolves after the given number of milliseconds.
+ * @param {number} ms Milliseconds to sleep.
+ * @returns {Promise<void>}
  */
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
 /**
- *
- * @param promise
- * @param ms
- * @param label
+ * Wraps a promise with a timeout that rejects with the given label.
+ * @param {Promise<*>} promise Promise to race against the timer.
+ * @param {number} ms Timeout in milliseconds.
+ * @param {string} label Error label to reject with on timeout.
+ * @returns {Promise<*>} Resolves with the promise value or rejects on timeout.
  */
 function withTimeout(promise, ms, label = "SAT_TIMEOUT") {
   return new Promise((resolve, reject) => {

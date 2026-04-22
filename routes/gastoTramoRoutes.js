@@ -7,13 +7,13 @@ import express from "express";
 const router = express.Router();
 import { createGastoTramo, getResumenTramos } from "../controllers/gastoTramoController.js";
 import { validateViajeId, validateViajeTramoIds, validateGastoTramoBody, validateInputs } from "../middleware/validation.js";
-import { requireAuth } from "../middleware/authMiddleware.js";
+import { requirePermission } from "../middleware/permissionMiddleware.js";
 import { generalRateLimiter } from "../middleware/rateLimiters.js";
 
 router.route("/:id/tramos/:tramo_id/gastos")
   .post(
     generalRateLimiter,
-    ...requireAuth(["Solicitante", "N1", "N2"]),
+    ...requirePermission("receipt:upload"),
     validateViajeTramoIds,
     validateGastoTramoBody,
     validateInputs,
@@ -23,7 +23,7 @@ router.route("/:id/tramos/:tramo_id/gastos")
 router.route("/:id/resumen-tramos")
   .get(
     generalRateLimiter,
-    ...requireAuth(["Solicitante", "N1", "N2", "Cuentas por pagar"]),
+    ...requirePermission("expense:view"),
     validateViajeId,
     validateInputs,
     getResumenTramos,

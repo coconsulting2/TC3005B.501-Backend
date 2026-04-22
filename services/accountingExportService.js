@@ -13,7 +13,6 @@ import AccountingExport from "../models/accountingExportModel.js";
 import {
     SOCIEDAD_DEFAULT,
     GL_ACCOUNTS,
-    GL_ACCOUNT_DESCRIPTIONS,
     DOC_TYPES,
     SHKZG,
     proveedorFromUserId,
@@ -22,14 +21,26 @@ import {
 
 const MXN = "MXN";
 
+/**
+ * Error thrown when a required resource is missing (HTTP 404).
+ */
 class NotFoundError extends Error {
+    /**
+     * @param {string} message Human-readable error message.
+     */
     constructor(message) {
         super(message);
         this.status = 404;
     }
 }
 
+/**
+ * Error thrown when the request conflicts with current state (HTTP 409).
+ */
 class ConflictError extends Error {
+    /**
+     * @param {string} message Human-readable error message.
+     */
     constructor(message) {
         super(message);
         this.status = 409;

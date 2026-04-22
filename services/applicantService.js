@@ -89,7 +89,7 @@ export const cancelTravelRequestValidation = async (request_id) => {
                 message:
                     "Request cannot be cancelled after reaching 'Atención Agencia de Viajes'",
             };
-        } else if (status_id == 9) {
+        } else if (status_id === 9) {
             throw {
                 status: 400,
                 message: "Request has already been cancelled.",

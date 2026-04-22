@@ -75,6 +75,7 @@ const verifyToken = (token) => {
  * @param {import("express").Request} req - Express request
  * @param {import("express").Response} res - Express response
  * @param {import("express").NextFunction} next - Express next function
+ * @returns {Promise<void>}
  */
 export const authenticateToken = async (req, res, next) => {
   // Dev-only mock session: all three conditions are validated at startup

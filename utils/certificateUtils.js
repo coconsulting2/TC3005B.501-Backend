@@ -1,35 +1,35 @@
 import fs from "fs";
-import path from "path";
 import https from "https";
 
 /**
- *
+ * Helpers for validating and reporting on Wise mTLS certificate files.
  */
 class CertificateUtils {
   /**
-   *
-   * @param certPath
-   * @param keyPath
-   * @param caPath
+   * Checks that the certificate, private key, and CA files are readable.
+   * @param {string} certPath Path to the client certificate file.
+   * @param {string} keyPath Path to the client private key file.
+   * @param {string} caPath Path to the CA certificate file.
+   * @returns {{isValid: boolean, errors: string[]}} Validation result.
    */
   static validateCertificateFiles(certPath, keyPath, caPath) {
     const errors = [];
 
     try {
       fs.accessSync(certPath, fs.constants.R_OK);
-    } catch (error) {
+    } catch {
       errors.push(`Certificate file not readable: ${certPath}`);
     }
 
     try {
       fs.accessSync(keyPath, fs.constants.R_OK);
-    } catch (error) {
+    } catch {
       errors.push(`Private key file not readable: ${keyPath}`);
     }
 
     try {
       fs.accessSync(caPath, fs.constants.R_OK);
-    } catch (error) {
+    } catch {
       errors.push(`CA certificate file not readable: ${caPath}`);
     }
 
@@ -40,10 +40,11 @@ class CertificateUtils {
   }
 
   /**
-   *
-   * @param certPath
-   * @param keyPath
-   * @param caPath
+   * Creates an https.Agent configured for mTLS with the provided certs.
+   * @param {string} certPath Path to the client certificate file.
+   * @param {string} keyPath Path to the client private key file.
+   * @param {string} caPath Path to the CA certificate file.
+   * @returns {https.Agent} Configured HTTPS agent.
    */
   static createHttpsAgent(certPath, keyPath, caPath) {
     const validation = CertificateUtils.validateCertificateFiles(certPath, keyPath, caPath);
@@ -66,8 +67,9 @@ class CertificateUtils {
   }
 
   /**
-   *
-   * @param certPath
+   * Reads basic metadata about a certificate file.
+   * @param {string} certPath Path to the certificate file.
+   * @returns {Object} Info object describing the certificate or the error.
    */
   static getCertificateInfo(certPath) {
     try {
@@ -95,12 +97,13 @@ class CertificateUtils {
   }
 
   /**
-   *
-   * @param keyPath
+   * Reads permission metadata about a private key file.
+   * @param {string} keyPath Path to the private key file.
+   * @returns {Object} Info object with permissions and a security flag.
    */
   static getPrivateKeyInfo(keyPath) {
     try {
-      const keyContent = fs.readFileSync(keyPath, "utf8");
+      fs.readFileSync(keyPath, "utf8");
       const stats = fs.statSync(keyPath);
 
       // Check file permissions
@@ -130,7 +133,8 @@ class CertificateUtils {
   }
 
   /**
-   *
+   * Checks private key permissions and returns remediation recommendations.
+   * @returns {Array<Object>} Array of recommendation objects.
    */
   static validateCertificatePermissions() {
     const recommendations = [];
@@ -154,7 +158,8 @@ class CertificateUtils {
   }
 
   /**
-   *
+   * Builds a combined report on certificate files and their status.
+   * @returns {Object} Report including environment, file status, and recommendations.
    */
   static generateCertificateReport() {
     const isProduction = process.env.NODE_ENV === "production";
@@ -187,14 +192,15 @@ class CertificateUtils {
   }
 
   /**
-   *
+   * Ensures the certificate directory exists with appropriate permissions.
+   * @returns {void}
    */
   static setupCertificateDirectories() {
     const certDir = "./certs/wise";
 
     if (!fs.existsSync(certDir)) {
       fs.mkdirSync(certDir, { recursive: true });
-      console.log(`Created certificate directory: ${certDir}`);
+      console.warn(`Created certificate directory: ${certDir}`);
     }
 
     // Set proper permissions for certificate directory
