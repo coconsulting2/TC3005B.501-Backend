@@ -34,7 +34,7 @@ const setupDBs = async () => {
             await connectMongo();
             await connectPostgres();
         });
-        console.info("[ E2E ] - Connected to DBs"); // eslint-disable-line no-console
+        console.info("[ E2E ] - Connected to DBs");
     } catch (err) {
         console.error(`[ E2E TESTS FAILED ] - Could not Connect to Database\n${err.message}`);
         throw new Error();
@@ -46,7 +46,7 @@ const startMockServer = async () => { // TODO: logs server logs to a file
         let url = "";
         await mutedConsoleLogs(async () => {
             url = await startSATMockServer();
-            console.info("[ E2E ] - Mock SAT server initialized."); // eslint-disable-line no-console
+            console.info("[ E2E ] - Mock SAT server initialized.");
         });
         return url;
     } catch (err) {
@@ -135,7 +135,7 @@ describe("CDFI Verification service", () => {
                 await disconnectPostgres();
                 await stopSATMockServer();
             });
-            console.info("[ E2E ] - Disconnected to DBs");// eslint-disable-line no-console
+            console.info("[ E2E ] - Disconnected to DBs");
         } catch (err) {
             console.error(`[ E2E TESTS ERROR ] - Error deallocating resources\n${err}`);
             throw new Error();

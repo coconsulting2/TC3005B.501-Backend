@@ -273,6 +273,17 @@ export const validateExpenseReceipts = [
     .isFloat({ min: 0 })
     .toFloat()
     .withMessage("Amounts needs to be a valid number"),
+  body("receipts.*.cfdi_uuid")
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ min: 36, max: 36 })
+    .withMessage("cfdi_uuid must be a 36-char UUID string when provided"),
+  body("allow_missing_cfdi_uuid")
+    .optional()
+    .isBoolean()
+    .toBoolean()
+    .withMessage("allow_missing_cfdi_uuid must be boolean"),
 ];
 
 /*

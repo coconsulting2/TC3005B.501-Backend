@@ -58,7 +58,7 @@ describe("ExchangeRateService", () => {
       const result = await exchangeRateService.getExchangeRate("USD", "MXN");
 
       expect(result).toEqual(mockDOFRate);
-      expect(exchangeRateService.getDOFRate).toHaveBeenCalledWith("USD", "MXN");
+      expect(exchangeRateService.getDOFRate).toHaveBeenCalledWith();
       expect(exchangeRateService.cacheRate).toHaveBeenCalledWith("USD", "MXN", 17.6, "DOF");
     });
 

@@ -17,6 +17,20 @@ const CfdiModel = {
       select: { receiptId: true, uuid: true },
     });
   },
+
+  /**
+   * Busca por UUID sin depender del casing guardado en BD.
+   * @param {string} uuid
+   * @returns {Promise<{ receiptId: number; uuid: string } | null>}
+   */
+  async findByCfdiUuidInsensitive(uuid) {
+    const u = String(uuid).trim();
+    if (!u) return null;
+    return prisma.cfdiComprobante.findFirst({
+      where: { uuid: { equals: u, mode: "insensitive" } },
+      select: { receiptId: true, uuid: true },
+    });
+  },
 };
 
 export default CfdiModel;
