@@ -229,7 +229,8 @@ export function parseCFDI(xmlString) {
   const taxes = extractTaxes(comprobante.Impuestos);
 
   const selloRaw = comprobante["@_Sello"] ?? null;
-  const sello = selloRaw !== null && selloRaw !== "" ? String(selloRaw).trim() : null;
+  const sello =
+    selloRaw !== null && selloRaw !== undefined && selloRaw !== "" ? String(selloRaw).trim() : null;
 
   return {
     version,
@@ -408,13 +409,19 @@ export function buildComprobanteRegistroBodyFromXml(xmlString) {
 
   const selloRaw = comprobante["@_Sello"] ?? null;
   const selloEmisor =
-    selloRaw !== null && String(selloRaw).trim().length >= 8 ? String(selloRaw).trim() : undefined;
+    selloRaw !== null && selloRaw !== undefined && String(selloRaw).trim().length >= 8
+      ? String(selloRaw).trim()
+      : undefined;
 
   const exportacion = (comprobante["@_Exportacion"] || "01").toString().trim();
-  const serieRaw = comprobante["@_Serie"] ?? null;
-  const serie = serieRaw !== null ? String(serieRaw).trim() : undefined;
-  const folioRaw = comprobante["@_Folio"] ?? null;
-  const folio = folioRaw !== null ? String(folioRaw).trim() : undefined;
+  const serie =
+    comprobante["@_Serie"] !== null && comprobante["@_Serie"] !== undefined
+      ? String(comprobante["@_Serie"]).trim()
+      : undefined;
+  const folio =
+    comprobante["@_Folio"] !== null && comprobante["@_Folio"] !== undefined
+      ? String(comprobante["@_Folio"]).trim()
+      : undefined;
 
   const fechaEmisionIso = new Date(fechaEmision).toISOString();
   let fechaTimbradoIso;

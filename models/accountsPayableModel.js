@@ -145,6 +145,16 @@ const AccountsPayable = {
    * @returns {Promise<Object>} Structured expense validation summary.
    */
   async getExpenseValidations(requestId) {
+    const request = await prisma.request.findUnique({
+      where: { requestId: Number(requestId) },
+      select: {
+        requestStatusId: true,
+        requestStatus: { select: { status: true } },
+      },
+    });
+    const requestStatusId = request?.requestStatusId ?? null;
+    const requestStatusName = request?.requestStatus?.status ?? null;
+
     const rows = await prisma.receipt.findMany({
       where: { requestId: Number(requestId) },
       include: { receiptType: true, cfdiComprobante: true },
@@ -153,6 +163,8 @@ const AccountsPayable = {
     if (rows.length === 0) {
       return {
         request_id: requestId,
+        request_status_id: requestStatusId,
+        request_status_name: requestStatusName,
         Expenses: [],
       };
     }
@@ -165,6 +177,8 @@ const AccountsPayable = {
 
     return {
       request_id: requestId,
+      request_status_id: requestStatusId,
+      request_status_name: requestStatusName,
       status: expense_status,
       Expenses: rows.map((row) => ({
         receipt_id: row.receiptId,

@@ -222,12 +222,10 @@ class ExchangeRateService {
   }
 
   /**
-   * Fetches a live USD/MXN rate from Banxico DOF.
-   * @param {string} _source Source currency (only USD currently supported).
-   * @param {string} _target Target currency (only MXN currently supported).
+   * Tipo de cambio USD/MXN desde Banxico (serie SF43718).
    * @returns {Promise<Object>} Rate payload with rate, source, date, fromCache.
    */
-  async getDOFRate(_source = "USD", _target = "MXN") {
+  async getDOFRate() {
     try {
       const response = await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos", {
         headers: {
@@ -275,7 +273,7 @@ class ExchangeRateService {
       } catch {
         console.warn("Wise API failed, falling back to DOF");
         try {
-          rateData = await this.getDOFRate(source, target);
+          rateData = await this.getDOFRate();
         } catch {
           throw new Error("Both Wise and DOF APIs failed");
         }

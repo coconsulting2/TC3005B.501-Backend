@@ -63,8 +63,10 @@ function buildObjectKey(orgId, viajeId, fileName, receiptId) {
   const safeViaje = String(viajeId).replace(/[^a-zA-Z0-9-_]/g, "");
   const base = path.basename(String(fileName) || "file").replace(/[^a-zA-Z0-9._-]/g, "_");
   const id = randomUUID();
-  const receiptNormalized = receiptId ?? null;
-  const receiptRaw = receiptNormalized !== null && String(receiptNormalized).trim() !== "" ? String(receiptNormalized).trim() : "";
+  const receiptRaw =
+    receiptId !== null && receiptId !== undefined && String(receiptId).trim() !== ""
+      ? String(receiptId).trim()
+      : "";
   const safeReceipt = receiptRaw.replace(/[^a-zA-Z0-9-_]/g, "");
   const mid = safeReceipt ? `${safeReceipt}/${id}` : id;
   return `${safeOrg}/${safeViaje}/${mid}/${base}`;

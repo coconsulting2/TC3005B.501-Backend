@@ -13,6 +13,19 @@ import { Mail } from "../services/email/mail.cjs";
 const EFOS_EMISOR_BLACKLIST_APPROVAL = ["100", "101", "104"];
 
 /**
+ * Lista "0, 1, 0" del modelo → true si algún tramo requiere hotel o avión.
+ * @param {string} csv
+ * @returns {boolean}
+ */
+function csvListNeedsService(csv) {
+  if (!csv || typeof csv !== "string") return false;
+  return csv
+    .split(",")
+    .map((s) => s.trim())
+    .includes("1");
+}
+
+/**
  * Attends a travel request by setting the imposed fee and advancing its status.
  * Routes to travel agency (status 5) if hotel/plane is needed, otherwise to status 6.
  * @param {import('express').Request} req - Express request (params: request_id, body: { imposed_fee })
@@ -37,7 +50,8 @@ const attendTravelRequest = async (req, res) => {
 
         const hotel = request.hotel_needed_list;
         const plane = request.plane_needed_list;
-        const newStatus = (hotel.includes(1) || plane.includes(1)) ? 5 : 6;
+        const newStatus =
+            csvListNeedsService(hotel) || csvListNeedsService(plane) ? 5 : 6;
 
         const updated = await AccountsPayable.attendTravelRequest(requestId, imposedFee, newStatus);
 
@@ -45,8 +59,12 @@ const attendTravelRequest = async (req, res) => {
             return res.status(400).json({ error: "Failed to update travel request status" });
         }
 
-        const { user_email, user_name, status } = await mailData(requestId);
-        await Mail(user_email, user_name, requestId, status);
+        try {
+            const { user_email, user_name, status } = await mailData(requestId);
+            await Mail(user_email, user_name, requestId, status);
+        } catch (mailErr) {
+            console.warn("[attendTravelRequest] Estado actualizado; correo no enviado:", mailErr?.message || mailErr);
+        }
 
         return res.status(200).json({
             message: "Travel request status updated successfully",
