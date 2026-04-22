@@ -2,7 +2,6 @@
 
 import CertificateUtils from "../utils/certificateUtils.js";
 import fs from "fs";
-import path from "path";
 
 console.log("=== Wise Certificate Setup Script ===\n");
 

@@ -1,7 +1,6 @@
 import axios from "axios";
 import { MongoClient } from "mongodb";
 import fs from "fs";
-import path from "path";
 import https from "https";
 
 /**
@@ -211,17 +210,15 @@ class ExchangeRateService {
       }
     } catch (error) {
       console.error("Error fetching Wise rate:", error.response?.data || error.message);
-      console.log("Wise API not available, will use DOF fallback");
+      console.warn("Wise API not available, will use DOF fallback");
       throw error;
     }
   }
 
   /**
-   *
-   * @param source
-   * @param target
+   * Tipo de cambio USD/MXN desde Banxico (serie SF43718).
    */
-  async getDOFRate(source = "USD", target = "MXN") {
+  async getDOFRate() {
     try {
       const response = await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos", {
         headers: {
@@ -265,11 +262,11 @@ class ExchangeRateService {
 
       try {
         rateData = await this.getWiseRate(source, target);
-      } catch (wiseError) {
-        console.log("Wise API failed, falling back to DOF");
+      } catch {
+        console.warn("Wise API failed, falling back to DOF");
         try {
-          rateData = await this.getDOFRate(source, target);
-        } catch (dofError) {
+          rateData = await this.getDOFRate();
+        } catch {
           throw new Error("Both Wise and DOF APIs failed");
         }
       }
@@ -336,13 +333,13 @@ class ExchangeRateService {
             symbol: currency.symbol,
             supportsDecimals: currency.supportsDecimals
           }));
-        } catch (wiseError) {
-          console.log("Wise currencies not available, using Banxico fallback");
+        } catch {
+          console.warn("Wise currencies not available, using Banxico fallback");
         }
       }
 
       // Fallback to Banxico catalog
-      const response = await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/catalogoSeries", {
+      await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/catalogoSeries", {
         headers: {
           "Bmx-Token": process.env.BANXICO_API_KEY,
           "Content-Type": "application/json"
@@ -404,9 +401,9 @@ class ExchangeRateService {
             "Content-Type": "application/json"
           }
         });
-      } catch (error) {
+      } catch {
         // If main endpoint fails, try without date range (get all data)
-        console.log("Date range endpoint failed, trying full data endpoint");
+        console.warn("Date range endpoint failed, trying full data endpoint");
         response = await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos", {
           headers: {
             "Bmx-Token": process.env.BANXICO_API_KEY,
