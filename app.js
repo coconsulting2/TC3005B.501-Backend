@@ -21,8 +21,17 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import csrf from "csurf";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import swaggerUi from "swagger-ui-express";
+import yaml from "js-yaml";
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const swaggerM1Path = path.join(__dirname, "openapi", "swagger-m1.yaml");
+const swaggerM1Document = yaml.load(fs.readFileSync(swaggerM1Path, "utf8"));
 
 const corsOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
@@ -66,6 +75,7 @@ app.use("/api/files", fileRoutes);
 app.use("/api/comprobantes", comprobantesRoutes);
 app.use("/api/viajes", gastoTramoRoutes);
 app.use("/api/exchange-rate", exchangeRateRoutes);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerM1Document));
 
 // Centralized auth error handler — must be registered after all routes
 app.use(handleAuthError);
