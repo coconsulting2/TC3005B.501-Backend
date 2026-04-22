@@ -34,9 +34,12 @@ const { default: app } = await import("../../../app.js");
 app.set("trust proxy", "loopback");
 
 const BASE = "/api/accounts-payable";
+// Pin user_id to match the auth fixture seeded below so the permission
+// middleware can resolve effective permissions against a real DB row.
+const AUTH_USER_ID = 1001;
 const authHeaders = (role = ROLES.ACCOUNTS_PAYABLE) => ({
     "Content-Type": "application/json",
-    Authorization: `Bearer ${createTestJWT(role, { IP: LOCALHOST })}`,
+    Authorization: `Bearer ${createTestJWT(role, { IP: LOCALHOST, user_id: AUTH_USER_ID })}`,
     "x-forwarded-for": LOCALHOST,
 });
 
@@ -78,6 +81,39 @@ async function seedCatalogs() {
     await prisma.receiptType.createMany({
         data: [{ receiptTypeName: "Comida" }, { receiptTypeName: "Hospedaje" }],
         skipDuplicates: true,
+    });
+
+    // Minimum permission state for the granular middleware: the accounting-
+    // export routes are gated on `accounting:export`. Grant it to "Cuentas por
+    // pagar" and materialize the pinned auth user so loadEffectivePermissions
+    // resolves to a non-empty set.
+    const cppRole = await prisma.role.findFirstOrThrow({ where: { roleName: "Cuentas por pagar" } });
+    const perm = await prisma.permission.upsert({
+        where: { code: "accounting:export" },
+        update: {},
+        create: {
+            code: "accounting:export",
+            resource: "accounting",
+            action: "export",
+            description: "Export accounting data",
+        },
+    });
+    await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: cppRole.roleId, permissionId: perm.permissionId } },
+        update: {},
+        create: { roleId: cppRole.roleId, permissionId: perm.permissionId },
+    });
+    await prisma.user.upsert({
+        where: { userId: AUTH_USER_ID },
+        update: { roleId: cppRole.roleId },
+        create: {
+            userId: AUTH_USER_ID,
+            roleId: cppRole.roleId,
+            userName: `e2e-auth-${AUTH_USER_ID}`,
+            password: "test",
+            workstation: "test",
+            email: `e2e-auth-${AUTH_USER_ID}@example.com`,
+        },
     });
 }
 
