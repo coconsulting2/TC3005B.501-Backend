@@ -5,6 +5,8 @@
 import prisma from "../database/config/prisma.js";
 import { formatRoutes, getRequestDays, getCountryId, getCityId } from "../services/applicantService.js";
 import { createRequestInsertAlert } from "../services/createRequestInsertAlert.js";
+import { buildRequestWorkflowSnapshots } from "../services/buildRequestWorkflowSnapshots.js";
+import { initialStatusFromLevels } from "../services/workflowRulesEngine.js";
 
 const Applicant = {
   /**
@@ -87,16 +89,30 @@ const Applicant = {
     const request_days = getRequestDays(allRoutes);
 
     return await prisma.$transaction(async (tx) => {
-      // Determine status based on user role
       const user = await tx.user.findUnique({
         where: { userId: Number(userId) },
-        select: { roleId: true },
+        include: { role: true },
       });
 
+      const destinationCountryIds = [];
+      for (const route of allRoutes) {
+        const destCountryId = await getCountryId(tx, route.destination_country_name);
+        if (destCountryId != null) destinationCountryIds.push(destCountryId);
+      }
+
+      const { pre, post } = await buildRequestWorkflowSnapshots(tx, {
+        orgId: user.orgId,
+        departmentId: user.departmentId,
+        requestedFee: requested_fee,
+        destinationCountryIds,
+      });
+
+      const rn = user.role?.roleName;
       let request_status;
-      if (user.roleId === 1) request_status = 2;
-      else if (user.roleId === 4) request_status = 3;
-      else if (user.roleId === 5) request_status = 4;
+      if (rn === "Solicitante") {
+        request_status = pre ? initialStatusFromLevels(pre.levels) : 2;
+      } else if (rn === "N1") request_status = 3;
+      else if (rn === "N2") request_status = 4;
       else throw new Error("User role is not allowed to create a travel request");
 
       const request = await tx.request.create({
@@ -107,6 +123,12 @@ const Applicant = {
           requestedFee: requested_fee,
           imposedFee: imposed_fee,
           requestDays: request_days,
+          ...(pre || post
+            ? {
+              workflowPreSnapshot: pre ?? undefined,
+              workflowPostSnapshot: post ?? undefined,
+            }
+            : {}),
         },
       });
       await createRequestInsertAlert(tx, request);
@@ -560,18 +582,54 @@ const Applicant = {
     return await prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({
         where: { userId: Number(userId) },
-        select: { roleId: true },
+        include: { role: true },
       });
 
+      const reqRow = await tx.request.findUnique({
+        where: { requestId: Number(requestId) },
+        include: {
+          routeRequests: {
+            include: { route: true },
+          },
+        },
+      });
+
+      if (!reqRow) {
+        throw new Error("Request not found");
+      }
+
+      const destinationCountryIds = [];
+      for (const rr of reqRow?.routeRequests || []) {
+        const did = rr.route?.idDestinationCountry;
+        if (did != null) destinationCountryIds.push(did);
+      }
+
+      const { pre, post } = await buildRequestWorkflowSnapshots(tx, {
+        orgId: user.orgId,
+        departmentId: user.departmentId,
+        requestedFee: reqRow.requestedFee ?? 0,
+        destinationCountryIds,
+      });
+
+      const rn = user.role?.roleName;
       let request_status;
-      if (user.roleId === 1) request_status = 2;
-      else if (user.roleId === 4) request_status = 3;
-      else if (user.roleId === 5) request_status = 4;
+      if (rn === "Solicitante") {
+        request_status = pre ? initialStatusFromLevels(pre.levels) : 2;
+      } else if (rn === "N1") request_status = 3;
+      else if (rn === "N2") request_status = 4;
       else throw new Error("User role is not allowed to create a travel request");
 
       await tx.request.update({
         where: { requestId: Number(requestId) },
-        data: { requestStatusId: request_status },
+        data: {
+          requestStatusId: request_status,
+          ...(pre || post
+            ? {
+              workflowPreSnapshot: pre ?? undefined,
+              workflowPostSnapshot: post ?? undefined,
+            }
+            : {}),
+        },
       });
 
       return {

@@ -37,6 +37,7 @@ model User {
   userId       Int         @id @default(autoincrement()) @map("user_id")
   roleId       Int?        @map("role_id")
   departmentId Int?        @map("department_id")
+  orgId        BigInt?     @map("org_id")
   userName     String      @unique @map("user_name") @db.VarChar(60)
   password     String      @db.VarChar(60)
   workstation  String      @db.VarChar(20)
@@ -69,6 +70,8 @@ model Request {
   requestedFee    Float?         @map("requested_fee")
   imposedFee      Float?         @map("imposed_fee")
   requestDays     Float?         @map("request_days")
+  workflowPreSnapshot  Json?     @map("workflow_pre_snapshot")
+  workflowPostSnapshot Json?     @map("workflow_post_snapshot")
   creationDate    DateTime       @default(now()) @map("creation_date")
   lastModDate     DateTime       @default(now()) @updatedAt @map("last_mod_date")
   active          Boolean        @default(true)
@@ -251,4 +254,22 @@ model GastoTramo {
   receipt Receipt @relation(fields: [receiptId], references: [receiptId])
 
   @@map("gasto_tramo")
+}
+
+/// Reglas de workflow por organización (M2-004). Evaluación al alta de solicitud nueva.
+model WorkflowRule {
+  id            BigInt   @id @default(autoincrement())
+  orgId         BigInt   @map("org_id")
+  ruleType      String   @map("rule_type") @db.VarChar(10)
+  paramType     String   @map("param_type") @db.VarChar(20)
+  threshold     Decimal? @db.Decimal(18, 4)
+  paramValue    String?  @map("param_value") @db.VarChar(100)
+  approvalLevel Int      @map("approval_level")
+  skipIfBelow   Decimal? @map("skip_if_below") @db.Decimal(18, 4)
+  priority      Int      @default(0)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([orgId, ruleType, active])
+  @@map("workflow_rules")
 }
