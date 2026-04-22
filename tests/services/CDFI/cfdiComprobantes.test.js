@@ -54,7 +54,15 @@ await jest.unstable_mockModule("../../../models/comprobantesModel.js", () => ({
   },
 }));
 
+/** Política de carga de comprobantes (insertarCfdi) consulta estado de solicitud vía Prisma; se simula aquí. */
+await jest.unstable_mockModule("../../../models/applicantModel.js", () => ({
+  default: {
+    getRequestStatus: jest.fn().mockResolvedValue(7),
+  },
+}));
+
 const { default: ComprobantesModel } = await import("../../../models/comprobantesModel.js");
+const { default: Applicant } = await import("../../../models/applicantModel.js");
 const { default: AccountsPayable } = await import("../../../models/accountsPayableModel.js");
 const { consultarCfdiWithRetries } = await import("../../../services/satConsultaService.js");
 const { default: app } = await import("../../../app.js");
@@ -123,6 +131,8 @@ const validPayload = {
 };
 
 const RECEIPT_ID = 1;
+/** Debe existir en el mock de receipt para pasar insertarCfdi → assertRequestAllowsReceiptUpload */
+const MOCK_REQUEST_ID = 42;
 
 // ──────────────────────────────────────────────────────────
 // Tests
@@ -142,13 +152,18 @@ beforeEach(() => {
   ComprobantesModel.findByUUID.mockClear();
   ComprobantesModel.createCfdi.mockClear();
   ComprobantesModel.updateSatAcuseByReceiptId.mockClear();
+  Applicant.getRequestStatus.mockClear();
+  Applicant.getRequestStatus.mockResolvedValue(7);
   AccountsPayable.findReceiptForValidation.mockClear();
   AccountsPayable.validateReceipt.mockClear();
   AccountsPayable.validateReceipt.mockResolvedValue(true);
   consultarCfdiWithRetries.mockClear();
   consultarCfdiWithRetries.mockResolvedValue(vigenteSat());
-  // Default happy-path mocks
-  ComprobantesModel.findReceiptById.mockResolvedValue({ receiptId: RECEIPT_ID });
+  // Default happy-path mocks (requestId requerido por insertarCfdi + política N2)
+  ComprobantesModel.findReceiptById.mockResolvedValue({
+    receiptId: RECEIPT_ID,
+    requestId: MOCK_REQUEST_ID,
+  });
   ComprobantesModel.findByUUID.mockResolvedValue(null);
   ComprobantesModel.createCfdi.mockResolvedValue({ cfdiId: 1, ...validPayload, receiptId: RECEIPT_ID });
 });
