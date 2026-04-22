@@ -61,12 +61,14 @@
     "express-rate-limit": "^7.5.0",
     "express-validator": "^7.2.1",
     "fast-xml-parser": "^5.5.11",
+    "js-yaml": "^4.1.1",
     "jsonwebtoken": "^9.0.2",
     "mongo-sanitize": "^1.1.0",
     "mongodb": "^5.0.0",
     "multer": "^2.0.1",
     "nodemailer": "^7.0.3",
-    "soap": "^1.8.0"
+    "soap": "^1.8.0",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
