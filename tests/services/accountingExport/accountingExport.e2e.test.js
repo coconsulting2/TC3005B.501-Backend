@@ -34,12 +34,20 @@ const { default: app } = await import("../../../app.js");
 app.set("trust proxy", "loopback");
 
 const BASE = "/api/accounts-payable";
-// Pin user_id to match the auth fixture seeded below so the permission
-// middleware can resolve effective permissions against a real DB row.
-const AUTH_USER_ID = 1001;
+// Pin one user_id per role so the JWT subject resolves to a real DB row with
+// the right role — the granular permission middleware ignores the JWT's role
+// claim and looks up effective permissions by user_id. Seeded in seedCatalogs.
+const AUTH_USER_BY_ROLE = {
+    [ROLES.ACCOUNTS_PAYABLE]: 1001,
+    [ROLES.SOLICITING]: 1002,
+};
+const AUTH_USER_ID = AUTH_USER_BY_ROLE[ROLES.ACCOUNTS_PAYABLE];
 const authHeaders = (role = ROLES.ACCOUNTS_PAYABLE) => ({
     "Content-Type": "application/json",
-    Authorization: `Bearer ${createTestJWT(role, { IP: LOCALHOST, user_id: AUTH_USER_ID })}`,
+    Authorization: `Bearer ${createTestJWT(role, {
+        IP: LOCALHOST,
+        user_id: AUTH_USER_BY_ROLE[role] ?? AUTH_USER_ID,
+    })}`,
     "x-forwarded-for": LOCALHOST,
 });
 
@@ -85,9 +93,11 @@ async function seedCatalogs() {
 
     // Minimum permission state for the granular middleware: the accounting-
     // export routes are gated on `accounting:export`. Grant it to "Cuentas por
-    // pagar" and materialize the pinned auth user so loadEffectivePermissions
-    // resolves to a non-empty set.
+    // pagar" and materialize one pinned user per role so loadEffective-
+    // Permissions resolves to the expected set (including the Solicitante case
+    // used by TC-E2E-08 that must NOT have accounting:export).
     const cppRole = await prisma.role.findFirstOrThrow({ where: { roleName: "Cuentas por pagar" } });
+    const solRole = await prisma.role.findFirstOrThrow({ where: { roleName: "Solicitante" } });
     const perm = await prisma.permission.upsert({
         where: { code: "accounting:export" },
         update: {},
@@ -104,15 +114,27 @@ async function seedCatalogs() {
         create: { roleId: cppRole.roleId, permissionId: perm.permissionId },
     });
     await prisma.user.upsert({
-        where: { userId: AUTH_USER_ID },
+        where: { userId: AUTH_USER_BY_ROLE[ROLES.ACCOUNTS_PAYABLE] },
         update: { roleId: cppRole.roleId },
         create: {
-            userId: AUTH_USER_ID,
+            userId: AUTH_USER_BY_ROLE[ROLES.ACCOUNTS_PAYABLE],
             roleId: cppRole.roleId,
-            userName: `e2e-auth-${AUTH_USER_ID}`,
+            userName: `e2e-auth-cpp-${AUTH_USER_BY_ROLE[ROLES.ACCOUNTS_PAYABLE]}`,
             password: "test",
             workstation: "test",
-            email: `e2e-auth-${AUTH_USER_ID}@example.com`,
+            email: `e2e-auth-cpp-${AUTH_USER_BY_ROLE[ROLES.ACCOUNTS_PAYABLE]}@example.com`,
+        },
+    });
+    await prisma.user.upsert({
+        where: { userId: AUTH_USER_BY_ROLE[ROLES.SOLICITING] },
+        update: { roleId: solRole.roleId },
+        create: {
+            userId: AUTH_USER_BY_ROLE[ROLES.SOLICITING],
+            roleId: solRole.roleId,
+            userName: `e2e-auth-sol-${AUTH_USER_BY_ROLE[ROLES.SOLICITING]}`,
+            password: "test",
+            workstation: "test",
+            email: `e2e-auth-sol-${AUTH_USER_BY_ROLE[ROLES.SOLICITING]}@example.com`,
         },
     });
 }
