@@ -75,7 +75,7 @@ export const login = async (req, res) => {
         maxAge: 1000 * 60 * 60,
       })
       .json(result);
-  } catch (error) {
+  } catch {
     res.status(401).json({ error: "Invalid credentials" });
   }
 };
@@ -193,7 +193,7 @@ export const getUserWallet = async (req, res) => {
     };
 
     return res.status(200).json(formatted);
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: "Internal server error" });
   }
 };

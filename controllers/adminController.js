@@ -2,7 +2,6 @@
  * @module adminController
  * @description Handles HTTP requests for admin user management (CRUD, CSV import, deactivation).
  */
-import parseCSV from "../services/adminService.js";
 import * as adminService from "../services/adminService.js";
 import Admin from "../models/adminModel.js";
 import userModel from "../models/userModel.js";

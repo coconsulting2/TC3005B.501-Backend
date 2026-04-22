@@ -13,7 +13,6 @@ import AccountingExport from "../models/accountingExportModel.js";
 import {
     SOCIEDAD_DEFAULT,
     GL_ACCOUNTS,
-    GL_ACCOUNT_DESCRIPTIONS,
     DOC_TYPES,
     SHKZG,
     proveedorFromUserId,
@@ -22,14 +21,28 @@ import {
 
 const MXN = "MXN";
 
+/**
+ *
+ */
 class NotFoundError extends Error {
+    /**
+     *
+     * @param message
+     */
     constructor(message) {
         super(message);
         this.status = 404;
     }
 }
 
+/**
+ *
+ */
 class ConflictError extends Error {
+    /**
+     *
+     * @param message
+     */
     constructor(message) {
         super(message);
         this.status = 409;

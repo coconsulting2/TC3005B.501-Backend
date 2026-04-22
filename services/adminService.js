@@ -8,9 +8,8 @@ import User from "../models/userModel.js";
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 const AES_SECRET_KEY = process.env.AES_SECRET_KEY;
-const AES_IV = process.env.AES_IV;
 import { parse } from "csv-parse";
-import fs, { unlink } from "fs";
+import fs from "fs";
 import { decrypt } from "../middleware/decryption.js";
 
 const requiredColumns = ["role_name", "department_name", "user_name", "password", "workstation", "email"];
@@ -40,10 +39,6 @@ const hash = async (data) => {
  * @param {string} userData.email - Email address (will be encrypted)
  * @param {string} userData.phone_number - Phone number (will be encrypted)
  * @returns {Promise<Object>} The created user record
- */
-/**
- *
- * @param userData
  */
 export async function createUser(userData) {
   try {
@@ -153,7 +148,7 @@ const getForeignKeyValues = async (rowData, rowNumber) => {
     const encryptedPhone = encrypt(userData.phone_number);
     userData.phone_number = encryptedPhone;
 
-  } catch (error) {
+  } catch {
     rowErrors.push(`Error processing row ${rowNumber}`);
   }
 
@@ -236,7 +231,7 @@ export const parseCSV = async (filePath, dummy) => {
         const createdCount = await Admin.createMultipleUsers(usersToCreate);
         results.created = createdCount;
         results.failed += (usersToCreate.length - createdCount);
-      } catch (error) {
+      } catch {
         results.errors.push({
           row_number: "N/A",
           error: "Bulk insert failed"
