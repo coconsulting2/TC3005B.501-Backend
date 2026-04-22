@@ -1,5 +1,4 @@
 import fs from "fs";
-import path from "path";
 import https from "https";
 
 /**
@@ -17,19 +16,19 @@ class CertificateUtils {
 
     try {
       fs.accessSync(certPath, fs.constants.R_OK);
-    } catch (error) {
+    } catch {
       errors.push(`Certificate file not readable: ${certPath}`);
     }
 
     try {
       fs.accessSync(keyPath, fs.constants.R_OK);
-    } catch (error) {
+    } catch {
       errors.push(`Private key file not readable: ${keyPath}`);
     }
 
     try {
       fs.accessSync(caPath, fs.constants.R_OK);
-    } catch (error) {
+    } catch {
       errors.push(`CA certificate file not readable: ${caPath}`);
     }
 
@@ -100,7 +99,7 @@ class CertificateUtils {
    */
   static getPrivateKeyInfo(keyPath) {
     try {
-      const keyContent = fs.readFileSync(keyPath, "utf8");
+      fs.readFileSync(keyPath, "utf8");
       const stats = fs.statSync(keyPath);
 
       // Check file permissions
@@ -194,7 +193,7 @@ class CertificateUtils {
 
     if (!fs.existsSync(certDir)) {
       fs.mkdirSync(certDir, { recursive: true });
-      console.log(`Created certificate directory: ${certDir}`);
+      console.warn(`Created certificate directory: ${certDir}`);
     }
 
     // Set proper permissions for certificate directory

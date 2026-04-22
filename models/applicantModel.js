@@ -391,6 +391,7 @@ const Applicant = {
     if (request.routeRequests.length === 0) {
       return [{
         request_id: request.requestId,
+        request_status_id: request.requestStatusId,
         request_status: request.requestStatus.status,
         notes: request.notes,
         requested_fee: request.requestedFee,
@@ -419,6 +420,7 @@ const Applicant = {
       const route = rr.route;
       return {
         request_id: request.requestId,
+        request_status_id: request.requestStatusId,
         request_status: request.requestStatus.status,
         notes: request.notes,
         requested_fee: request.requestedFee,
