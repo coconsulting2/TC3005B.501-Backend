@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--Malformed fixture 1: attribute value has no closing quote, parser cannot tokenize-->
+<cfdi:Comprobante
+        xmlns:cfdi="http://www.sat.gob.mx/cfd/4"
+        Version="4.0
+        Fecha="2024-03-15T14:30:00"
+        Total="100.00">
+    <cfdi:Emisor Rfc="EKU9003173C9"/>
+</cfdi:Comprobante>

@@ -70,7 +70,7 @@ const verifyToken = (token) => {
  * Core authentication middleware. Validates the JWT from the Authorization header,
  * checks IP binding, and attaches decoded user to req.user.
  *
- * In development, if MOCK_AUTH is enabled, it bypasses real auth and uses a mock user.
+ * In development, if MOCK_AUTH is enabled and no Bearer token is sent, it uses a mock user.
  *
  * @param {import("express").Request} req - Express request
  * @param {import("express").Response} res - Express response
@@ -78,14 +78,16 @@ const verifyToken = (token) => {
  * @returns {Promise<void>}
  */
 export const authenticateToken = async (req, res, next) => {
-  // Dev-only mock session: all three conditions are validated at startup
-  if (MOCK_AUTH_ENABLED) {
+  const token = extractToken(req);
+
+  // Mock solo si no hay Bearer: así en dev puedes usar `MOCK_AUTH` para SSR sin login
+  // y aún probar login real (p. ej. Cuentas por pagar) desde el navegador.
+  if (MOCK_AUTH_ENABLED && !token) {
     req.user = { ...MOCK_USER };
     return next();
   }
 
   try {
-    const token = extractToken(req);
     if (!token) {
       throw new MissingTokenError();
     }
