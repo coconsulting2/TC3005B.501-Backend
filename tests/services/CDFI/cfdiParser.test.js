@@ -38,6 +38,17 @@ const CFDI_V33_HOTEL = await CFDI.import("CFDI-v33-hotel.xml");
  */
 const CFDI_V40_TRANSPORT_WITH_RETENCION = await CFDI.import("CFDI-v40-transport-with-retention.xml");
 
+// ─── Malformed CFDI Fixtures ─────────────────────────────────────────────────
+
+/** Malformed fixture: Comprobante tag is not closed before Emisor */
+const CFDI_MALFORMED_BROKEN_TAG = await CFDI.import("CFDI-malformed-broken-tag.xml");
+
+/** Malformed fixture: Complemento present but TimbreFiscalDigital missing */
+const CFDI_MALFORMED_NO_TIMBRE = await CFDI.import("CFDI-malformed-no-timbre.xml");
+
+/** Malformed fixture: Comprobante root without Version attribute */
+const CFDI_MALFORMED_NO_VERSION = await CFDI.import("CFDI-malformed-no-version.xml");
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe("parseCFDI", () => {
@@ -159,6 +170,23 @@ describe("parseCFDI", () => {
       expect(iva.impuesto).toBe("002");
       expect(iva.importe).toBe(480.00);
       expect(iva.base).toBe(3000.00);
+    });
+
+    it("extracts fecha as Date in 2023", () => {
+      result = parseCFDI(CFDI_V33_HOTEL);
+      expect(result.fecha).toBeInstanceOf(Date);
+      expect(result.fecha.getFullYear()).toBe(2023);
+      expect(result.fecha.getMonth()).toBe(10); // November = 10 (0-indexed)
+    });
+
+    it("normalizes rfcReceptor to uppercase", () => {
+      result = parseCFDI(CFDI_V33_HOTEL);
+      expect(result.rfcReceptor).toBe("JUFA7509103S4");
+    });
+
+    it("exposes totalTrasladados 480.00 from Impuestos node", () => {
+      result = parseCFDI(CFDI_V33_HOTEL);
+      expect(result.taxes.totalTrasladados).toBe(480.00);
     });
   });
 
@@ -283,6 +311,62 @@ describe("parseCFDI", () => {
         expect(e.code).toBe("MISSING_FECHA");
       }
     });
+
+    it("throws INVALID_XML for malformed broken-tag fixture", () => {
+      expect(() => parseCFDI(CFDI_MALFORMED_BROKEN_TAG)).toThrow(CfdiParseError);
+      try { parseCFDI(CFDI_MALFORMED_BROKEN_TAG); } catch (e) {
+        expect(e.code).toBe("INVALID_XML");
+      }
+    });
+
+    it("throws MISSING_TIMBRE when Complemento has no TimbreFiscalDigital (fixture)", () => {
+      expect(() => parseCFDI(CFDI_MALFORMED_NO_TIMBRE)).toThrow(CfdiParseError);
+      try { parseCFDI(CFDI_MALFORMED_NO_TIMBRE); } catch (e) {
+        expect(e.code).toBe("MISSING_TIMBRE");
+      }
+    });
+
+    it("throws MISSING_VERSION when Version attribute is absent (fixture)", () => {
+      expect(() => parseCFDI(CFDI_MALFORMED_NO_VERSION)).toThrow(CfdiParseError);
+      try { parseCFDI(CFDI_MALFORMED_NO_VERSION); } catch (e) {
+        expect(e.code).toBe("MISSING_VERSION");
+      }
+    });
+
+    it("throws MISSING_EMISOR when Emisor node is absent", () => {
+      const xml = CFDI_V40_RESTAURANT.replace(/<cfdi:Emisor[\s\S]*?\/>/, "");
+      expect(() => parseCFDI(xml)).toThrow(CfdiParseError);
+      try { parseCFDI(xml); } catch (e) {
+        expect(e.code).toBe("MISSING_EMISOR");
+      }
+    });
+
+    it("throws INVALID_FECHA when Fecha is not a valid ISO date", () => {
+      const xml = CFDI_V40_RESTAURANT.replace(
+        'Fecha="2024-03-15T14:30:00"',
+        'Fecha="not-a-date"',
+      );
+      expect(() => parseCFDI(xml)).toThrow(CfdiParseError);
+      try { parseCFDI(xml); } catch (e) {
+        expect(e.code).toBe("INVALID_FECHA");
+      }
+    });
+
+    it("throws MISSING_TOTAL when Total attribute is absent", () => {
+      const xml = CFDI_V40_RESTAURANT.replace('Total="1160.00"', "");
+      expect(() => parseCFDI(xml)).toThrow(CfdiParseError);
+      try { parseCFDI(xml); } catch (e) {
+        expect(e.code).toBe("MISSING_TOTAL");
+      }
+    });
+
+    it("throws INVALID_TOTAL when Total is not numeric", () => {
+      const xml = CFDI_V40_RESTAURANT.replace('Total="1160.00"', 'Total="abc"');
+      expect(() => parseCFDI(xml)).toThrow(CfdiParseError);
+      try { parseCFDI(xml); } catch (e) {
+        expect(e.code).toBe("INVALID_TOTAL");
+      }
+    });
   });
 
   describe("buildComprobanteRegistroBodyFromXml", () => {
@@ -299,6 +383,33 @@ describe("parseCFDI", () => {
       // Sello del fixture es demasiado corto (< 8) — no se incluye sello_emisor
       expect(body.sello_emisor).toBeUndefined();
       expect(body.iva).toBe(160);
+    });
+
+    it("body incluye metodo_pago, forma_pago y lugar_expedicion del comprobante v4.0", () => {
+      const body = buildComprobanteRegistroBodyFromXml(CFDI_V40_RESTAURANT);
+      expect(body.metodo_pago).toMatch(/^(PUE|PPD)$/);
+      expect(body.forma_pago).toHaveLength(2);
+      expect(body.lugar_expedicion).toMatch(/^\d{5}$/);
+    });
+
+    it("body incluye regimen fiscal de emisor y receptor v4.0", () => {
+      const body = buildComprobanteRegistroBodyFromXml(CFDI_V40_RESTAURANT);
+      expect(body.regimen_fiscal_emisor).toHaveLength(3);
+      expect(body.regimen_fiscal_receptor).toHaveLength(3);
+      expect(body.domicilio_fiscal_receptor).toMatch(/^\d{5}$/);
+    });
+
+    it("body expone subtotal y tipo_cambio v4.0", () => {
+      const body = buildComprobanteRegistroBodyFromXml(CFDI_V40_RESTAURANT);
+      expect(body.subtotal).toBe(1000);
+      expect(body.tipo_cambio).toBe(1);
+    });
+
+    it("rechaza CFDI v3.3 con INVALID_REGIMEN porque v3.3 no trae RegimenFiscalReceptor", () => {
+      expect(() => buildComprobanteRegistroBodyFromXml(CFDI_V33_HOTEL)).toThrow(CfdiParseError);
+      try { buildComprobanteRegistroBodyFromXml(CFDI_V33_HOTEL); } catch (e) {
+        expect(e.code).toBe("INVALID_REGIMEN");
+      }
     });
   });
 
