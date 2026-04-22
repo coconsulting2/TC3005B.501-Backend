@@ -1,0 +1,607 @@
+{
+	"info": {
+		"_postman_id": "m1-fiscal-collection",
+		"name": "M1-Fiscal",
+		"description": "Postman collection for Module 1 (Automatizacion Fiscal) endpoints.\n\nCovers: file upload (S3), CFDI comprobantes, exchange rate, viajes resumen-tramos, and accounting export.\n\nTask: NT-006",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "jwt_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "csrf_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "username",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "password",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "org_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "receipt_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "viaje_id",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "request_id",
+			"value": "1",
+			"type": "string"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Skip auth for exchange-rate endpoints (no auth required)",
+					"const noAuthPaths = ['/api/exchange-rate'];",
+					"const currentUrl = pm.request.url.toString();",
+					"const skipAuth = noAuthPaths.some(p => currentUrl.includes(p));",
+					"",
+					"if (skipAuth) { return; }",
+					"",
+					"const jwt = pm.collectionVariables.get('jwt_token');",
+					"if (jwt) { return; }",
+					"",
+					"const baseUrl = pm.collectionVariables.get('base_url');",
+					"const username = pm.collectionVariables.get('username');",
+					"const password = pm.collectionVariables.get('password');",
+					"",
+					"if (!username || !password) {",
+					"    console.warn('Set username and password collection variables before running.');",
+					"    return;",
+					"}",
+					"",
+					"// 1. Login to obtain JWT",
+					"pm.sendRequest({",
+					"    url: baseUrl + '/api/user/login',",
+					"    method: 'POST',",
+					"    header: [{ key: 'Content-Type', value: 'application/json' }],",
+					"    body: {",
+					"        mode: 'raw',",
+					"        raw: JSON.stringify({ username, password })",
+					"    }",
+					"}, (err, res) => {",
+					"    if (err) { console.error('Login failed:', err); return; }",
+					"    if (res.code !== 200) { console.error('Login returned', res.code); return; }",
+					"",
+					"    const data = res.json();",
+					"    pm.collectionVariables.set('jwt_token', data.token);",
+					"",
+					"    // 2. Obtain CSRF token",
+					"    pm.sendRequest({",
+					"        url: baseUrl + '/api/user/csrf-token',",
+					"        method: 'GET'",
+					"    }, (csrfErr, csrfRes) => {",
+					"        if (csrfErr) { console.error('CSRF fetch failed:', csrfErr); return; }",
+					"        if (csrfRes.code === 200) {",
+					"            pm.collectionVariables.set('csrf_token', csrfRes.json().csrfToken);",
+					"        }",
+					"    });",
+					"});"
+				]
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "Files",
+			"description": "File upload endpoints (S3 storage).",
+			"item": [
+				{
+					"name": "Upload file to S3",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}"
+							},
+							{
+								"key": "x-csrf-token",
+								"value": "{{csrf_token}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "",
+									"description": "PDF, JPEG, PNG, or XML file (max 10 MB)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/files/upload",
+							"host": ["{{base_url}}"],
+							"path": ["api", "files", "upload"]
+						},
+						"description": "Uploads a single file to S3.\n\nAllowed MIME types: application/pdf, image/jpeg, image/png, application/xml, text/xml.\nMax size: 10 MB."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 201', () => {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test('Response has key and bucket', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('key');",
+									"    pm.expect(json).to.have.property('bucket');",
+									"});",
+									"",
+									"pm.test('Response has success message', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json.message).to.eql('File uploaded to S3 successfully');",
+									"});",
+									"",
+									"pm.test('Schema validation', () => {",
+									"    const schema = {",
+									"        type: 'object',",
+									"        required: ['message', 'key', 'bucket'],",
+									"        properties: {",
+									"            message: { type: 'string' },",
+									"            key: { type: 'string' },",
+									"            bucket: { type: 'string' }",
+									"        }",
+									"    };",
+									"    pm.response.to.have.jsonSchema(schema);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Comprobantes",
+			"description": "CFDI comprobantes endpoints (M1-003). Validates against SAT before persisting.",
+			"item": [
+				{
+					"name": "Create CFDI comprobante",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}"
+							},
+							{
+								"key": "x-csrf-token",
+								"value": "{{csrf_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"uuid\": \"550E8400-E29B-41D4-A716-446655440000\",\n    \"fecha_timbrado\": \"2026-04-01T12:00:00Z\",\n    \"rfc_pac\": \"SAT970701NN3\",\n    \"version\": \"4.0\",\n    \"serie\": \"A\",\n    \"folio\": \"12345\",\n    \"fecha_emision\": \"2026-04-01T10:00:00Z\",\n    \"tipo_comprobante\": \"I\",\n    \"lugar_expedicion\": \"64000\",\n    \"exportacion\": \"01\",\n    \"metodo_pago\": \"PUE\",\n    \"forma_pago\": \"03\",\n    \"moneda\": \"MXN\",\n    \"tipo_cambio\": 1.0,\n    \"subtotal\": 1000.00,\n    \"descuento\": 0.00,\n    \"iva\": 160.00,\n    \"total\": 1160.00,\n    \"rfc_emisor\": \"AAA010101AAA\",\n    \"nombre_emisor\": \"Empresa Ejemplo SA de CV\",\n    \"regimen_fiscal_emisor\": \"601\",\n    \"rfc_receptor\": \"XAXX010101000\",\n    \"nombre_receptor\": \"Publico en General\",\n    \"domicilio_fiscal_receptor\": \"64000\",\n    \"regimen_fiscal_receptor\": \"616\",\n    \"uso_cfdi\": \"G03\",\n    \"sello_emisor\": \"abc123==\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/comprobantes/{{receipt_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "comprobantes", "{{receipt_id}}"]
+						},
+						"description": "Creates a CFDI comprobante linked to a receipt.\n\nFlow: validates receipt exists -> queries SAT -> checks EFOS blacklist -> checks UUID uniqueness -> persists.\n\nRoles: Solicitante, N1, N2."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 201', () => {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test('Response has cfdiId and uuid', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('cfdiId');",
+									"    pm.expect(json).to.have.property('uuid');",
+									"});",
+									"",
+									"pm.test('UUID is valid format', () => {",
+									"    const json = pm.response.json();",
+									"    const uuidRegex = /^[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}$/i;",
+									"    pm.expect(json.uuid).to.match(uuidRegex);",
+									"});",
+									"",
+									"pm.test('SAT estado is present', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('sat_estado');",
+									"});",
+									"",
+									"pm.test('Schema validation', () => {",
+									"    const schema = {",
+									"        type: 'object',",
+									"        required: ['cfdiId', 'receiptId', 'uuid', 'rfc_emisor', 'rfc_receptor', 'fecha_emision', 'total', 'sat_estado'],",
+									"        properties: {",
+									"            cfdiId: { type: 'number' },",
+									"            receiptId: { type: 'number' },",
+									"            uuid: { type: 'string' },",
+									"            rfc_emisor: { type: 'string' },",
+									"            rfc_receptor: { type: 'string' },",
+									"            fecha_emision: { type: 'string' },",
+									"            total: { type: ['string', 'number'] },",
+									"            sat_estado: { type: 'string' },",
+									"            sat_validacion_efos: { type: 'string' }",
+									"        }",
+									"    };",
+									"    pm.response.to.have.jsonSchema(schema);",
+									"});",
+									"",
+									"pm.test('UUID uniqueness — duplicate returns 409', () => {",
+									"    // This test documents expected behavior for duplicate UUIDs.",
+									"    // Run this request twice with the same UUID: first should be 201, second 409.",
+									"    if (pm.response.code === 409) {",
+									"        const json = pm.response.json();",
+									"        pm.expect(json).to.have.property('error');",
+									"        pm.expect(json.error).to.include('UUID');",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Exchange Rate",
+			"description": "Currency exchange rate endpoints (Banxico integration).",
+			"item": [
+				{
+					"name": "Get exchange rate",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/exchange-rate/rate?source=USD&target=MXN",
+							"host": ["{{base_url}}"],
+							"path": ["api", "exchange-rate", "rate"],
+							"query": [
+								{
+									"key": "source",
+									"value": "USD",
+									"description": "Source currency (3-letter ISO code)"
+								},
+								{
+									"key": "target",
+									"value": "MXN",
+									"description": "Target currency (3-letter ISO code)"
+								}
+							]
+						},
+						"description": "Returns the current exchange rate between two currencies.\n\nDefaults: source=USD, target=MXN.\nNo authentication required."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response indicates success', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json.success).to.eql(true);",
+									"});",
+									"",
+									"pm.test('Response data contains rate info', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('data');",
+									"});",
+									"",
+									"pm.test('Schema validation', () => {",
+									"    const schema = {",
+									"        type: 'object',",
+									"        required: ['success', 'data', 'message'],",
+									"        properties: {",
+									"            success: { type: 'boolean' },",
+									"            data: { type: 'object' },",
+									"            message: { type: 'string' }",
+									"        }",
+									"    };",
+									"    pm.response.to.have.jsonSchema(schema);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get supported currencies",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/exchange-rate/currencies",
+							"host": ["{{base_url}}"],
+							"path": ["api", "exchange-rate", "currencies"]
+						},
+						"description": "Returns the list of supported currencies for exchange rate queries.\n\nNo authentication required."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response indicates success', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json.success).to.eql(true);",
+									"});",
+									"",
+									"pm.test('Data is present', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('data');",
+									"});",
+									"",
+									"pm.test('Schema validation', () => {",
+									"    const schema = {",
+									"        type: 'object',",
+									"        required: ['success', 'data', 'message'],",
+									"        properties: {",
+									"            success: { type: 'boolean' },",
+									"            data: {},",
+									"            message: { type: 'string' }",
+									"        }",
+									"    };",
+									"    pm.response.to.have.jsonSchema(schema);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Viajes",
+			"description": "Travel trip endpoints — consolidated accounting summary by tramo.",
+			"item": [
+				{
+					"name": "Get resumen tramos",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/viajes/{{viaje_id}}/resumen-tramos",
+							"host": ["{{base_url}}"],
+							"path": ["api", "viajes", "{{viaje_id}}", "resumen-tramos"]
+						},
+						"description": "Returns a consolidated accounting summary of comprobantes grouped by tramo for a given viaje.\n\nRoles: Solicitante, N1, N2, Cuentas por pagar."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has viaje_id', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('viaje_id');",
+									"});",
+									"",
+									"pm.test('Response has tramos array', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('tramos');",
+									"    pm.expect(json.tramos).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Response has total_general', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('total_general');",
+									"});",
+									"",
+									"pm.test('Schema validation', () => {",
+									"    const schema = {",
+									"        type: 'object',",
+									"        required: ['viaje_id', 'tramos', 'total_general'],",
+									"        properties: {",
+									"            viaje_id: { type: 'number' },",
+									"            tramos: {",
+									"                type: 'array',",
+									"                items: {",
+									"                    type: 'object',",
+									"                    required: ['tramo_id'],",
+									"                    properties: {",
+									"                        tramo_id: { type: 'number' },",
+									"                        comprobantes: { type: 'array' },",
+									"                        total_tramo: { type: 'number' }",
+									"                    }",
+									"                }",
+									"            },",
+									"            total_general: { type: 'number' }",
+									"        }",
+									"    };",
+									"    pm.response.to.have.jsonSchema(schema);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Accounting Export",
+			"description": "Accounting export endpoints for ERP integration (M1-010).\n\nRestricted to role: Cuentas por pagar.\nSupports JSON (default) and XML (?format=xml) output.",
+			"item": [
+				{
+					"name": "Export by request ID",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/accounts-payable/accounting-export/{{request_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "accounts-payable", "accounting-export", "{{request_id}}"]
+						},
+						"description": "Exports accounting polizas for a single finalized travel request.\n\nAdd ?format=xml for XML output.\n\nRole: Cuentas por pagar."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has polizas array', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('polizas');",
+									"    pm.expect(json.polizas).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Schema validation', () => {",
+									"    const schema = {",
+									"        type: 'object',",
+									"        required: ['polizas'],",
+									"        properties: {",
+									"            polizas: {",
+									"                type: 'array',",
+									"                items: { type: 'object' }",
+									"            }",
+									"        }",
+									"    };",
+									"    pm.response.to.have.jsonSchema(schema);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Export by date range",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{jwt_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/accounts-payable/accounting-export?from=2026-01-01&to=2026-12-31",
+							"host": ["{{base_url}}"],
+							"path": ["api", "accounts-payable", "accounting-export"],
+							"query": [
+								{
+									"key": "from",
+									"value": "2026-01-01",
+									"description": "Start date (YYYY-MM-DD, required)"
+								},
+								{
+									"key": "to",
+									"value": "2026-12-31",
+									"description": "End date (YYYY-MM-DD, required)"
+								}
+							]
+						},
+						"description": "Exports accounting polizas for all finalized requests within a date range.\n\nBoth 'from' and 'to' query params are required (YYYY-MM-DD).\nAdd ?format=xml for XML output.\n\nRole: Cuentas por pagar."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status code is 200', () => {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test('Response has polizas array', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('polizas');",
+									"    pm.expect(json.polizas).to.be.an('array');",
+									"});",
+									"",
+									"pm.test('Missing date params returns 400', () => {",
+									"    // This test documents expected behavior when from/to are missing.",
+									"    // Remove query params and re-run to verify 400 response.",
+									"    if (pm.response.code === 400) {",
+									"        const json = pm.response.json();",
+									"        pm.expect(json).to.have.property('error');",
+									"        pm.expect(json.error).to.include('from');",
+									"    }",
+									"});",
+									"",
+									"pm.test('Schema validation', () => {",
+									"    const schema = {",
+									"        type: 'object',",
+									"        required: ['polizas'],",
+									"        properties: {",
+									"            polizas: {",
+									"                type: 'array',",
+									"                items: { type: 'object' }",
+									"            }",
+									"        }",
+									"    };",
+									"    pm.response.to.have.jsonSchema(schema);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}
