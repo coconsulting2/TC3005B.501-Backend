@@ -8,9 +8,11 @@ datasource db {
 }
 
 model Role {
-  roleId   Int    @id @default(autoincrement()) @map("role_id")
-  roleName String @unique @map("role_name") @db.VarChar(20)
-  users    User[]
+  roleId               Int                   @id @default(autoincrement()) @map("role_id")
+  roleName             String                @unique @map("role_name") @db.VarChar(20)
+  users                User[]
+  rolePermissions      RolePermission[]
+  rolePermissionGroups RolePermissionGroup[]
 
   @@map("Role")
 }
@@ -34,21 +36,23 @@ model AlertMessage {
 }
 
 model User {
-  userId       Int         @id @default(autoincrement()) @map("user_id")
-  roleId       Int?        @map("role_id")
-  departmentId Int?        @map("department_id")
-  userName     String      @unique @map("user_name") @db.VarChar(60)
-  password     String      @db.VarChar(60)
-  workstation  String      @db.VarChar(20)
-  email        String      @unique @db.VarChar(254)
-  phoneNumber  String?     @map("phone_number") @db.VarChar(254)
-  wallet       Float       @default(0.00)
-  creationDate DateTime    @default(now()) @map("creation_date")
-  lastModDate  DateTime    @default(now()) @updatedAt @map("last_mod_date")
-  active       Boolean     @default(true)
-  role         Role?       @relation(fields: [roleId], references: [roleId])
-  department   Department? @relation(fields: [departmentId], references: [departmentId])
-  requests     Request[]
+  userId               Int                   @id @default(autoincrement()) @map("user_id")
+  roleId               Int?                  @map("role_id")
+  departmentId         Int?                  @map("department_id")
+  userName             String                @unique @map("user_name") @db.VarChar(60)
+  password             String                @db.VarChar(60)
+  workstation          String                @db.VarChar(20)
+  email                String                @unique @db.VarChar(254)
+  phoneNumber          String?               @map("phone_number") @db.VarChar(254)
+  wallet               Float                 @default(0.00)
+  creationDate         DateTime              @default(now()) @map("creation_date")
+  lastModDate          DateTime              @default(now()) @updatedAt @map("last_mod_date")
+  active               Boolean               @default(true)
+  role                 Role?                 @relation(fields: [roleId], references: [roleId])
+  department           Department?           @relation(fields: [departmentId], references: [departmentId])
+  requests             Request[]
+  userPermissions      UserPermission[]
+  userPermissionGroups UserPermissionGroup[]
 
   @@map("User")
 }
@@ -251,4 +255,105 @@ model GastoTramo {
   receipt Receipt @relation(fields: [receiptId], references: [receiptId])
 
   @@map("gasto_tramo")
+}
+
+/// Atomic permission — a resource:action pair (e.g. "travel_request:approve").
+/// Assigned to roles or users directly, or bundled through PermissionGroup.
+model Permission {
+  permissionId Int      @id @default(autoincrement()) @map("permission_id")
+  code         String   @unique @db.VarChar(80)
+  resource     String   @db.VarChar(40)
+  action       String   @db.VarChar(40)
+  description  String?  @db.VarChar(254)
+  active       Boolean  @default(true)
+  creationDate DateTime @default(now()) @map("creation_date")
+  lastModDate  DateTime @default(now()) @updatedAt @map("last_mod_date")
+
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+  groupItems      PermissionGroupItem[]
+
+  @@index([resource, action])
+  @@map("Permission")
+}
+
+/// Reusable bundle of permissions that can be granted to roles or users as a unit.
+model PermissionGroup {
+  groupId      Int      @id @default(autoincrement()) @map("group_id")
+  groupName    String   @unique @map("group_name") @db.VarChar(60)
+  description  String?  @db.VarChar(254)
+  active       Boolean  @default(true)
+  creationDate DateTime @default(now()) @map("creation_date")
+  lastModDate  DateTime @default(now()) @updatedAt @map("last_mod_date")
+
+  items      PermissionGroupItem[]
+  roleGroups RolePermissionGroup[]
+  userGroups UserPermissionGroup[]
+
+  @@map("PermissionGroup")
+}
+
+/// Join table — which permissions belong to which group.
+model PermissionGroupItem {
+  groupId      Int      @map("group_id")
+  permissionId Int      @map("permission_id")
+  creationDate DateTime @default(now()) @map("creation_date")
+
+  group      PermissionGroup @relation(fields: [groupId], references: [groupId], onDelete: Cascade)
+  permission Permission      @relation(fields: [permissionId], references: [permissionId], onDelete: Cascade)
+
+  @@id([groupId, permissionId])
+  @@map("Permission_Group_Item")
+}
+
+/// Direct permission grant to a role.
+model RolePermission {
+  roleId       Int      @map("role_id")
+  permissionId Int      @map("permission_id")
+  creationDate DateTime @default(now()) @map("creation_date")
+
+  role       Role       @relation(fields: [roleId], references: [roleId], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [permissionId], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("Role_Permission")
+}
+
+/// Group grant to a role — expands to all items of the group at resolve time.
+model RolePermissionGroup {
+  roleId       Int      @map("role_id")
+  groupId      Int      @map("group_id")
+  creationDate DateTime @default(now()) @map("creation_date")
+
+  role  Role            @relation(fields: [roleId], references: [roleId], onDelete: Cascade)
+  group PermissionGroup @relation(fields: [groupId], references: [groupId], onDelete: Cascade)
+
+  @@id([roleId, groupId])
+  @@map("Role_Permission_Group")
+}
+
+/// Direct permission grant to a user (additive over the role-derived set).
+model UserPermission {
+  userId       Int      @map("user_id")
+  permissionId Int      @map("permission_id")
+  creationDate DateTime @default(now()) @map("creation_date")
+
+  user       User       @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [permissionId], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+  @@map("User_Permission")
+}
+
+/// Group grant to a user (additive over the role-derived set).
+model UserPermissionGroup {
+  userId       Int      @map("user_id")
+  groupId      Int      @map("group_id")
+  creationDate DateTime @default(now()) @map("creation_date")
+
+  user  User            @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  group PermissionGroup @relation(fields: [groupId], references: [groupId], onDelete: Cascade)
+
+  @@id([userId, groupId])
+  @@map("User_Permission_Group")
 }
