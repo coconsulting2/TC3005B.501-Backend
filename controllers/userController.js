@@ -5,6 +5,7 @@
 import * as userService from "../services/userService.js";
 import User from "../models/userModel.js";
 import { decrypt } from "../middleware/decryption.js";
+import { loadEffectivePermissions } from "../services/permissionService.js";
 
 /**
  * Retrieves user profile data by ID.
@@ -43,6 +44,7 @@ export const login = async (req, res) => {
   try {
     const { username, password } = req.body;
     const result = await userService.authenticateUser(username, password, req);
+    const permissions = await loadEffectivePermissions(result.user_id);
     res
       .cookie("token", result.token, {
         httpOnly: true,
@@ -74,9 +76,29 @@ export const login = async (req, res) => {
         secure: true,
         maxAge: 1000 * 60 * 60,
       })
-      .json(result);
-  } catch (error) {
+      .json({ ...result, permissions });
+  } catch {
     res.status(401).json({ error: "Invalid credentials" });
+  }
+};
+
+/**
+ * Returns the effective permission set for the authenticated caller.
+ * Consumed by the frontend to render UI conditionally (hasPermission helper).
+ * @param {import('express').Request} req - Express request (req.user populated by requirePermission)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} JSON { userId, role, permissions: string[] }
+ */
+export const getMyPermissions = async (req, res) => {
+  try {
+    const { user_id: userId, role } = req.user;
+    const codes = req.user.permissionSet instanceof Set
+      ? Array.from(req.user.permissionSet)
+      : await loadEffectivePermissions(userId);
+    return res.status(200).json({ userId, role, permissions: codes });
+  } catch (error) {
+    console.error("getMyPermissions error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -193,7 +215,7 @@ export const getUserWallet = async (req, res) => {
     };
 
     return res.status(200).json(formatted);
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: "Internal server error" });
   }
 };

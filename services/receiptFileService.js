@@ -5,7 +5,7 @@
  * Validates and parses CFDI XML before storage; UUID duplicado se valida contra cfdi_comprobantes.
  */
 import { ObjectId } from "mongodb";
-import { uploadFile, getFile, db, bucket } from "./fileStorage.js";
+import { uploadFile, getFile, bucket } from "./fileStorage.js";
 import prisma from "../database/config/prisma.js";
 import { parseCFDI, buildComprobanteRegistroBodyFromXml, CfdiParseError } from "./cfdiParserService.js";
 import CfdiModel from "../models/cfdiModel.js";

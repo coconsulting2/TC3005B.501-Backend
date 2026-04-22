@@ -37,9 +37,8 @@ const IMPUESTO_NOMBRES = {
  */
 export class CfdiParseError extends Error {
   /**
-   *
-   * @param message
-   * @param code
+   * @param {string} message Human-readable error message.
+   * @param {string} code Machine-readable error code.
    */
   constructor(message, code) {
     super(message);
@@ -230,7 +229,7 @@ export function parseCFDI(xmlString) {
   const taxes = extractTaxes(comprobante.Impuestos);
 
   const selloRaw = comprobante["@_Sello"] ?? null;
-  const sello = selloRaw != null && selloRaw !== "" ? String(selloRaw).trim() : null;
+  const sello = selloRaw !== null && selloRaw !== "" ? String(selloRaw).trim() : null;
 
   return {
     version,
@@ -407,13 +406,15 @@ export function buildComprobanteRegistroBodyFromXml(xmlString) {
     throw new CfdiParseError("UsoCFDI inválido", "INVALID_USO_CFDI");
   }
 
-  const selloRaw = comprobante["@_Sello"];
+  const selloRaw = comprobante["@_Sello"] ?? null;
   const selloEmisor =
-    selloRaw != null && String(selloRaw).trim().length >= 8 ? String(selloRaw).trim() : undefined;
+    selloRaw !== null && String(selloRaw).trim().length >= 8 ? String(selloRaw).trim() : undefined;
 
   const exportacion = (comprobante["@_Exportacion"] || "01").toString().trim();
-  const serie = comprobante["@_Serie"] != null ? String(comprobante["@_Serie"]).trim() : undefined;
-  const folio = comprobante["@_Folio"] != null ? String(comprobante["@_Folio"]).trim() : undefined;
+  const serieRaw = comprobante["@_Serie"] ?? null;
+  const serie = serieRaw !== null ? String(serieRaw).trim() : undefined;
+  const folioRaw = comprobante["@_Folio"] ?? null;
+  const folio = folioRaw !== null ? String(folioRaw).trim() : undefined;
 
   const fechaEmisionIso = new Date(fechaEmision).toISOString();
   let fechaTimbradoIso;

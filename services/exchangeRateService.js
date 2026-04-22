@@ -1,15 +1,14 @@
 import axios from "axios";
 import { MongoClient } from "mongodb";
 import fs from "fs";
-import path from "path";
 import https from "https";
 
 /**
- *
+ * Service for fetching and caching currency exchange rates from Wise and DOF.
  */
 class ExchangeRateService {
   /**
-   *
+   * Initializes API URLs, credentials, and certificate paths.
    */
   constructor() {
     // Handle test environment where MONGO_URI might be undefined
@@ -40,7 +39,8 @@ class ExchangeRateService {
   }
 
   /**
-   *
+   * Connects to MongoDB and caches the db handle.
+   * @returns {Promise<Object>} The connected MongoDB database instance.
    */
   async connectDB() {
     if (!this.db) {
@@ -51,7 +51,8 @@ class ExchangeRateService {
   }
 
   /**
-   *
+   * Creates an axios instance configured with mTLS client certificates.
+   * @returns {Object} A configured axios instance.
    */
   createAxiosInstance() {
     return axios.create({
@@ -65,7 +66,8 @@ class ExchangeRateService {
   }
 
   /**
-   *
+   * Retrieves a Wise OAuth access token, refreshing when near expiry.
+   * @returns {Promise<string>} The current bearer access token.
    */
   async getAccessToken() {
     try {
@@ -100,9 +102,10 @@ class ExchangeRateService {
   }
 
   /**
-   *
-   * @param source
-   * @param target
+   * Returns a cached exchange rate for today if available.
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @returns {Promise<Object|null>} Cached rate object or null if not cached.
    */
   async getCachedRate(source = "USD", target = "MXN") {
     try {
@@ -139,11 +142,12 @@ class ExchangeRateService {
   }
 
   /**
-   *
-   * @param source
-   * @param target
-   * @param rate
-   * @param dataSource
+   * Persists an exchange rate in the cache for today.
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @param {number} rate Exchange rate value.
+   * @param {string} dataSource Label for the rate provider (e.g. "Wise" or "DOF").
+   * @returns {Promise<void>}
    */
   async cacheRate(source, target, rate, dataSource) {
     try {
@@ -177,9 +181,10 @@ class ExchangeRateService {
   }
 
   /**
-   *
-   * @param source
-   * @param target
+   * Fetches a live exchange rate from the Wise API.
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @returns {Promise<Object>} Rate payload with rate, source, date, fromCache.
    */
   async getWiseRate(source = "USD", target = "MXN") {
     try {
@@ -211,17 +216,18 @@ class ExchangeRateService {
       }
     } catch (error) {
       console.error("Error fetching Wise rate:", error.response?.data || error.message);
-      console.log("Wise API not available, will use DOF fallback");
+      console.warn("Wise API not available, will use DOF fallback");
       throw error;
     }
   }
 
   /**
-   *
-   * @param source
-   * @param target
+   * Fetches a live USD/MXN rate from Banxico DOF.
+   * @param {string} _source Source currency (only USD currently supported).
+   * @param {string} _target Target currency (only MXN currently supported).
+   * @returns {Promise<Object>} Rate payload with rate, source, date, fromCache.
    */
-  async getDOFRate(source = "USD", target = "MXN") {
+  async getDOFRate(_source = "USD", _target = "MXN") {
     try {
       const response = await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos", {
         headers: {
@@ -250,9 +256,10 @@ class ExchangeRateService {
   }
 
   /**
-   *
-   * @param source
-   * @param target
+   * Returns an exchange rate, preferring cache, then Wise, then DOF.
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @returns {Promise<Object>} Rate payload.
    */
   async getExchangeRate(source = "USD", target = "MXN") {
     try {
@@ -265,11 +272,11 @@ class ExchangeRateService {
 
       try {
         rateData = await this.getWiseRate(source, target);
-      } catch (wiseError) {
-        console.log("Wise API failed, falling back to DOF");
+      } catch {
+        console.warn("Wise API failed, falling back to DOF");
         try {
           rateData = await this.getDOFRate(source, target);
-        } catch (dofError) {
+        } catch {
           throw new Error("Both Wise and DOF APIs failed");
         }
       }
@@ -283,10 +290,11 @@ class ExchangeRateService {
   }
 
   /**
-   *
-   * @param amount
-   * @param source
-   * @param target
+   * Converts an amount between two currencies using the current rate.
+   * @param {number} amount Amount expressed in the source currency.
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @returns {Promise<Object>} Conversion result including rate metadata.
    */
   async convertCurrency(amount, source = "USD", target = "MXN") {
     try {
@@ -310,7 +318,8 @@ class ExchangeRateService {
   }
 
   /**
-   *
+   * Returns the list of currencies supported by upstream providers.
+   * @returns {Promise<Array<Object>>} Array of currency descriptors.
    */
   async getSupportedCurrencies() {
     try {
@@ -336,13 +345,13 @@ class ExchangeRateService {
             symbol: currency.symbol,
             supportsDecimals: currency.supportsDecimals
           }));
-        } catch (wiseError) {
-          console.log("Wise currencies not available, using Banxico fallback");
+        } catch {
+          console.warn("Wise currencies not available, using Banxico fallback");
         }
       }
 
       // Fallback to Banxico catalog
-      const response = await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/catalogoSeries", {
+      await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/catalogoSeries", {
         headers: {
           "Bmx-Token": process.env.BANXICO_API_KEY,
           "Content-Type": "application/json"
@@ -373,11 +382,12 @@ class ExchangeRateService {
   }
 
   /**
-   *
-   * @param source
-   * @param target
-   * @param startDate
-   * @param endDate
+   * Returns historical USD/MXN rates between two dates from Banxico.
+   * @param {string} source Source currency code (only USD supported).
+   * @param {string} target Target currency code (only MXN supported).
+   * @param {string|Date} startDate Inclusive start date.
+   * @param {string|Date} endDate Inclusive end date.
+   * @returns {Promise<Array<Object>>} Array of { date, rate, source } entries.
    */
   async getRateHistory(source = "USD", target = "MXN", startDate, endDate) {
     try {
@@ -404,9 +414,9 @@ class ExchangeRateService {
             "Content-Type": "application/json"
           }
         });
-      } catch (error) {
+      } catch {
         // If main endpoint fails, try without date range (get all data)
-        console.log("Date range endpoint failed, trying full data endpoint");
+        console.warn("Date range endpoint failed, trying full data endpoint");
         response = await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos", {
           headers: {
             "Bmx-Token": process.env.BANXICO_API_KEY,

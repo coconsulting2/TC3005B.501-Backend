@@ -55,6 +55,7 @@ function getBucketName() {
  * @param {string|number} orgId
  * @param {string|number} viajeId
  * @param {string} fileName
+ * @param {string|number|null} [receiptId]
  * @returns {string}
  */
 function buildObjectKey(orgId, viajeId, fileName, receiptId) {
@@ -62,7 +63,8 @@ function buildObjectKey(orgId, viajeId, fileName, receiptId) {
   const safeViaje = String(viajeId).replace(/[^a-zA-Z0-9-_]/g, "");
   const base = path.basename(String(fileName) || "file").replace(/[^a-zA-Z0-9._-]/g, "_");
   const id = randomUUID();
-  const receiptRaw = receiptId != null && String(receiptId).trim() !== "" ? String(receiptId).trim() : "";
+  const receiptNormalized = receiptId ?? null;
+  const receiptRaw = receiptNormalized !== null && String(receiptNormalized).trim() !== "" ? String(receiptNormalized).trim() : "";
   const safeReceipt = receiptRaw.replace(/[^a-zA-Z0-9-_]/g, "");
   const mid = safeReceipt ? `${safeReceipt}/${id}` : id;
   return `${safeOrg}/${safeViaje}/${mid}/${base}`;

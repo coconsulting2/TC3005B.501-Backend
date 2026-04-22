@@ -26,7 +26,7 @@ export const getApplicantById = async (req, res) => {
       user_name: applicant.user_name,
     };
     res.json(applicantWithId);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -133,7 +133,7 @@ export const getCostCenterByUserId = async (req, res) => {
       });
     }
     res.json(costCenter);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -305,7 +305,7 @@ export const confirmDraftTravelRequest = async (req, res) => {
 
   try {
     const result = await Applicant.confirmDraftTravelRequest(userId, requestId);
-    const { user_email, user_name, request_id, status } = await mailData(requestId);
+    const { user_email, user_name, status } = await mailData(requestId);
     await Mail(user_email, user_name, requestId, status);
     return res.status(200).json(result);
   } catch (error) {
@@ -328,7 +328,7 @@ export const sendExpenseValidation = async (req, res) => {
 
   try {
     const result = await sendReceiptsForValidation(requestId);
-    const { user_email, user_name, request_id, status } = await mailData(requestId);
+    const { user_email, user_name, status } = await mailData(requestId);
     await Mail(user_email, user_name, requestId, status);
     return res.status(200).json(result);
   } catch (error) {

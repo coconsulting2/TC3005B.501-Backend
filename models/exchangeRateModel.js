@@ -1,11 +1,11 @@
 import { MongoClient } from "mongodb";
 
 /**
- *
+ * MongoDB-backed data access layer for exchange rates.
  */
 class ExchangeRateModel {
   /**
-   *
+   * Configures the MongoDB client using MONGO_URI.
    */
   constructor() {
     this.mongoClient = new MongoClient(process.env.MONGO_URI);
@@ -13,7 +13,8 @@ class ExchangeRateModel {
   }
 
   /**
-   *
+   * Connects to MongoDB and caches the db handle.
+   * @returns {Promise<Object>} Connected database instance.
    */
   async connectDB() {
     if (!this.db) {
@@ -24,7 +25,8 @@ class ExchangeRateModel {
   }
 
   /**
-   *
+   * Creates indexes on the exchange_rates collection.
+   * @returns {Promise<void>}
    */
   async createIndexes() {
     try {
@@ -41,8 +43,9 @@ class ExchangeRateModel {
   }
 
   /**
-   *
-   * @param rateData
+   * Upserts an exchange rate document.
+   * @param {Object} rateData Rate payload with source, target, date, rate, dataSource.
+   * @returns {Promise<Object>} MongoDB update result.
    */
   async saveExchangeRate(rateData) {
     try {
@@ -71,10 +74,11 @@ class ExchangeRateModel {
   }
 
   /**
-   *
-   * @param source
-   * @param target
-   * @param date
+   * Retrieves an exchange rate for a given date (today if omitted).
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @param {string|null} date ISO date string or null for today.
+   * @returns {Promise<Object|null>} Rate document or null.
    */
   async getExchangeRate(source, target, date = null) {
     try {
@@ -96,11 +100,12 @@ class ExchangeRateModel {
   }
 
   /**
-   *
-   * @param source
-   * @param target
-   * @param startDate
-   * @param endDate
+   * Returns rate documents within a date range, sorted ascending.
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @param {string} startDate Inclusive start ISO date.
+   * @param {string} endDate Inclusive end ISO date.
+   * @returns {Promise<Array<Object>>} Array of rate documents.
    */
   async getRateHistory(source, target, startDate, endDate) {
     try {
@@ -125,9 +130,10 @@ class ExchangeRateModel {
   }
 
   /**
-   *
-   * @param source
-   * @param target
+   * Returns today's rate documents, optionally filtered by source/target.
+   * @param {string|null} source Optional source currency code.
+   * @param {string|null} target Optional target currency code.
+   * @returns {Promise<Array<Object>>} Array of rate documents.
    */
   async getLatestRates(source = null, target = null) {
     try {
@@ -150,8 +156,9 @@ class ExchangeRateModel {
   }
 
   /**
-   *
-   * @param daysToKeep
+   * Deletes rate documents older than the retention window.
+   * @param {number} daysToKeep Number of most-recent days to keep.
+   * @returns {Promise<number>} Number of deleted documents.
    */
   async deleteOldRates(daysToKeep = 30) {
     try {
@@ -172,10 +179,11 @@ class ExchangeRateModel {
   }
 
   /**
-   *
-   * @param source
-   * @param target
-   * @param days
+   * Computes aggregate statistics for a source/target over a rolling window.
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @param {number} days Window length in days.
+   * @returns {Promise<Object|null>} Aggregation result or null if no data.
    */
   async getRateStatistics(source, target, days = 30) {
     try {
@@ -213,7 +221,8 @@ class ExchangeRateModel {
   }
 
   /**
-   *
+   * Closes the underlying MongoDB client.
+   * @returns {Promise<void>}
    */
   async close() {
     if (this.mongoClient) {

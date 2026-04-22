@@ -23,7 +23,7 @@ const getAlerts = async (req, res) => {
       return res.status(404).json({ error: "Not found" });
     }
     return res.status(200).json(userRequest);
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: "Internal server error" });
   }
 };

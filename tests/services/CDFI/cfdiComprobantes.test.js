@@ -54,6 +54,21 @@ await jest.unstable_mockModule("../../../models/comprobantesModel.js", () => ({
   },
 }));
 
+// The granular permission middleware queries the DB to resolve a user's effective
+// permission set. These tests mint JWTs with hand-picked roles for user_id=1, so
+// we stub the resolver to hand back a superset covering every permission the
+// endpoints under test require — no DB hit, no pollution across tests.
+await jest.unstable_mockModule("../../../services/permissionService.js", () => ({
+  loadEffectivePermissions: jest.fn().mockResolvedValue([
+    "receipt:upload",
+    "receipt:validate",
+    "travel_request:view_any",
+    "expense:view",
+    "expense:submit",
+    "user:view_self",
+  ]),
+}));
+
 const { default: ComprobantesModel } = await import("../../../models/comprobantesModel.js");
 const { default: AccountsPayable } = await import("../../../models/accountsPayableModel.js");
 const { consultarCfdiWithRetries } = await import("../../../services/satConsultaService.js");

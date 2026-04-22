@@ -45,7 +45,7 @@ const attendTravelRequest = async (req, res) => {
             return res.status(400).json({ error: "Failed to update travel request status" });
         }
 
-        const { user_email, user_name, request_id, status } = await mailData(requestId);
+        const { user_email, user_name, status } = await mailData(requestId);
         await Mail(user_email, user_name, requestId, status);
 
         return res.status(200).json({
@@ -71,7 +71,7 @@ const validateReceiptsHandler = async (req, res) => {
 
     try {
         const result = await AccountsPayableService.validateReceiptsAndUpdateStatus(requestId);
-        const { user_email, user_name, request_id, status } = await mailData(requestId);
+        const { user_email, user_name, status } = await mailData(requestId);
         await Mail(user_email, user_name, requestId, status);
         res.status(200).json(result);
     } catch (error) {
