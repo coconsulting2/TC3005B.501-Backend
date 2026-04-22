@@ -4,11 +4,11 @@ import fs from "fs";
 import https from "https";
 
 /**
- *
+ * Service for fetching and caching currency exchange rates from Wise and DOF.
  */
 class ExchangeRateService {
   /**
-   *
+   * Initializes API URLs, credentials, and certificate paths.
    */
   constructor() {
     // Handle test environment where MONGO_URI might be undefined
@@ -39,7 +39,8 @@ class ExchangeRateService {
   }
 
   /**
-   *
+   * Connects to MongoDB and caches the db handle.
+   * @returns {Promise<Object>} The connected MongoDB database instance.
    */
   async connectDB() {
     if (!this.db) {
@@ -50,7 +51,8 @@ class ExchangeRateService {
   }
 
   /**
-   *
+   * Creates an axios instance configured with mTLS client certificates.
+   * @returns {Object} A configured axios instance.
    */
   createAxiosInstance() {
     return axios.create({
@@ -64,7 +66,8 @@ class ExchangeRateService {
   }
 
   /**
-   *
+   * Retrieves a Wise OAuth access token, refreshing when near expiry.
+   * @returns {Promise<string>} The current bearer access token.
    */
   async getAccessToken() {
     try {
@@ -99,9 +102,10 @@ class ExchangeRateService {
   }
 
   /**
-   *
-   * @param source
-   * @param target
+   * Returns a cached exchange rate for today if available.
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @returns {Promise<Object|null>} Cached rate object or null if not cached.
    */
   async getCachedRate(source = "USD", target = "MXN") {
     try {
@@ -138,11 +142,12 @@ class ExchangeRateService {
   }
 
   /**
-   *
-   * @param source
-   * @param target
-   * @param rate
-   * @param dataSource
+   * Persists an exchange rate in the cache for today.
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @param {number} rate Exchange rate value.
+   * @param {string} dataSource Label for the rate provider (e.g. "Wise" or "DOF").
+   * @returns {Promise<void>}
    */
   async cacheRate(source, target, rate, dataSource) {
     try {
@@ -176,9 +181,10 @@ class ExchangeRateService {
   }
 
   /**
-   *
-   * @param source
-   * @param target
+   * Fetches a live exchange rate from the Wise API.
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @returns {Promise<Object>} Rate payload with rate, source, date, fromCache.
    */
   async getWiseRate(source = "USD", target = "MXN") {
     try {
@@ -217,6 +223,7 @@ class ExchangeRateService {
 
   /**
    * Tipo de cambio USD/MXN desde Banxico (serie SF43718).
+   * @returns {Promise<Object>} Rate payload with rate, source, date, fromCache.
    */
   async getDOFRate() {
     try {
@@ -247,9 +254,10 @@ class ExchangeRateService {
   }
 
   /**
-   *
-   * @param source
-   * @param target
+   * Returns an exchange rate, preferring cache, then Wise, then DOF.
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @returns {Promise<Object>} Rate payload.
    */
   async getExchangeRate(source = "USD", target = "MXN") {
     try {
@@ -280,10 +288,11 @@ class ExchangeRateService {
   }
 
   /**
-   *
-   * @param amount
-   * @param source
-   * @param target
+   * Converts an amount between two currencies using the current rate.
+   * @param {number} amount Amount expressed in the source currency.
+   * @param {string} source Source currency code.
+   * @param {string} target Target currency code.
+   * @returns {Promise<Object>} Conversion result including rate metadata.
    */
   async convertCurrency(amount, source = "USD", target = "MXN") {
     try {
@@ -307,7 +316,8 @@ class ExchangeRateService {
   }
 
   /**
-   *
+   * Returns the list of currencies supported by upstream providers.
+   * @returns {Promise<Array<Object>>} Array of currency descriptors.
    */
   async getSupportedCurrencies() {
     try {
@@ -370,11 +380,12 @@ class ExchangeRateService {
   }
 
   /**
-   *
-   * @param source
-   * @param target
-   * @param startDate
-   * @param endDate
+   * Returns historical USD/MXN rates between two dates from Banxico.
+   * @param {string} source Source currency code (only USD supported).
+   * @param {string} target Target currency code (only MXN supported).
+   * @param {string|Date} startDate Inclusive start date.
+   * @param {string|Date} endDate Inclusive end date.
+   * @returns {Promise<Array<Object>>} Array of { date, rate, source } entries.
    */
   async getRateHistory(source = "USD", target = "MXN", startDate, endDate) {
     try {
