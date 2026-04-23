@@ -89,4 +89,4 @@ jobs:
           MAIL_PASSWORD: changeme
           NODE_OPTIONS: --experimental-vm-modules
           PRISMA_DISABLE_TRIGGERS: true
-        run: bun run test:e2e
+        run: bun run test:e2e --forceExit
