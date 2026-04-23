@@ -128,6 +128,17 @@ class ExchangeRateController {
         message: `Rate history from ${source} to ${target} retrieved successfully`
       });
     } catch (error) {
+      if (
+        error.message.includes("YYYY-MM-DD")
+        || error.message.includes("startDate must be before or equal to endDate")
+        || error.message.includes("Historical rates only available for USD to MXN")
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+
       console.error("Error in getRateHistory controller:", error);
       res.status(500).json({
         success: false,
@@ -189,10 +200,18 @@ class ExchangeRateController {
         .isLength({ min: 3, max: 3 })
         .withMessage("Target currency must be a 3-letter code"),
       query("startDate")
-        .isISO8601()
+        .trim()
+        .matches(/^\d{4}-\d{2}-\d{2}$/)
+        .withMessage("Start date must use YYYY-MM-DD format")
+        .bail()
+        .isISO8601({ strict: true, strictSeparator: true })
         .withMessage("Start date must be a valid date"),
       query("endDate")
-        .isISO8601()
+        .trim()
+        .matches(/^\d{4}-\d{2}-\d{2}$/)
+        .withMessage("End date must use YYYY-MM-DD format")
+        .bail()
+        .isISO8601({ strict: true, strictSeparator: true })
         .withMessage("End date must be a valid date")
     ];
   }
