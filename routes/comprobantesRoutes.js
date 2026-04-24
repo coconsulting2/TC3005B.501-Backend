@@ -5,7 +5,7 @@
  */
 import express from "express";
 const router = express.Router();
-import { crearComprobante } from "../controllers/comprobantesController.js";
+import { crearComprobante, getValidacionSat } from "../controllers/comprobantesController.js";
 import { validateId, validateCfdi, validateInputs } from "../middleware/validation.js";
 import { requireAuth } from "../middleware/authMiddleware.js";
 import { generalRateLimiter } from "../middleware/rateLimiters.js";
@@ -20,6 +20,16 @@ router.route("/:receipt_id")
     validateCfdi,
     validateInputs,
     crearComprobante
+  );
+
+// GET /api/comprobantes/:id/validacion-sat
+router.route("/:id/validacion-sat")
+  .get(
+    generalRateLimiter,
+    ...requireAuth(["Solicitante", "N1", "N2", "Cuentas por pagar"]),
+    validateId,
+    validateInputs,
+    getValidacionSat,
   );
 
 export default router;

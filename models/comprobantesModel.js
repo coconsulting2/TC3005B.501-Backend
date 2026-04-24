@@ -26,6 +26,21 @@ const ComprobantesModel = {
   },
 
   /**
+   * Obtiene el ultimo estado SAT del CFDI ligado al recibo.
+   * @param {number} receiptId
+   * @returns {Promise<{satEstado: string, createdAt: Date}|null>}
+   */
+  async getSatValidationByReceiptId(receiptId) {
+    return prisma.cfdiComprobante.findUnique({
+      where: { receiptId: Number(receiptId) },
+      select: {
+        satEstado: true,
+        createdAt: true,
+      },
+    });
+  },
+
+  /**
    * Actualiza solo los campos de acuse SAT para el CFDI ligado al recibo.
    * @param {number} receiptId
    * @param {Object} data - sat_codigo_estatus, sat_estado, sat_es_cancelable, sat_estatus_cancelacion, sat_validacion_efos
