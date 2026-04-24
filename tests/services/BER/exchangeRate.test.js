@@ -1,9 +1,24 @@
+/**
+ * @file tests/services/BER/exchangeRate.test.js
+ * @description Unit tests for exchange-rate service orchestration and conversion behavior.
+ */
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
-import exchangeRateService from "../services/exchangeRateService.js";
+import axios from "axios";
+import exchangeRateService from "../../../services/exchangeRateService.js";
+
+/**
+ * @typedef {Object} ExchangeRateResult
+ * @property {number} rate
+ * @property {string} source
+ * @property {string} date
+ * @property {boolean} fromCache
+ */
 
 describe("ExchangeRateService", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.BMX_API_URL = "https://banxico.example.test/api";
+    process.env.BANXICO_API_KEY = "test-token";
   });
 
   describe("getExchangeRate", () => {
@@ -58,7 +73,7 @@ describe("ExchangeRateService", () => {
       const result = await exchangeRateService.getExchangeRate("USD", "MXN");
 
       expect(result).toEqual(mockDOFRate);
-      expect(exchangeRateService.getDOFRate).toHaveBeenCalledWith();
+      expect(exchangeRateService.getDOFRate).toHaveBeenCalledWith("USD", "MXN");
       expect(exchangeRateService.cacheRate).toHaveBeenCalledWith("USD", "MXN", 17.6, "DOF");
     });
 
@@ -94,6 +109,38 @@ describe("ExchangeRateService", () => {
         rateDate: "2026-04-13",
         fromCache: false
       });
+    });
+  });
+
+  describe("getRateHistory", () => {
+    it("rejects non-YYYY-MM-DD date input before making outbound request", async () => {
+      const axiosGetSpy = jest.spyOn(axios, "get").mockResolvedValue({ data: {} });
+
+      await expect(
+        exchangeRateService.getRateHistory("USD", "MXN", "2026-04-01/../../secret", "2026-04-10")
+      ).rejects.toThrow("startDate must use YYYY-MM-DD format");
+
+      expect(axiosGetSpy).not.toHaveBeenCalled();
+    });
+
+    it("constructs history endpoint URL from trusted segments", async () => {
+      const axiosGetSpy = jest.spyOn(axios, "get").mockResolvedValue({
+        data: {
+          bmx: {
+            series: [{ datos: [{ fecha: "01/04/2026", dato: "17.80" }] }]
+          }
+        }
+      });
+
+      await exchangeRateService.getRateHistory("USD", "MXN", "2026-04-01", "2026-04-10");
+
+      expect(axiosGetSpy).toHaveBeenCalledTimes(1);
+      expect(axiosGetSpy).toHaveBeenCalledWith(
+        "https://banxico.example.test/api/series/SF43718/datos/2026-04-01/2026-04-10",
+        expect.objectContaining({
+          headers: expect.objectContaining({ "Bmx-Token": "test-token" })
+        })
+      );
     });
   });
 });

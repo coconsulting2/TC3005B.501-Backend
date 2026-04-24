@@ -36,6 +36,7 @@ export default [
                 clearInterval: "readonly",
                 URL: "readonly",
                 URLSearchParams: "readonly",
+                global: "readonly",
                 atob: "readonly",
                 btoa: "readonly",
                 crypto: "readonly",
