@@ -22,12 +22,11 @@ import {
 const MXN = "MXN";
 
 /**
- *
+ * Error thrown when a required resource is missing (HTTP 404).
  */
 class NotFoundError extends Error {
     /**
-     *
-     * @param message
+     * @param {string} message Human-readable error message.
      */
     constructor(message) {
         super(message);
@@ -36,12 +35,11 @@ class NotFoundError extends Error {
 }
 
 /**
- *
+ * Error thrown when the request conflicts with current state (HTTP 409).
  */
 class ConflictError extends Error {
     /**
-     *
-     * @param message
+     * @param {string} message Human-readable error message.
      */
     constructor(message) {
         super(message);
