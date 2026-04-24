@@ -1,0 +1,660 @@
+openapi: 3.0.3
+info:
+  title: CocoAPI - Modulo 1
+  version: 1.0.0
+  description: |
+    Documentacion de endpoints del Modulo 1.
+    Incluye endpoints implementados y un endpoint planificado (no implementado aun)
+    para validacion SAT de CFDI.
+servers:
+  - url: https://localhost:3000
+    description: Local HTTPS
+tags:
+  - name: Comprobantes
+  - name: TipoCambio
+  - name: Viajes
+  - name: ExportContable
+paths:
+  /api/comprobantes/{receipt_id}:
+    post:
+      tags: [Comprobantes]
+      summary: Crear comprobante CFDI para un recibo
+      description: |
+        Inserta un CFDI asociado a un `receipt_id`, valida formato, UUID duplicado y estado SAT.
+        Requiere autenticacion con rol `Solicitante`, `N1` o `N2`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/ReceiptId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CfdiCreateRequest"
+            example:
+              uuid: "550e8400-e29b-41d4-a716-446655440000"
+              fecha_timbrado: "2026-04-09T10:05:00"
+              rfc_pac: "SAT970701NN3"
+              version: "4.0"
+              serie: "A"
+              folio: "12345"
+              fecha_emision: "2026-04-09T10:00:00"
+              tipo_comprobante: "I"
+              lugar_expedicion: "64000"
+              exportacion: "01"
+              metodo_pago: "PUE"
+              forma_pago: "03"
+              moneda: "MXN"
+              tipo_cambio: 1
+              subtotal: 1000
+              iva: 160
+              total: 1160
+              rfc_emisor: "AAA010101AAA"
+              nombre_emisor: "EMPRESA EJEMPLO S.A. DE C.V."
+              regimen_fiscal_emisor: "601"
+              rfc_receptor: "COSC8001137NA"
+              nombre_receptor: "CLIENTE EJEMPLO S.A. DE C.V."
+              domicilio_fiscal_receptor: "64000"
+              regimen_fiscal_receptor: "601"
+              uso_cfdi: "G03"
+              sello_emisor: "0123456789ABCDEF0123456789ABCDEF"
+      responses:
+        "201":
+          description: CFDI creado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CfdiCreateResponse"
+        "400":
+          description: Datos invalidos o receipt no ligado a solicitud
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/ValidationErrorResponse"
+                  - $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                validation:
+                  value:
+                    errors:
+                      - msg: "uuid debe ser UUID valido (Folio Fiscal del SAT)"
+                        path: "uuid"
+                receiptWithoutRequest:
+                  value:
+                    error: "El recibo no esta ligado a una solicitud de viaje"
+        "401":
+          description: Token ausente o invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "403":
+          description: Rol no permitido o politica de carga no valida
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/AuthErrorResponse"
+                  - $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Receipt no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Receipt 1 not found"
+        "409":
+          description: Conflicto SAT, EFOS o UUID duplicado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                cancelado:
+                  value:
+                    error: "El CFDI no puede registrarse: estado SAT es \"Cancelado\""
+                efos:
+                  value:
+                    error: "El RFC Emisor AAA010101AAA esta en la lista EFOS (codigo 100). Ver Art. 69-B CFF."
+                duplicatedUuid:
+                  value:
+                    error: "El UUID 550e8400-e29b-41d4-a716-446655440000 ya fue registrado (cfdi_id: 99)"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Servicio SAT no disponible
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/comprobantes/{id}/validacion-sat:
+    get:
+      tags: [Comprobantes]
+      summary: Endpoint planificado de consulta SAT por comprobante
+      description: |
+        Este endpoint se documenta para trazabilidad de M1, pero actualmente NO esta implementado
+        en el backend.
+
+        Estado actual:
+        - La validacion SAT activa se ejecuta en el flujo de aprobacion:
+          `PUT /api/accounts-payable/validate-receipt/{receipt_id}`.
+      deprecated: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "501":
+          description: No implementado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Endpoint pendiente de implementacion"
+
+  /api/exchange-rate/rate:
+    get:
+      tags: [TipoCambio]
+      summary: Obtener tipo de cambio entre monedas
+      description: Retorna tipo de cambio actual (cache, Wise o DOF/Banxico).
+      parameters:
+        - name: source
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 3
+            default: USD
+        - name: target
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 3
+            default: MXN
+      responses:
+        "200":
+          description: Tipo de cambio obtenido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExchangeRateResponse"
+              example:
+                success: true
+                data:
+                  rate: 17.23
+                  source: "DOF"
+                  date: "22/04/2026"
+                  fromCache: false
+                message: "Exchange rate from USD to MXN retrieved successfully"
+        "400":
+          description: Parametros invalidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+        "500":
+          description: Error al obtener tipo de cambio
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExchangeRateErrorResponse"
+
+  /api/viajes/{id}/resumen-tramos:
+    get:
+      tags: [Viajes]
+      summary: Obtener resumen consolidado por tramos de un viaje
+      description: |
+        Retorna el desglose de comprobantes por tramo y total general de un viaje.
+        Requiere autenticacion con rol `Solicitante`, `N1`, `N2` o `Cuentas por pagar`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Resumen obtenido correctamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResumenTramosResponse"
+        "400":
+          description: ID de viaje invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+        "401":
+          description: Token ausente o invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "403":
+          description: Sin permisos para consultar resumen
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "404":
+          description: Viaje no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Viaje no encontrado"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/accounts-payable/accounting-export:
+    get:
+      tags: [ExportContable]
+      summary: Exportar polizas contables por rango de fechas
+      description: |
+        Exporta polizas para solicitudes finalizadas en un rango [from, to].
+        Requiere rol `Cuentas por pagar`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [json, xml]
+      responses:
+        "200":
+          description: Exportacion exitosa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolizasResponse"
+            application/xml:
+              schema:
+                type: string
+        "400":
+          description: Parametros `from/to` invalidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingDates:
+                  value:
+                    error: "Query params 'from' and 'to' (YYYY-MM-DD) are required"
+                badRange:
+                  value:
+                    error: "'from' must be on or before 'to'"
+        "401":
+          description: Token ausente o invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "403":
+          description: Rol no permitido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/accounts-payable/accounting-export/{request_id}:
+    get:
+      tags: [ExportContable]
+      summary: Exportar polizas contables de una solicitud
+      description: |
+        Exporta polizas de una solicitud especifica. Requiere rol `Cuentas por pagar`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [json, xml]
+      responses:
+        "200":
+          description: Exportacion exitosa
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolizasResponse"
+            application/xml:
+              schema:
+                type: string
+        "401":
+          description: Token ausente o invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "403":
+          description: Rol no permitido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "404":
+          description: Solicitud no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Solicitud no finalizada para exportacion
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ReceiptId:
+      name: receipt_id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    AuthErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        error:
+          type: string
+      required: [statusCode, message, error]
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              msg:
+                type: string
+              path:
+                type: string
+      required: [errors]
+
+    CfdiCreateRequest:
+      type: object
+      required:
+        - uuid
+        - fecha_timbrado
+        - rfc_pac
+        - fecha_emision
+        - tipo_comprobante
+        - lugar_expedicion
+        - metodo_pago
+        - forma_pago
+        - moneda
+        - subtotal
+        - total
+        - rfc_emisor
+        - nombre_emisor
+        - regimen_fiscal_emisor
+        - rfc_receptor
+        - nombre_receptor
+        - domicilio_fiscal_receptor
+        - regimen_fiscal_receptor
+        - uso_cfdi
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        fecha_timbrado:
+          type: string
+          format: date-time
+        rfc_pac:
+          type: string
+        version:
+          type: string
+          enum: ["3.3", "4.0"]
+        serie:
+          type: string
+        folio:
+          type: string
+        fecha_emision:
+          type: string
+          format: date-time
+        tipo_comprobante:
+          type: string
+          enum: ["I", "E", "T", "P", "N"]
+        lugar_expedicion:
+          type: string
+        exportacion:
+          type: string
+          enum: ["01", "02", "03", "04"]
+        metodo_pago:
+          type: string
+          enum: ["PUE", "PPD"]
+        forma_pago:
+          type: string
+        moneda:
+          type: string
+        tipo_cambio:
+          type: number
+        subtotal:
+          type: number
+        descuento:
+          type: number
+        iva:
+          type: number
+        total:
+          type: number
+        rfc_emisor:
+          type: string
+        nombre_emisor:
+          type: string
+        regimen_fiscal_emisor:
+          type: string
+        rfc_receptor:
+          type: string
+        nombre_receptor:
+          type: string
+        domicilio_fiscal_receptor:
+          type: string
+        regimen_fiscal_receptor:
+          type: string
+        uso_cfdi:
+          type: string
+        sello_emisor:
+          type: string
+
+    CfdiCreateResponse:
+      type: object
+      properties:
+        cfdiId:
+          type: integer
+        receiptId:
+          type: integer
+        uuid:
+          type: string
+        satEstado:
+          type: string
+        satValidacionEfos:
+          type: string
+
+    ExchangeRateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            rate:
+              type: number
+            source:
+              type: string
+            date:
+              type: string
+            fromCache:
+              type: boolean
+        message:
+          type: string
+      required: [success, data, message]
+
+    ExchangeRateErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        error:
+          type: string
+      required: [success, message, error]
+
+    ResumenTramosResponse:
+      type: object
+      properties:
+        viaje_id:
+          type: integer
+        tramos:
+          type: array
+          items:
+            type: object
+            properties:
+              tramo_id:
+                type: integer
+                nullable: true
+              router_index:
+                type: integer
+                nullable: true
+              origin_country:
+                type: string
+                nullable: true
+              origin_city:
+                type: string
+                nullable: true
+              destination_country:
+                type: string
+                nullable: true
+              destination_city:
+                type: string
+                nullable: true
+              beginning_date:
+                type: string
+                nullable: true
+              ending_date:
+                type: string
+                nullable: true
+              comprobantes:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    gasto_tramo_id:
+                      type: integer
+                    receipt_id:
+                      type: integer
+                    receipt_type:
+                      type: string
+                      nullable: true
+                    amount:
+                      type: number
+                    validation:
+                      type: string
+                      nullable: true
+                    submission_date:
+                      type: string
+                      nullable: true
+              total_tramo:
+                type: number
+        total_general:
+          type: number
+      required: [viaje_id, tramos, total_general]
+
+    Poliza:
+      type: object
+      properties:
+        header:
+          type: object
+          additionalProperties: true
+        detalles:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      required: [header, detalles]
+
+    PolizasResponse:
+      type: object
+      properties:
+        polizas:
+          type: array
+          items:
+            $ref: "#/components/schemas/Poliza"
+      required: [polizas]

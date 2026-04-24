@@ -89,6 +89,7 @@ export class InsufficientPermissionsError extends AuthError {
  * @param {import("express").Request} req - Express request
  * @param {import("express").Response} res - Express response
  * @param {import("express").NextFunction} next - Express next function
+ * @returns {import("express").Response|void}
  */
 export const handleAuthError = (err, req, res, next) => {
   if (err instanceof AuthError) {

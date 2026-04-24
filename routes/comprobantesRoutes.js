@@ -7,15 +7,15 @@ import express from "express";
 const router = express.Router();
 import { crearComprobante } from "../controllers/comprobantesController.js";
 import { validateId, validateCfdi, validateInputs } from "../middleware/validation.js";
-import { requireAuth } from "../middleware/authMiddleware.js";
+import { requirePermission } from "../middleware/permissionMiddleware.js";
 import { generalRateLimiter } from "../middleware/rateLimiters.js";
 
 // POST /api/comprobantes/:receipt_id
-// Roles: Solicitante, N1, N2 (quienes generan comprobaciones de gastos)
+// Permission: receipt:upload (granted to Solicitante, N1, N2)
 router.route("/:receipt_id")
   .post(
     generalRateLimiter,
-    ...requireAuth(["Solicitante", "N1", "N2"]),
+    ...requirePermission("receipt:upload"),
     validateId,
     validateCfdi,
     validateInputs,

@@ -2,13 +2,14 @@ import exchangeRateService from "../services/exchangeRateService.js";
 import { body, query, validationResult } from "express-validator";
 
 /**
- *
+ * HTTP controller for exchange-rate endpoints.
  */
 class ExchangeRateController {
   /**
-   *
-   * @param req
-   * @param res
+   * GET endpoint returning the current exchange rate.
+   * @param {Object} req Express request.
+   * @param {Object} res Express response.
+   * @returns {Promise<void>}
    */
   async getExchangeRate(req, res) {
     try {
@@ -27,7 +28,14 @@ class ExchangeRateController {
         message: `Exchange rate from ${source} to ${target} retrieved successfully`
       });
     } catch (error) {
-      console.error("Error in getExchangeRate controller:", error);
+      if (/CODE: 62$/.test(error.message.split("|").at(0))) {
+        res.status(400).json({
+          success: false,
+          errors: error
+        });
+        return;
+      }
+
       res.status(500).json({
         success: false,
         message: "Failed to retrieve exchange rate",
@@ -37,9 +45,10 @@ class ExchangeRateController {
   }
 
   /**
-   *
-   * @param req
-   * @param res
+   * POST endpoint converting an amount between two currencies.
+   * @param {Object} req Express request.
+   * @param {Object} res Express response.
+   * @returns {Promise<void>}
    */
   async convertCurrency(req, res) {
     try {
@@ -72,9 +81,10 @@ class ExchangeRateController {
   }
 
   /**
-   *
-   * @param req
-   * @param res
+   * GET endpoint returning the list of supported currencies.
+   * @param {Object} req Express request.
+   * @param {Object} res Express response.
+   * @returns {Promise<void>}
    */
   async getSupportedCurrencies(req, res) {
     try {
@@ -96,9 +106,10 @@ class ExchangeRateController {
   }
 
   /**
-   *
-   * @param req
-   * @param res
+   * GET endpoint returning historical exchange rates.
+   * @param {Object} req Express request.
+   * @param {Object} res Express response.
+   * @returns {Promise<void>}
    */
   async getRateHistory(req, res) {
     try {
@@ -117,6 +128,17 @@ class ExchangeRateController {
         message: `Rate history from ${source} to ${target} retrieved successfully`
       });
     } catch (error) {
+      if (
+        error.message.includes("YYYY-MM-DD")
+        || error.message.includes("startDate must be before or equal to endDate")
+        || error.message.includes("Historical rates only available for USD to MXN")
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+
       console.error("Error in getRateHistory controller:", error);
       res.status(500).json({
         success: false,
@@ -127,7 +149,8 @@ class ExchangeRateController {
   }
 
   /**
-   *
+   * Returns express-validator chain for the exchange-rate query params.
+   * @returns {Array} Validation middleware chain.
    */
   validateExchangeRate() {
     return [
@@ -143,7 +166,8 @@ class ExchangeRateController {
   }
 
   /**
-   *
+   * Returns express-validator chain for the currency conversion body.
+   * @returns {Array} Validation middleware chain.
    */
   validateCurrencyConversion() {
     return [
@@ -162,7 +186,8 @@ class ExchangeRateController {
   }
 
   /**
-   *
+   * Returns express-validator chain for the rate-history query params.
+   * @returns {Array} Validation middleware chain.
    */
   validateRateHistory() {
     return [
@@ -175,10 +200,18 @@ class ExchangeRateController {
         .isLength({ min: 3, max: 3 })
         .withMessage("Target currency must be a 3-letter code"),
       query("startDate")
-        .isISO8601()
+        .trim()
+        .matches(/^\d{4}-\d{2}-\d{2}$/)
+        .withMessage("Start date must use YYYY-MM-DD format")
+        .bail()
+        .isISO8601({ strict: true, strictSeparator: true })
         .withMessage("Start date must be a valid date"),
       query("endDate")
-        .isISO8601()
+        .trim()
+        .matches(/^\d{4}-\d{2}-\d{2}$/)
+        .withMessage("End date must use YYYY-MM-DD format")
+        .bail()
+        .isISO8601({ strict: true, strictSeparator: true })
         .withMessage("End date must be a valid date")
     ];
   }

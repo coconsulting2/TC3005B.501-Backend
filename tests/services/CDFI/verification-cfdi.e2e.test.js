@@ -115,6 +115,58 @@ async function seedReceiptWithCfdi(invoice) {
     return receipt;
 }
 
+/**
+ * Recreates the minimum auth state that the granular permission middleware
+ * needs after `resetPostgres()` wipes every table:
+ *  - A Role "Cuentas por pagar" (role the test JWT claims).
+ *  - A User with the same user_id the JWT uses (default: 1 from createTestJWT).
+ *  - A Permission "receipt:validate" granted to that role.
+ *
+ * Without this, `requirePermission("receipt:validate")` correctly rejects the
+ * request with 403 because the user resolved from the JWT has no effective
+ * permission set in the empty DB.
+ *
+ * @param {number} userId - user_id embedded in the test JWT (default 1).
+ */
+async function seedAuthForAccountsPayable(userId = 1) {
+    const role = await prisma.role.upsert({
+        where: { roleName: "Cuentas por pagar" },
+        update: {},
+        create: { roleName: "Cuentas por pagar" },
+    });
+
+    // Receipt.validate is the permission /validate-receipt is gated on.
+    const perm = await prisma.permission.upsert({
+        where: { code: "receipt:validate" },
+        update: {},
+        create: {
+            code: "receipt:validate",
+            resource: "receipt",
+            action: "validate",
+            description: "Validate receipts (accounts payable)",
+        },
+    });
+
+    await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: role.roleId, permissionId: perm.permissionId } },
+        update: {},
+        create: { roleId: role.roleId, permissionId: perm.permissionId },
+    });
+
+    await prisma.user.upsert({
+        where: { userId },
+        update: { roleId: role.roleId },
+        create: {
+            userId,
+            roleId: role.roleId,
+            userName: `test-user-${userId}`,
+            password: "test",
+            workstation: "test",
+            email: `test-${userId}@example.com`,
+        },
+    });
+}
+
 describe("CDFI Verification service", () => {
     beforeAll(async () => {
         await setupDBs();
@@ -125,6 +177,7 @@ describe("CDFI Verification service", () => {
         await mutedConsoleLogs(async () => {
             await resetMongo();
             await resetPostgres();
+            await seedAuthForAccountsPayable();
         });
     }, 5_000);
 
