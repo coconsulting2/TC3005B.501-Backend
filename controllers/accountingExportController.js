@@ -26,6 +26,7 @@ const resolveFormat = (req) => {
  * @param {import('express').Response} res
  * @param {Array<Object>} polizas
  * @param {'xml'|'json'} format
+ * @returns {import('express').Response}
  */
 const sendPolizas = (res, polizas, format) => {
     if (format === "xml") {
@@ -39,6 +40,7 @@ const sendPolizas = (res, polizas, format) => {
  * Exporta polizas contables para un Request finalizado.
  * @param {import('express').Request} req
  * @param {import('express').Response} res
+ * @returns {Promise<import('express').Response>}
  */
 const exportByRequest = async (req, res) => {
     const requestId = Number(req.params.request_id);
@@ -63,6 +65,7 @@ const exportByRequest = async (req, res) => {
  * Exporta polizas contables de todos los Requests finalizados en un rango [from, to].
  * @param {import('express').Request} req
  * @param {import('express').Response} res
+ * @returns {Promise<import('express').Response>}
  */
 const exportByRange = async (req, res) => {
     const { from, to } = req.query;

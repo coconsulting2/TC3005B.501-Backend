@@ -97,13 +97,18 @@ services:
       - cocoscheme
 
   # One-shot: install deps into the shared volume, generate the Prisma client,
-  # apply the schema, and (only on first run) seed reference + dummy data.
+  # apply the schema, and seed.
   #
-  # Seeding is gated on a sentinel file inside the node_modules_dev named volume
-  # so it persists across `up`/`down`/reboots. The seed inserts dummy Requests,
-  # Routes and Receipts via plain `create` (no idempotency check), so re-running
-  # it would duplicate them. To force a full re-seed run `bun run docker:dev:clean`
-  # which removes all volumes (including the sentinel and pgdata).
+  # Seeding policy:
+  #  - Reference data (roles, request statuses, receipt types, PERMISSIONS and
+  #    permission groups) is idempotent (upsert + skipDuplicates). It runs on
+  #    EVERY `up` so that when a teammate adds a new permission to
+  #    prisma/seed.js, their PR lands automatically on other devs' machines
+  #    without a manual `docker:dev:clean`.
+  #  - Dummy data (Requests, Routes, Receipts via plain `create`) is NOT
+  #    idempotent. It is gated by a sentinel file inside the node_modules_dev
+  #    volume so it only runs on first boot. To force a full re-seed run
+  #    `bun run docker:dev:clean` which removes all volumes.
   #
   # IMPORTANT: env vars below are HARDCODED dev defaults. Compose's
   # ${VAR:-default} substitution reads from the host .env file, which is
@@ -126,11 +131,12 @@ services:
              bunx prisma generate &&
              bunx prisma db push --accept-data-loss &&
              if [ ! -f /app/node_modules/.seeded ]; then
-               echo '[migrate] First run — seeding dummy data...' &&
+               echo '[migrate] First run — seeding reference data + dummy data...' &&
                node prisma/seed.js dev &&
                touch /app/node_modules/.seeded;
              else
-               echo '[migrate] Seed sentinel found — skipping seed (use docker:dev:clean for a full reset).';
+               echo '[migrate] Re-applying reference seed (idempotent — permissions, roles, statuses)...' &&
+               node prisma/seed.js;
              fi"
     depends_on:
       postgres:
