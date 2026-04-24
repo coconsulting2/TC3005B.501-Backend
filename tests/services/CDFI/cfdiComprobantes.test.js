@@ -63,6 +63,7 @@ await jest.unstable_mockModule("../../../services/permissionService.js", () => (
   loadEffectivePermissions: jest.fn().mockResolvedValue([
     "receipt:upload",
     "receipt:validate",
+    "receipt:view_sat",
     "travel_request:view_any",
     "expense:view",
     "expense:submit",

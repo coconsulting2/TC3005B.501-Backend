@@ -23,10 +23,11 @@ router.route("/:receipt_id")
   );
 
 // GET /api/comprobantes/:id/validacion-sat
+// Permission: receipt:view_sat (granted to Solicitante, N1, N2, Cuentas por pagar)
 router.route("/:id/validacion-sat")
   .get(
     generalRateLimiter,
-    ...requireAuth(["Solicitante", "N1", "N2", "Cuentas por pagar"]),
+    ...requirePermission("receipt:view_sat"),
     validateId,
     validateInputs,
     getValidacionSat,
