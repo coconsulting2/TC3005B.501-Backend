@@ -3,6 +3,7 @@ import '@styles/global.css'
 import PageHeader from "@components/PageHeader.astro";
 import SideBar from "@components/Sidebar.astro";
 import Messages from "@/components/Messages.astro"
+import AppAlertHost from "@components/AppAlertHost.tsx";
 import type { UserRole } from "@type/roles";
 
 interface Props {
@@ -67,6 +68,8 @@ const { title, data, showMessages = false } = Astro.props;
       menuBtn?.addEventListener('click', () => { sidebar?.classList.toggle('open'); overlay?.classList.toggle('open'); });
       overlay?.addEventListener('click', () => { sidebar?.classList.remove('open'); overlay?.classList.remove('open'); });
     </script>
+
+    <AppAlertHost client:load />
 
     <style>
       #app {

@@ -1,6 +1,7 @@
 import React from "react";
 import Button from "@components/Button";
 import { apiRequest } from "@utils/apiClient";
+import { showAppAlert, showAppAlertAsync } from "@utils/appAlert";
 
 interface Props {
   requestId: number;
@@ -9,7 +10,7 @@ interface Props {
 }
 
 export default function FinishRequestButton({ requestId, redirectTo = "/dashboard", token}: Props) {
-  const handleClick = async () => {
+  const handleClick = async (): Promise<void> => {
     try {
       // Puedes cambiar el método y la lógica según lo que quieras hacer
       await apiRequest(`/accounts-payable/validate-receipts/${requestId}`, { 
@@ -17,11 +18,11 @@ export default function FinishRequestButton({ requestId, redirectTo = "/dashboar
       headers: { Authorization: `Bearer ${token}` } 
     });
 
-      alert("Solicitud finalizada correctamente");
+      await showAppAlertAsync("Solicitud finalizada correctamente", { variant: "success" });
       window.location.href = redirectTo;
     } catch (error) {
       console.error("Error al finalizar la solicitud", error);
-      alert("Error al finalizar la solicitud.");
+      showAppAlert("Error al finalizar la solicitud.", { variant: "error" });
     }
   };
 

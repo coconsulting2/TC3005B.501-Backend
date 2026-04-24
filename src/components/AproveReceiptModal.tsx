@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { apiRequest } from "@utils/apiClient";
 import ModalWrapper from "@components/ModalWrapper";
+import { showAppAlertAsync } from "@utils/appAlert";
 
 interface Props {
   receipt_id: number;
@@ -27,7 +28,7 @@ export default function ValidateReceiptStatus({
     try {
       const url = `/accounts-payable/validate-receipt/${receipt_id}`;
       await apiRequest(url, { method: "PUT", data: {"approval": 1}, headers: { Authorization: `Bearer ${token}` }});
-      alert(`Comprobante enviado exitosamente.`)
+      await showAppAlertAsync("Comprobante enviado exitosamente.", { variant: "success" });
 
       if (redirection) {
         window.location.href = redirection;

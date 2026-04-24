@@ -1,5 +1,6 @@
 ---
 import '@styles/global.css'
+import AppAlertHost from "@components/AppAlertHost.tsx";
 
 interface Props {
   title: string;
@@ -22,6 +23,7 @@ const { title } = Astro.props;
 	</head>
 	<body class="bg-[var(--color-surface)]">
 		<slot />
+		<AppAlertHost client:load />
 	</body>
 </html>
 

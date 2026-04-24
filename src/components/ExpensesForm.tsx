@@ -7,6 +7,7 @@ import { submitTravelExpense } from "@components/SubmitTravelWarper";
 import ModalWrapper from "@components/ModalWrapper.tsx";
 import { apiRequest } from "@utils/apiClient";
 import { extractCfdiUuidFromXml } from "@utils/cfdiXml";
+import { showAppAlert } from "@utils/appAlert";
 
 const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL;
 
@@ -71,7 +72,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
       setDevRegistroError(null);
 
       if (!concepto || !monto || isNaN(parseFloat(monto)) || !pdfFile || (!isInternational && !xmlFile)) {
-        alert("Por favor, completa todos los campos correctamente.");
+        showAppAlert("Por favor, completa todos los campos correctamente.", { variant: "warning" });
         setSubmitting(false);
         return;
       }
@@ -81,7 +82,9 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         const xmlText = await xmlFile.text();
         cfdiUuid = extractCfdiUuidFromXml(xmlText);
         if (!cfdiUuid) {
-          alert("No se pudo leer el UUID del XML. Verifica que sea un CFDI con TimbreFiscalDigital válido.");
+          showAppAlert("No se pudo leer el UUID del XML. Verifica que sea un CFDI con TimbreFiscalDigital válido.", {
+            variant: "error",
+          });
           setSubmitting(false);
           return;
         }
@@ -99,13 +102,13 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         });
         lastReceiptId = res.lastReceiptId;
       } catch (createErr) {
-        alert(formatCreateReceiptError(createErr));
+        showAppAlert(formatCreateReceiptError(createErr), { variant: "error" });
         setSubmitting(false);
         return;
       }
 
       if (!lastReceiptId) {
-        alert("No se pudo crear el comprobante.");
+        showAppAlert("No se pudo crear el comprobante.", { variant: "error" });
         setSubmitting(false);
         return;
       }
@@ -141,7 +144,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
           console.error(regErr);
           const msg = formatRegistroError(regErr);
           setDevRegistroError(msg);
-          alert(msg);
+          showAppAlert(msg, { variant: "error" });
           if (showDevPanel) {
             setDevUploadResult(uploadRes);
             setDevReceiptId(lastReceiptId);

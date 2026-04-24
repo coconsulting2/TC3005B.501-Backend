@@ -206,32 +206,49 @@ const statusLabel: Record<string, string> = {
 </MainLayout>
 
 <script is:inline>
-  document.getElementById('bankForm')?.addEventListener('submit', function(e) {
-    e.preventDefault();
-    const requiredFields = this.querySelectorAll('[required]');
-    let isValid = true;
-    requiredFields.forEach(field => {
-      if (!field.value.trim()) {
-        field.style.borderColor = 'var(--color-accent-400)';
-        isValid = false;
-      } else {
-        field.style.borderColor = '';
+  (function () {
+    var EV = 'coco:alert';
+    var DONE = 'coco:alert-closed';
+    function appAlert(message, variant) {
+      window.dispatchEvent(new CustomEvent(EV, { detail: { message: message, variant: variant || 'info' } }));
+    }
+    function appAlertThen(message, variant, fn) {
+      function onDone() {
+        window.removeEventListener(DONE, onDone);
+        fn();
       }
-    });
-    if (!isValid) { alert('Complete todos los campos requeridos'); return; }
-    alert('Información bancaria guardada correctamente');
-  });
+      window.addEventListener(DONE, onDone);
+      appAlert(message, variant);
+    }
 
-  document.getElementById('reimbursementForm')?.addEventListener('submit', function(e) {
-    e.preventDefault();
-    const amountInput = this.querySelector('[name="amount"]');
-    const amount = parseFloat(amountInput.value);
-    const maxAmount = parseFloat(amountInput.max);
-    if (isNaN(amount) || amount <= 0) { alert('Ingrese un monto válido'); return; }
-    if (amount > maxAmount) { alert('El monto no puede exceder su saldo disponible'); return; }
-    const receiptsSelect = this.querySelector('[name="receipts"]');
-    if (receiptsSelect.selectedOptions.length === 0) { alert('Seleccione al menos un comprobante'); return; }
-    alert('Solicitud de reembolso enviada correctamente');
-    window.location.reload();
-  });
+    document.getElementById('bankForm')?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var requiredFields = this.querySelectorAll('[required]');
+      var isValid = true;
+      requiredFields.forEach(function(field) {
+        if (!field.value.trim()) {
+          field.style.borderColor = 'var(--color-accent-400)';
+          isValid = false;
+        } else {
+          field.style.borderColor = '';
+        }
+      });
+      if (!isValid) { appAlert('Complete todos los campos requeridos', 'warning'); return; }
+      appAlert('Información bancaria guardada correctamente', 'success');
+    });
+
+    document.getElementById('reimbursementForm')?.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var amountInput = this.querySelector('[name="amount"]');
+      var amount = parseFloat(amountInput.value);
+      var maxAmount = parseFloat(amountInput.max);
+      if (isNaN(amount) || amount <= 0) { appAlert('Ingrese un monto válido', 'warning'); return; }
+      if (amount > maxAmount) { appAlert('El monto no puede exceder su saldo disponible', 'warning'); return; }
+      var receiptsSelect = this.querySelector('[name="receipts"]');
+      if (receiptsSelect.selectedOptions.length === 0) { appAlert('Seleccione al menos un comprobante', 'warning'); return; }
+      appAlertThen('Solicitud de reembolso enviada correctamente', 'success', function() {
+        window.location.reload();
+      });
+    });
+  })();
 </script>

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import Modal from "@components/Modal";
 import AproveReceipStatus from "@components/AproveReceiptsModal";
 import RejectReceipStatus from "@components/RejectReceiptsModal";
+import { showAppAlert } from "@utils/appAlert";
 
 interface ReceiptProps {
   receipt_id: number;
@@ -50,7 +51,7 @@ export default function ReceiptActions({
       if (res.ok) {
         approval === 1 ? onApprove?.(receipt_id) : onReject?.(receipt_id);
       } else {
-        alert(data.error || "No se pudo actualizar.");
+        showAppAlert(data.error || "No se pudo actualizar.", { variant: "error" });
       }
     } catch (err) {
       console.error(err);

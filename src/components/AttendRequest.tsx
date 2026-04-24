@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { apiRequest } from "@utils/apiClient";
 import ModalWrapper from "@components/ModalWrapper";
 import Toast from '@components/Toast';
+import { showAppAlert } from "@utils/appAlert";
 
 interface Props {
   request_id: string;
@@ -42,7 +43,7 @@ export default function AssignBudget({ request_id, token }: Props) {
         wrapped?.detail?.response && typeof wrapped.detail.response === "object"
           ? (wrapped.detail.response as { error?: string }).error
           : undefined;
-      alert(msg || "Ocurrió un error al enviar la información.");
+      showAppAlert(msg || "Ocurrió un error al enviar la información.", { variant: "error" });
     }
   }, [imposedFee, request_id, token]);
 

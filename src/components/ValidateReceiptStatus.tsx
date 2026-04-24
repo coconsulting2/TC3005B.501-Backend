@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { apiRequest } from "@utils/apiClient";
 import ModalWrapper from "@components/ModalWrapper";
+import { showAppAlert, showAppAlertAsync } from "@utils/appAlert";
 
 interface Props {
   request_id: number;
@@ -59,7 +60,7 @@ export default function ValidateReceiptStatus({
         data?.already_submitted === true
           ? "La solicitud ya estaba en validación de comprobantes."
           : "Comprobantes enviados a revisión correctamente.";
-      alert(okMsg);
+      await showAppAlertAsync(okMsg, { variant: "success" });
 
       if (redirection) {
         window.location.href = redirection;
@@ -70,7 +71,7 @@ export default function ValidateReceiptStatus({
       console.error("Error en la solicitud:", error);
       const wrapped = error as { detail?: unknown };
       const msg = mensajeDesdeApiError(wrapped?.detail);
-      alert(msg);
+      showAppAlert(msg, { variant: "error" });
     }
   }, [request_id, redirection, token]);
 
