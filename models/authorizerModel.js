@@ -54,6 +54,34 @@ const Authorizer = {
   },
 
   /**
+   * Role name for workflow checks (evita depender de IDs numéricos entre seeds).
+   * @param {number} userId
+   * @returns {Promise<string|null>}
+   */
+  async getUserRoleName(userId) {
+    const user = await prisma.user.findUnique({
+      where: { userId: Number(userId) },
+      include: { role: true },
+    });
+    return user?.role?.roleName ?? null;
+  },
+
+  /**
+   * Estado y snapshot pre-viaje para autorización dinámica (M2-004).
+   * @param {number} requestId
+   */
+  async getRequestAuthorizationContext(requestId) {
+    const row = await prisma.request.findUnique({
+      where: { requestId: Number(requestId) },
+      select: {
+        requestStatusId: true,
+        workflowPreSnapshot: true,
+      },
+    });
+    return row;
+  },
+
+  /**
    * Update a travel request status (approve flow).
    * @param {number} requestId - Request ID.
    * @param {number} statusId - New status ID to set.
