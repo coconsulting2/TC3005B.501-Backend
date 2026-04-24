@@ -223,11 +223,18 @@ class ExchangeRateService {
 
   /**
    * Tipo de cambio USD/MXN desde Banxico (serie SF43718).
+   * @param source
+   * @param target
    * @returns {Promise<Object>} Rate payload with rate, source, date, fromCache.
    */
-  async getDOFRate() {
+  async getDOFRate(source = "USD", target = "MXN") {
     try {
-      const response = await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos", {
+      // Guard because serie SF43718 is for USD to MXN,
+      // we would have to make a map table to translate from src trg
+      // to bmx series id
+      if (source !== "USD" || target !== "MXN") throw new Error("CODE: 62|BMX support only is for UDS to MXN");
+      const dofUrl = this.buildBanxicoUrl(["series", "SF43718", "datos"]);
+      const response = await axios.get(dofUrl, {
         headers: {
           "Bmx-Token": process.env.BANXICO_API_KEY,
           "Content-Type": "application/json"
@@ -273,9 +280,9 @@ class ExchangeRateService {
       } catch {
         console.warn("Wise API failed, falling back to DOF");
         try {
-          rateData = await this.getDOFRate();
-        } catch {
-          throw new Error("Both Wise and DOF APIs failed");
+          rateData = await this.getDOFRate(source, target);
+        } catch (dofError) {
+          throw new Error(`Both Wise and DOF APIs failed: ${dofError.message}`);
         }
       }
 
@@ -348,14 +355,6 @@ class ExchangeRateService {
         }
       }
 
-      // Fallback to Banxico catalog
-      await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/catalogoSeries", {
-        headers: {
-          "Bmx-Token": process.env.BANXICO_API_KEY,
-          "Content-Type": "application/json"
-        }
-      });
-
       // Return common currencies based on Banxico data
       return [
         { code: "MXN", name: "Mexican Peso", symbol: "$", supportsDecimals: true },
@@ -394,33 +393,40 @@ class ExchangeRateService {
         throw new Error("Historical rates only available for USD to MXN with Banxico");
       }
 
-      // Format dates for Banxico API (dd/mm/yyyy)
-      const formatDate = (date) => {
-        const d = new Date(date);
-        return `${d.getDate().toString().padStart(2, "0")}/${(d.getMonth() + 1).toString().padStart(2, "0")}/${d.getFullYear()}`;
-      };
-
-      const formattedStartDate = formatDate(startDate);
-      const formattedEndDate = formatDate(endDate);
+      const safeStartDate = this.sanitizeDate(startDate, "startDate");
+      const safeEndDate = this.sanitizeDate(endDate, "endDate");
+      if (safeStartDate > safeEndDate) {
+        throw new Error("startDate must be before or equal to endDate");
+      }
 
       // Try the main endpoint first
       let response;
+      let retry = false;
       try {
-        response = await axios.get(`https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos/${formattedStartDate}/${formattedEndDate}`, {
+        const historyUrl = this.buildBanxicoUrl([
+          "series",
+          "SF43718",
+          "datos",
+          safeStartDate,
+          safeEndDate
+        ]);
+        response = await axios.get(historyUrl, {
           headers: {
             "Bmx-Token": process.env.BANXICO_API_KEY,
             "Content-Type": "application/json"
           }
         });
-      } catch {
+      } catch (error) {
         // If main endpoint fails, try without date range (get all data)
-        console.warn("Date range endpoint failed, trying full data endpoint");
-        response = await axios.get("https://www.banxico.org.mx/SieAPIRest/service/v1/series/SF43718/datos", {
+        console.log("Date range endpoint failed, trying full data endpoint");
+        const fallbackUrl = this.buildBanxicoUrl(["series", "SF43718", "datos"]);
+        response = await axios.get(fallbackUrl, {
           headers: {
             "Bmx-Token": process.env.BANXICO_API_KEY,
             "Content-Type": "application/json"
           }
         });
+        retry = true;
       }
 
       if (response.data && response.data.bmx && response.data.bmx.series && response.data.bmx.series.length > 0) {
@@ -432,26 +438,76 @@ class ExchangeRateService {
         }));
 
         // Filter by date range if we got all data
-        if (startDate && endDate) {
-          const start = new Date(startDate);
-          const end = new Date(endDate);
+        if (retry) {
+          const start = new Date(`${safeStartDate}T00:00:00.000Z`);
+          const end = new Date(`${safeEndDate}T23:59:59.999Z`);
           historicalRates = historicalRates.filter(rate => {
-            if (!rate.fecha) return false;
+            if (!rate.date) return false;
             // Convert Banxico date format (dd/mm/yyyy) to Date object
-            const [day, month, year] = rate.fecha.split("/");
-            const rateDate = new Date(`${year}-${month}-${day}`);
-            return rateDate >= start && rateDate <= end;
+            const [day, month, year] = rate.date.split("/");
+            const rateDate = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
+            return !Number.isNaN(rateDate.getTime()) && rateDate >= start && rateDate <= end;
           });
         }
 
         return historicalRates;
-      } else {
-        throw new Error("No historical rate data returned from DOF API");
       }
+
+      throw new Error("No historical rate data returned from DOF API");
     } catch (error) {
       console.error("Error fetching rate history:", error.response?.data || error.message);
       throw error;
     }
+  }
+
+  /**
+   * Validates and normalizes Banxico base URL from environment.
+   * @returns {URL} Parsed URL object.
+   */
+  getBanxicoBaseUrl() {
+    const rawUrl = process.env.BMX_API_URL;
+    if (!rawUrl) {
+      throw new Error("BMX_API_URL must be configured");
+    }
+
+    const parsedUrl = new URL(rawUrl);
+    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+      throw new Error("BMX_API_URL must use http or https protocol");
+    }
+
+    return parsedUrl;
+  }
+
+  /**
+   * Builds a Banxico API URL using trusted path segments.
+   * @param {Array<string>} pathSegments URL path segments to append.
+   * @returns {string} Fully-qualified URL.
+   */
+  buildBanxicoUrl(pathSegments) {
+    const baseUrl = this.getBanxicoBaseUrl();
+    const normalizedBasePath = baseUrl.pathname.replace(/\/+$/, "");
+    baseUrl.pathname = `${normalizedBasePath}/${pathSegments.join("/")}`.replace(/\/+/g, "/");
+    return baseUrl.toString();
+  }
+
+  /**
+   * Sanitizes a date to strict YYYY-MM-DD and validates calendar correctness.
+   * @param {string|Date} rawDate User-provided date value.
+   * @param {string} fieldName Field name for error messages.
+   * @returns {string} Sanitized YYYY-MM-DD value.
+   */
+  sanitizeDate(rawDate, fieldName) {
+    const stringDate = String(rawDate ?? "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(stringDate)) {
+      throw new Error(`${fieldName} must use YYYY-MM-DD format`);
+    }
+
+    const parsedDate = new Date(`${stringDate}T00:00:00.000Z`);
+    if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== stringDate) {
+      throw new Error(`${fieldName} must be a valid calendar date in YYYY-MM-DD format`);
+    }
+
+    return stringDate;
   }
 }
 
