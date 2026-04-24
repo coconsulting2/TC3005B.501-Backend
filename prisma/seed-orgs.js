@@ -91,7 +91,8 @@ const LAST_NAMES = [
 // ── Schema setup (idempotent DDL) ────────────────────────────────────────────
 
 /**
- *
+ * Creates/extends tables required by the seed.
+ * @returns {Promise<void>}
  */
 async function setupTables() {
   // Add business columns to organizaciones (migration 20260409000000 only has id + timestamps)
@@ -164,7 +165,8 @@ async function setupTables() {
 // ── Seed functions ────────────────────────────────────────────────────────────
 
 /**
- *
+ * Seeds the base roles and returns a roleName→roleId map.
+ * @returns {Promise<Object>} Map of role names to role IDs.
  */
 async function seedRoles() {
   await prisma.role.createMany({ data: ROLES, skipDuplicates: true });
@@ -176,7 +178,8 @@ async function seedRoles() {
 }
 
 /**
- *
+ * Seeds the two test organizations.
+ * @returns {Promise<number[]>} Array of inserted organization IDs.
  */
 async function seedOrganizations() {
   const orgIds = [];
@@ -195,7 +198,8 @@ async function seedOrganizations() {
 }
 
 /**
- *
+ * Seeds departments (2 per organization).
+ * @returns {Promise<Array<Array<Object>>>} Array of department records grouped by org index.
  */
 async function seedDepartments() {
   const orgDepts = [];
@@ -223,10 +227,11 @@ async function seedDepartments() {
 }
 
 /**
- *
- * @param roleMap
- * @param orgDepts
- * @param orgIds
+ * Seeds 10 users per organization across the role distribution.
+ * @param {Object} roleMap Map of role names to role IDs.
+ * @param {Array<Array<Object>>} orgDepts Department records grouped by org index.
+ * @param {number[]} orgIds Organization IDs returned by seedOrganizations.
+ * @returns {Promise<void>}
  */
 async function seedUsers(roleMap, orgDepts, orgIds) {
   for (let orgIdx = 0; orgIdx < ORGS.length; orgIdx++) {
@@ -265,8 +270,9 @@ async function seedUsers(roleMap, orgDepts, orgIds) {
 }
 
 /**
- *
- * @param orgIds
+ * Seeds example suppliers for each organization.
+ * @param {number[]} orgIds Organization IDs returned by seedOrganizations.
+ * @returns {Promise<void>}
  */
 /**
  * Reglas demo: bandas por importe + salto de nivel si importe &lt; umbral (pre/post).
@@ -402,8 +408,9 @@ async function seedSuppliers(orgIds) {
 }
 
 /**
- *
- * @param orgIds
+ * Seeds MongoDB configuration documents for each organization.
+ * @param {number[]} orgIds Organization IDs returned by seedOrganizations.
+ * @returns {Promise<void>}
  */
 async function seedMongoConfig(orgIds) {
   const client = await MongoClient.connect(MONGO_URL);
@@ -445,42 +452,43 @@ async function seedMongoConfig(orgIds) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 /**
- *
+ * Runs the full seed sequence.
+ * @returns {Promise<void>}
  */
 async function main() {
-  console.log("Configuring schema extensions...");
+  console.warn("Configuring schema extensions...");
   await setupTables();
 
-  console.log("Seeding roles...");
+  console.warn("Seeding roles...");
   const roleMap = await seedRoles();
 
-  console.log("Seeding organizations...");
+  console.warn("Seeding organizations...");
   const orgIds = await seedOrganizations();
 
-  console.log("Seeding departments...");
+  console.warn("Seeding departments...");
   const orgDepts = await seedDepartments();
 
-  console.log("Seeding users (10 per org)...");
+  console.warn("Seeding users (10 per org)...");
   await seedUsers(roleMap, orgDepts, orgIds);
 
-  console.log("Seeding workflow rules (M2-004)...");
+  console.warn("Seeding workflow rules (M2-004)...");
   await seedWorkflowRules(orgIds);
 
-  console.log("Seeding suppliers...");
+  console.warn("Seeding suppliers...");
   await seedSuppliers(orgIds);
 
-  console.log("Seeding MongoDB org config...");
+  console.warn("Seeding MongoDB org config...");
   await seedMongoConfig(orgIds);
 
-  console.log("");
-  console.log("Seed complete:");
-  console.log(`  Organizations : 2  (IDs ${orgIds.join(", ")})`);
-  console.log("  Roles         : 5  (Administrador / N1 / N2 / Cuentas por pagar / Solicitante)");
-  console.log("  Departments   : 4  (2 per org)");
-  console.log("  Users         : 20 (10 per org, roles: 1 admin · 2 N1 · 2 N2 · 2 contabilidad · 3 solicitante)");
-  console.log("  Suppliers     : 5  (RFCs: XAXX010101000, XEXX010101000)");
-  console.log("  MongoDB cfg   : 2  (1 per org in orgConfig.org_settings)");
-  console.log("  Workflow rules: 6 por org (importe + skip_if_below pre/post)");
+  console.warn("");
+  console.warn("Seed complete:");
+  console.warn(`  Organizations : 2  (IDs ${orgIds.join(", ")})`);
+  console.warn("  Roles         : 5  (Administrador / N1 / N2 / Cuentas por pagar / Solicitante)");
+  console.warn("  Departments   : 4  (2 per org)");
+  console.warn("  Users         : 20 (10 per org, roles: 1 admin · 2 N1 · 2 N2 · 2 contabilidad · 3 solicitante)");
+  console.warn("  Suppliers     : 5  (RFCs: XAXX010101000, XEXX010101000)");
+  console.warn("  MongoDB cfg   : 2  (1 per org in orgConfig.org_settings)");
+  console.warn("  Workflow rules: 6 por org (importe + skip_if_below pre/post)");
 }
 
 main()

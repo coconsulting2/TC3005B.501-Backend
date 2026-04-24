@@ -87,7 +87,7 @@ describeIfEnabled("satConsultaService against real SAT API", () => {
             expect(typeof acuse.validacionEFOS).toBe("string");
         }
         expect(results.length).toBeGreaterThan(0);
-        console.info(`[REAL SAT] Source: ${fixtures.source} | Consulted: ${results.length} invoice(s)`);
+        console.warn(`[REAL SAT] Source: ${fixtures.source} | Consulted: ${results.length} invoice(s)`);
     });
 });
 

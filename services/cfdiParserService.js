@@ -37,9 +37,8 @@ const IMPUESTO_NOMBRES = {
  */
 export class CfdiParseError extends Error {
   /**
-   *
-   * @param message
-   * @param code
+   * @param {string} message Human-readable error message.
+   * @param {string} code Machine-readable error code.
    */
   constructor(message, code) {
     super(message);
@@ -408,7 +407,7 @@ export function buildComprobanteRegistroBodyFromXml(xmlString) {
     throw new CfdiParseError("UsoCFDI inválido", "INVALID_USO_CFDI");
   }
 
-  const selloRaw = comprobante["@_Sello"];
+  const selloRaw = comprobante["@_Sello"] ?? null;
   const selloEmisor =
     selloRaw !== null && selloRaw !== undefined && String(selloRaw).trim().length >= 8
       ? String(selloRaw).trim()

@@ -124,13 +124,17 @@ The repository ships a multi-target Dockerfile (`deps` for dev, `production` for
 ### Local development with hot-reload
 
 ```sh
-bun run docker:dev          # foreground, streams logs
-bun run docker:dev:build    # rebuild image first
-bun run docker:dev:down     # stop containers
-bun run docker:dev:clean    # stop AND wipe volumes (full reset)
+bun run docker:dev                # foreground, streams logs
+bun run docker:dev:build          # rebuild image first
+bun run docker:dev:down           # stop containers (keeps data)
+bun run docker:dev:clean          # stop AND wipe volumes (full reset)
+bun run docker:data:reset         # wipe Postgres + re-seed (keeps containers up)
+bun run docker:permissions:sync   # re-apply reference seed only (idempotent) — run after pulling a PR that adds permissions
 ```
 
 `docker-compose.dev.yml` brings up Postgres 16 + Mongo 7 + a one-shot `migrate` service (installs deps, applies the Prisma schema, seeds reference + dummy data) + the backend with the source bind-mounted and `node --watch` running. Edits on the host hot-reload the server inside the container. HTTPS certs are auto-generated into a named volume on first start.
+
+The migrate service runs **every** `up`: the reference-data seed (roles, request statuses, **permissions**) is idempotent (`upsert` + `createMany({skipDuplicates:true})`) so new permissions added by teammates' PRs land automatically on your machine without a full wipe. Dummy data is gated by a sentinel inside the `node_modules_dev` volume, so it only runs on first boot. See [cocowiki — sistema de permisos](https://github.com/coconsulting2/cocowiki/blob/main/docs/permisos.md) for the workflow of adding new permissions.
 
 ### Quickstart for end-users (uses the published image from GHCR)
 
