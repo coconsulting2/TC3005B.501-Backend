@@ -3,6 +3,8 @@ import LoginForm from "@components/LoginForm";
 import Layout from "@layouts/Layout.astro";
 ---
 
-<Layout title="Login">
-    <LoginForm client:only="react" />
+<Layout title="Iniciar sesión — CocoConsulting">
+    <div class="h-dvh min-h-0 w-full overflow-hidden">
+        <LoginForm client:only="react" />
+    </div>
 </Layout>
