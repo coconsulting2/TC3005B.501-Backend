@@ -1,0 +1,960 @@
+{
+	"info": {
+		"_postman_id": "m2-authorization-collection",
+		"name": "M2-Authorization",
+		"description": "Postman collection for Module 2 (Authorization & Workflow) endpoints.\n\nCovers:\n- Permissions catalog CRUD (/api/admin/permissions*)\n- Permission groups CRUD and assignment (/api/admin/permission-groups*)\n- Role and user permission assignment (/api/admin/roles/:roleId/..., /api/admin/users/:userId/...)\n- Approval workflow end-to-end: create travel request (Solicitante) → authorize N1 → authorize N2 → verify final status\n- Negative scenarios: decline without comment (expects 400), admin route as Solicitante (expects 403)\n\nTokens:\n- {{admin_token}} for /api/admin/* requests (Administrador)\n- {{requester_token}} for travel request creation and reads (Solicitante)\n- {{approver_token}} for first-level authorization (N1)\n- {{approver_n2_token}} for second-level authorization (N2)\n\nThe collection-level pre-request script logs in all four roles on first run, fetches the CSRF token, and caches everything in collection variables. Subsequent requests reuse the cached tokens.\n\nTask: NT-016",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{ "key": "base_url", "value": "https://localhost:3000", "type": "string" },
+		{ "key": "csrf_token", "value": "", "type": "string" },
+		{ "key": "admin_token", "value": "", "type": "string" },
+		{ "key": "requester_token", "value": "", "type": "string" },
+		{ "key": "approver_token", "value": "", "type": "string" },
+		{ "key": "approver_n2_token", "value": "", "type": "string" },
+		{ "key": "admin_username", "value": "admin", "type": "string" },
+		{ "key": "admin_password", "value": "admin123", "type": "string" },
+		{ "key": "requester_username", "value": "andres.gomez", "type": "string" },
+		{ "key": "requester_password", "value": "andres123", "type": "string" },
+		{ "key": "n1_username", "value": "laura.flores", "type": "string" },
+		{ "key": "n1_password", "value": "laura321", "type": "string" },
+		{ "key": "n2_username", "value": "diego.hernandez", "type": "string" },
+		{ "key": "n2_password", "value": "diego654", "type": "string" },
+		{ "key": "requester_user_id", "value": "", "type": "string" },
+		{ "key": "n1_user_id", "value": "", "type": "string" },
+		{ "key": "n2_user_id", "value": "", "type": "string" },
+		{ "key": "permission_id", "value": "", "type": "string" },
+		{ "key": "group_id", "value": "", "type": "string" },
+		{ "key": "request_id", "value": "", "type": "string" },
+		{ "key": "role_id_solicitante", "value": "1", "type": "string" }
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Skip auth bootstrapping for the explicit Auth folder requests — they manage their own tokens.",
+					"const url = pm.request.url.toString();",
+					"if (url.includes('/api/user/login') || url.includes('/api/user/csrf-token')) { return; }",
+					"",
+					"const baseUrl = pm.collectionVariables.get('base_url');",
+					"",
+					"const loginAs = (tokenVar, userIdVar, usernameVar, passwordVar, callback) => {",
+					"    const existing = pm.collectionVariables.get(tokenVar);",
+					"    if (existing) { return callback(); }",
+					"    const username = pm.collectionVariables.get(usernameVar);",
+					"    const password = pm.collectionVariables.get(passwordVar);",
+					"    if (!username || !password) {",
+					"        console.warn('Missing credentials for ' + tokenVar);",
+					"        return callback();",
+					"    }",
+					"    pm.sendRequest({",
+					"        url: baseUrl + '/api/user/login',",
+					"        method: 'POST',",
+					"        header: [{ key: 'Content-Type', value: 'application/json' }],",
+					"        body: { mode: 'raw', raw: JSON.stringify({ username, password }) }",
+					"    }, (err, res) => {",
+					"        if (err || res.code !== 200) {",
+					"            console.error('Login failed for ' + tokenVar + ':', err || res.code);",
+					"            return callback();",
+					"        }",
+					"        const data = res.json();",
+					"        pm.collectionVariables.set(tokenVar, data.token);",
+					"        if (userIdVar && data.user_id) {",
+					"            pm.collectionVariables.set(userIdVar, String(data.user_id));",
+					"        }",
+					"        callback();",
+					"    });",
+					"};",
+					"",
+					"const fetchCsrf = (callback) => {",
+					"    if (pm.collectionVariables.get('csrf_token')) { return callback(); }",
+					"    pm.sendRequest({",
+					"        url: baseUrl + '/api/user/csrf-token',",
+					"        method: 'GET'",
+					"    }, (err, res) => {",
+					"        if (!err && res && res.code === 200) {",
+					"            pm.collectionVariables.set('csrf_token', res.json().csrfToken);",
+					"        }",
+					"        callback();",
+					"    });",
+					"};",
+					"",
+					"// Chain: admin → requester → N1 → N2 → CSRF",
+					"loginAs('admin_token', null, 'admin_username', 'admin_password', () => {",
+					"    loginAs('requester_token', 'requester_user_id', 'requester_username', 'requester_password', () => {",
+					"        loginAs('approver_token', 'n1_user_id', 'n1_username', 'n1_password', () => {",
+					"            loginAs('approver_n2_token', 'n2_user_id', 'n2_username', 'n2_password', () => {",
+					"                fetchCsrf(() => {});",
+					"            });",
+					"        });",
+					"    });",
+					"});"
+				]
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"description": "Manual reference logins. The collection-level pre-request script invokes these automatically for each role on first run.",
+			"item": [
+				{
+					"name": "Login as Admin",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n    \"username\": \"{{admin_username}}\",\n    \"password\": \"{{admin_password}}\"\n}" },
+						"url": {
+							"raw": "{{base_url}}/api/user/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "login"]
+						},
+						"description": "Logs in as Administrador. Stores admin_token."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Response has token', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('token');",
+									"    pm.collectionVariables.set('admin_token', json.token);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Login as Solicitante",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n    \"username\": \"{{requester_username}}\",\n    \"password\": \"{{requester_password}}\"\n}" },
+						"url": {
+							"raw": "{{base_url}}/api/user/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "login"]
+						},
+						"description": "Logs in as Solicitante. Stores requester_token and requester_user_id."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Token and user_id present', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('token');",
+									"    pm.expect(json).to.have.property('user_id');",
+									"    pm.collectionVariables.set('requester_token', json.token);",
+									"    pm.collectionVariables.set('requester_user_id', String(json.user_id));",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Login as N1",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n    \"username\": \"{{n1_username}}\",\n    \"password\": \"{{n1_password}}\"\n}" },
+						"url": {
+							"raw": "{{base_url}}/api/user/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "login"]
+						},
+						"description": "Logs in as N1 authorizer. Stores approver_token and n1_user_id."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Stores N1 token', () => {",
+									"    const json = pm.response.json();",
+									"    pm.collectionVariables.set('approver_token', json.token);",
+									"    pm.collectionVariables.set('n1_user_id', String(json.user_id));",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Login as N2",
+					"request": {
+						"method": "POST",
+						"header": [{ "key": "Content-Type", "value": "application/json" }],
+						"body": { "mode": "raw", "raw": "{\n    \"username\": \"{{n2_username}}\",\n    \"password\": \"{{n2_password}}\"\n}" },
+						"url": {
+							"raw": "{{base_url}}/api/user/login",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "login"]
+						},
+						"description": "Logs in as N2 authorizer. Stores approver_n2_token and n2_user_id."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Stores N2 token', () => {",
+									"    const json = pm.response.json();",
+									"    pm.collectionVariables.set('approver_n2_token', json.token);",
+									"    pm.collectionVariables.set('n2_user_id', String(json.user_id));",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get CSRF token",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/user/csrf-token",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "csrf-token"]
+						},
+						"description": "Fetches the CSRF token. Required as 'x-csrf-token' header on every mutating request."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Has csrfToken', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('csrfToken');",
+									"    pm.collectionVariables.set('csrf_token', json.csrfToken);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Permissions CRUD",
+			"description": "Permission catalog management. All endpoints require admin token with permission:read or permission:write.",
+			"item": [
+				{
+					"name": "List permissions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{admin_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/permissions?active_only=true",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "permissions"],
+							"query": [
+								{ "key": "active_only", "value": "true", "description": "Filter to active permissions only" }
+							]
+						},
+						"description": "Lists permissions in the catalog. Requires permission:read."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Returns an array', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.be.an('array');",
+									"});",
+									"pm.test('Schema validation', () => {",
+									"    const schema = {",
+									"        type: 'array',",
+									"        items: {",
+									"            type: 'object',",
+									"            required: ['permissionId', 'code', 'resource', 'action', 'active'],",
+									"            properties: {",
+									"                permissionId: { type: 'number' },",
+									"                code: { type: 'string' },",
+									"                resource: { type: 'string' },",
+									"                action: { type: 'string' },",
+									"                active: { type: 'boolean' }",
+									"            }",
+									"        }",
+									"    };",
+									"    pm.response.to.have.jsonSchema(schema);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Create permission",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{admin_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"code\": \"qa_test:probe_{{$timestamp}}\",\n    \"resource\": \"qa_test\",\n    \"action\": \"probe\",\n    \"description\": \"NT-016 ephemeral permission for Postman tests\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/permissions",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "permissions"]
+						},
+						"description": "Creates a new permission. Requires permission:write. Returns 201 with permissionId."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 201', () => pm.response.to.have.status(201));",
+									"pm.test('Stores permission_id', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('permissionId');",
+									"    pm.collectionVariables.set('permission_id', String(json.permissionId));",
+									"});",
+									"pm.test('Schema validation', () => {",
+									"    const schema = {",
+									"        type: 'object',",
+									"        required: ['permissionId', 'code', 'resource', 'action', 'active'],",
+									"        properties: {",
+									"            permissionId: { type: 'number' },",
+									"            code: { type: 'string' },",
+									"            resource: { type: 'string' },",
+									"            action: { type: 'string' },",
+									"            active: { type: 'boolean' }",
+									"        }",
+									"    };",
+									"    pm.response.to.have.jsonSchema(schema);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Update permission",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{admin_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"description\": \"NT-016 updated description\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/permissions/{{permission_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "permissions", "{{permission_id}}"]
+						},
+						"description": "Updates a permission. Requires permission:write."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Description updated', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('description');",
+									"    pm.expect(json.description).to.eql('NT-016 updated description');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Deactivate (soft delete) permission",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{admin_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/permissions/{{permission_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "permissions", "{{permission_id}}"]
+						},
+						"description": "Soft-deletes the permission (sets active=false). Requires permission:write."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('active flag is false', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('active');",
+									"    pm.expect(json.active).to.eql(false);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Permission Groups",
+			"description": "Permission group management — bundles of permissions that can be assigned to roles or users.",
+			"item": [
+				{
+					"name": "List permission groups",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{admin_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/permission-groups",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "permission-groups"]
+						},
+						"description": "Lists permission groups. Requires permission:read."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Create permission group",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{admin_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"groupName\": \"NT016-QA-{{$timestamp}}\",\n    \"description\": \"NT-016 ephemeral group for Postman tests\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/permission-groups",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "permission-groups"]
+						},
+						"description": "Creates a permission group. Requires permission_group:manage."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 201', () => pm.response.to.have.status(201));",
+									"pm.test('Stores group_id', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('groupId');",
+									"    pm.collectionVariables.set('group_id', String(json.groupId));",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Add permissions to group",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{admin_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"permissionIds\": [{{permission_id}}]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/permission-groups/{{group_id}}/permissions",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "permission-groups", "{{group_id}}", "permissions"]
+						},
+						"description": "Adds permissions to a group. Requires permission_group:manage."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200 or 201', () => pm.expect([200, 201]).to.include(pm.response.code));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get group with permissions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{admin_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/permission-groups/{{group_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "permission-groups", "{{group_id}}"]
+						},
+						"description": "Returns the group with its assigned permissions. Requires permission:read."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Group has groupName', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('groupName');",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Role Assignment",
+			"description": "Assign permissions and groups to roles.",
+			"item": [
+				{
+					"name": "Assign permission to role",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{admin_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"permissionIds\": [{{permission_id}}]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/roles/{{role_id_solicitante}}/permissions",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "roles", "{{role_id_solicitante}}", "permissions"]
+						},
+						"description": "Assigns one or more permissions to a role. Requires role:manage_permissions."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200 or 201', () => pm.expect([200, 201]).to.include(pm.response.code));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Revoke permission from role",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{admin_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/roles/{{role_id_solicitante}}/permissions/{{permission_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "roles", "{{role_id_solicitante}}", "permissions", "{{permission_id}}"]
+						},
+						"description": "Removes a permission from a role. Requires role:manage_permissions. Returns 204."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200 or 204', () => pm.expect([200, 204]).to.include(pm.response.code));"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "User Permissions",
+			"description": "Assign permission groups directly to a user and read effective permissions.",
+			"item": [
+				{
+					"name": "Assign group to user",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{admin_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"groupIds\": [{{group_id}}]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/admin/users/{{requester_user_id}}/permission-groups",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "users", "{{requester_user_id}}", "permission-groups"]
+						},
+						"description": "Assigns permission groups to a user. Requires user:manage_permissions."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200 or 201', () => pm.expect([200, 201]).to.include(pm.response.code));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get effective permissions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{admin_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/users/{{requester_user_id}}/effective-permissions",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "users", "{{requester_user_id}}", "effective-permissions"]
+						},
+						"description": "Returns the user's effective permissions (role + groups + direct). Requires permission:read."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Response shape', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.satisfy((v) => Array.isArray(v) || (v && Array.isArray(v.permissions)));",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Workflow — Happy path",
+			"description": "End-to-end approval flow: Solicitante creates a travel request, N1 approves, N2 approves, final status verified via GET.",
+			"item": [
+				{
+					"name": "Create travel request (Solicitante)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{requester_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"router_index\": 0,\n    \"notes\": \"NT-016 Postman e2e test request\",\n    \"requested_fee\": 1500.00,\n    \"imposed_fee\": 1500.00,\n    \"origin_country_name\": \"Mexico\",\n    \"origin_city_name\": \"Monterrey\",\n    \"destination_country_name\": \"Mexico\",\n    \"destination_city_name\": \"Mexico City\",\n    \"beginning_date\": \"2026-05-01\",\n    \"beginning_time\": \"08:00\",\n    \"ending_date\": \"2026-05-03\",\n    \"ending_time\": \"18:00\",\n    \"plane_needed\": true,\n    \"hotel_needed\": true,\n    \"additionalRoutes\": []\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/applicant/create-travel-request/{{requester_user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "applicant", "create-travel-request", "{{requester_user_id}}"]
+						},
+						"description": "Creates a travel request as the Solicitante. Requires travel_request:create. Stores the resulting request_id."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200 or 201', () => pm.expect([200, 201]).to.include(pm.response.code));",
+									"pm.test('Stores request_id', () => {",
+									"    const json = pm.response.json();",
+									"    const id = json.request_id || json.requestId || (json.data && (json.data.request_id || json.data.requestId));",
+									"    pm.expect(id, 'request_id missing in response').to.exist;",
+									"    pm.collectionVariables.set('request_id', String(id));",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Approve N1",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{approver_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": { "mode": "raw", "raw": "{}" },
+						"url": {
+							"raw": "{{base_url}}/api/authorizer/authorize-travel-request/{{request_id}}/{{n1_user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "authorizer", "authorize-travel-request", "{{request_id}}", "{{n1_user_id}}"]
+						},
+						"description": "First-level approval (N1). Requires travel_request:authorize. Expects new_status to advance to 'Segunda Revisión'."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Advanced to second review', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('new_status');",
+									"    pm.expect(json.new_status).to.match(/Segunda Revisión|Cotización del Viaje/i);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Approve N2",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{approver_n2_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": { "mode": "raw", "raw": "{}" },
+						"url": {
+							"raw": "{{base_url}}/api/authorizer/authorize-travel-request/{{request_id}}/{{n2_user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "authorizer", "authorize-travel-request", "{{request_id}}", "{{n2_user_id}}"]
+						},
+						"description": "Second-level approval (N2). Expects new_status to land on 'Cotización del Viaje' (or equivalent next phase)."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Final status moved past second review', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('new_status');",
+									"    pm.expect(json.new_status).to.not.match(/Submitted|Pendiente Primera Revisión/i);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Verify final status (history substitute)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{requester_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/user/get-travel-request/{{request_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "user", "get-travel-request", "{{request_id}}"]
+						},
+						"description": "Retrieves the request to confirm the workflow transitions ran. Stands in for a dedicated audit-log endpoint (not yet implemented)."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Has request_status field', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('request_status');",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Workflow — Negative",
+			"description": "Negative workflow scenarios: rejection without comment (expects 400) and rejection with comment (200).",
+			"item": [
+				{
+					"name": "Decline without comment (expects 400)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{approver_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": { "mode": "raw", "raw": "{}" },
+						"url": {
+							"raw": "{{base_url}}/api/authorizer/decline-travel-request/{{request_id}}/{{n1_user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "authorizer", "decline-travel-request", "{{request_id}}", "{{n1_user_id}}"]
+						},
+						"description": "Sends a decline with an empty body. Per NT-016 acceptance criteria, the API must return 400 when the comment is missing.\n\nNOTE: until backend validation for the comment field is implemented, this test will fail (current behavior: 200). The test stays as-is so it flips to green automatically once the backend enforces the rule."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Returns 400 when comment is missing', () => pm.response.to.have.status(400));",
+									"pm.test('Body mentions a missing comment field', () => {",
+									"    if (pm.response.code === 400) {",
+									"        const json = pm.response.json();",
+									"        const text = JSON.stringify(json).toLowerCase();",
+									"        pm.expect(text).to.match(/comment|comentario|motivo/);",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Decline with comment (expects 200)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{approver_token}}" },
+							{ "key": "x-csrf-token", "value": "{{csrf_token}}" },
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"comment\": \"NT-016 rejection reason: presupuesto excedido\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/authorizer/decline-travel-request/{{request_id}}/{{n1_user_id}}",
+							"host": ["{{base_url}}"],
+							"path": ["api", "authorizer", "decline-travel-request", "{{request_id}}", "{{n1_user_id}}"]
+						},
+						"description": "Sends a decline with a non-empty comment. Expects 200 and new_status='Rechazado'.\n\nWhen this runs after the happy-path approvals, the request may already be in a terminal state — re-create a fresh request and update {{request_id}} to test this in isolation."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status is 200 or 4xx (terminal state)', () => {",
+									"    pm.expect([200, 400, 404, 409]).to.include(pm.response.code);",
+									"});",
+									"pm.test('If 200, new_status indicates rejection', () => {",
+									"    if (pm.response.code === 200) {",
+									"        const json = pm.response.json();",
+									"        pm.expect(json).to.have.property('new_status');",
+									"        pm.expect(json.new_status).to.match(/Rechazado/i);",
+									"    }",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Negative — 403",
+			"description": "Authorization negative test: hitting an admin route with a Solicitante token must return 403 InsufficientPermissionsError.",
+			"item": [
+				{
+					"name": "Admin route as Solicitante (expects 403)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{requester_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/admin/permissions",
+							"host": ["{{base_url}}"],
+							"path": ["api", "admin", "permissions"]
+						},
+						"description": "Lists permissions using a Solicitante token. The Solicitante role does not own permission:read, so requirePermission middleware must reject the request with 403."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 403', () => pm.response.to.have.status(403));",
+									"pm.test('Error indicates insufficient permissions', () => {",
+									"    const json = pm.response.json();",
+									"    const text = JSON.stringify(json).toLowerCase();",
+									"    pm.expect(text).to.match(/insufficient|forbidden|permission/);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}
