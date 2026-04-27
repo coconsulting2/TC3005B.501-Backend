@@ -880,6 +880,103 @@
           ]
         }
       ]
+    },
+    {
+      "name": "CFDI SAT",
+      "description": "Consulta de estatus SAT almacenado para comprobantes CFDI",
+      "item": [
+        {
+          "name": "TC-CFDI-SAT-001 | GET validacion SAT por receipt_id (Happy Path)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Respuesta contiene status y verified_at', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('status');",
+                  "    pm.expect(json).to.have.property('verified_at');",
+                  "});",
+                  "",
+                  "pm.test('status es uno de los valores esperados', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(['vigente', 'cancelado', 'no_encontrado']).to.include(json.status);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/comprobantes/1/validacion-sat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comprobantes", "1", "validacion-sat"]
+            },
+            "description": "Consulta el ultimo estado SAT guardado para el CFDI de un recibo."
+          },
+          "response": [
+            {
+              "name": "200 - Estado SAT obtenido",
+              "originalRequest": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/comprobantes/1/validacion-sat"
+              },
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": \"vigente\",\n  \"verified_at\": \"2026-04-22T10:00:00.000Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "TC-CFDI-SAT-002 | GET validacion SAT sin token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code es 401', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/comprobantes/1/validacion-sat",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comprobantes", "1", "validacion-sat"]
+            }
+          },
+          "response": [
+            {
+              "name": "401 - Sin token",
+              "originalRequest": {
+                "method": "GET",
+                "url": "{{baseUrl}}/api/comprobantes/1/validacion-sat"
+              },
+              "status": "Unauthorized",
+              "code": 401
+            }
+          ]
+        }
+      ]
     }
   ]
 }

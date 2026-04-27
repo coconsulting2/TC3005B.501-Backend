@@ -50,6 +50,7 @@ await jest.unstable_mockModule("../../../models/comprobantesModel.js", () => ({
     findReceiptById: jest.fn(),
     findByUUID: jest.fn(),
     createCfdi: jest.fn(),
+    getSatValidationByReceiptId: jest.fn(),
     updateSatAcuseByReceiptId: jest.fn().mockResolvedValue({}),
   },
 }));
@@ -62,6 +63,7 @@ await jest.unstable_mockModule("../../../services/permissionService.js", () => (
   loadEffectivePermissions: jest.fn().mockResolvedValue([
     "receipt:upload",
     "receipt:validate",
+    "receipt:view_sat",
     "travel_request:view_any",
     "expense:view",
     "expense:submit",
@@ -166,6 +168,7 @@ beforeEach(() => {
   ComprobantesModel.findReceiptById.mockClear();
   ComprobantesModel.findByUUID.mockClear();
   ComprobantesModel.createCfdi.mockClear();
+  ComprobantesModel.getSatValidationByReceiptId.mockClear();
   ComprobantesModel.updateSatAcuseByReceiptId.mockClear();
   Applicant.getRequestStatus.mockClear();
   Applicant.getRequestStatus.mockResolvedValue(7);
@@ -181,6 +184,10 @@ beforeEach(() => {
   });
   ComprobantesModel.findByUUID.mockResolvedValue(null);
   ComprobantesModel.createCfdi.mockResolvedValue({ cfdiId: 1, ...validPayload, receiptId: RECEIPT_ID });
+  ComprobantesModel.getSatValidationByReceiptId.mockResolvedValue({
+    satEstado: "Vigente",
+    createdAt: new Date("2026-04-22T10:00:00.000Z"),
+  });
 });
 
 describe("POST /api/comprobantes/:receipt_id", () => {
@@ -344,6 +351,49 @@ describe("POST /api/comprobantes/:receipt_id", () => {
       .send(validPayload);
     expect(res.status).toBe(500);
     expect(res.body.error).toBe("Internal server error");
+  });
+});
+
+describe("GET /api/comprobantes/:id/validacion-sat", () => {
+  test("401 si no se envia token", async () => {
+    const res = await request(app).get(`/api/comprobantes/${RECEIPT_ID}/validacion-sat`);
+    expect(res.status).toBe(401);
+  });
+
+  test("200 devuelve estado SAT normalizado", async () => {
+    const res = await request(app)
+      .get(`/api/comprobantes/${RECEIPT_ID}/validacion-sat`)
+      .set(AUTH_HEADERS);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      status: "vigente",
+      verified_at: "2026-04-22T10:00:00.000Z",
+    });
+  });
+
+  test("200 mapea estados distintos a Vigente/Cancelado como no_encontrado", async () => {
+    ComprobantesModel.getSatValidationByReceiptId.mockResolvedValue({
+      satEstado: "No Encontrado",
+      createdAt: new Date("2026-04-22T11:00:00.000Z"),
+    });
+
+    const res = await request(app)
+      .get(`/api/comprobantes/${RECEIPT_ID}/validacion-sat`)
+      .set(AUTH_HEADERS);
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("no_encontrado");
+  });
+
+  test("404 si no hay CFDI/SAT para el recibo", async () => {
+    ComprobantesModel.getSatValidationByReceiptId.mockResolvedValue(null);
+
+    const res = await request(app)
+      .get(`/api/comprobantes/${RECEIPT_ID}/validacion-sat`)
+      .set(AUTH_HEADERS);
+
+    expect(res.status).toBe(404);
   });
 });
 
