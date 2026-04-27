@@ -39,6 +39,7 @@ const PERMISSION_CATALOG = [
   { code: "receipt:upload",     resource: "receipt", action: "upload",     description: "Upload receipts and CFDI" },
   { code: "receipt:delete_own", resource: "receipt", action: "delete_own", description: "Delete own uploaded receipts" },
   { code: "receipt:validate",   resource: "receipt", action: "validate",   description: "Validate receipts (accounts payable)" },
+  { code: "receipt:view_sat",   resource: "receipt", action: "view_sat",   description: "View stored SAT validation status for a receipt" },
 
   // Expenses
   { code: "expense:view",   resource: "expense", action: "view",   description: "View expense validations" },
@@ -68,7 +69,7 @@ const PERMISSION_GROUPS = [
     permissions: [
       "travel_request:create", "travel_request:view_own", "travel_request:view_any",
       "travel_request:edit_own", "travel_request:submit", "travel_request:cancel",
-      "receipt:upload", "receipt:delete_own",
+      "receipt:upload", "receipt:delete_own", "receipt:view_sat",
       "expense:view", "expense:submit",
       "user:view_self",
     ],
@@ -80,7 +81,7 @@ const PERMISSION_GROUPS = [
       "travel_request:create", "travel_request:view_own", "travel_request:view_any",
       "travel_request:edit_own", "travel_request:submit", "travel_request:cancel",
       "travel_request:authorize",
-      "receipt:upload", "receipt:delete_own",
+      "receipt:upload", "receipt:delete_own", "receipt:view_sat",
       "expense:view", "expense:submit",
       "authorizer:view_alerts",
       "user:view_self",
@@ -101,7 +102,7 @@ const PERMISSION_GROUPS = [
     permissions: [
       "accounts_payable:attend",
       "accounting:export",
-      "receipt:validate",
+      "receipt:validate", "receipt:view_sat",
       "expense:view",
       "travel_request:view_any",
       "user:view_self",

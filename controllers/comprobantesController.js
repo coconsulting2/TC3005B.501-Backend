@@ -4,6 +4,17 @@
  * @author Hector Lugo
  */
 import { insertarCfdi } from "../services/comprobantesService.js";
+import ComprobantesModel from "../models/comprobantesModel.js";
+
+const SAT_STATUS_MAP = Object.freeze({
+  vigente: "vigente",
+  cancelado: "cancelado",
+});
+
+const normalizeSatStatus = (satEstado) => {
+  const key = String(satEstado || "").trim().toLowerCase();
+  return SAT_STATUS_MAP[key] || "no_encontrado";
+};
 
 /**
  * POST /api/comprobantes/:receipt_id
@@ -28,4 +39,30 @@ export const crearComprobante = async (req, res) => {
   }
 };
 
-export default { crearComprobante };
+/**
+ * GET /api/comprobantes/:id/validacion-sat
+ * Devuelve el ultimo estado SAT almacenado para el CFDI asociado al recibo.
+ *
+ * @param {import('express').Request} req - params: id
+ * @param {import('express').Response} res
+ * @returns {void}
+ */
+export const getValidacionSat = async (req, res) => {
+  const receiptId = Number(req.params.id);
+  try {
+    const sat = await ComprobantesModel.getSatValidationByReceiptId(receiptId);
+    if (!sat) {
+      return res.status(404).json({ error: "No SAT validation found for this receipt" });
+    }
+
+    return res.status(200).json({
+      status: normalizeSatStatus(sat.satEstado),
+      verified_at: sat.createdAt.toISOString(),
+    });
+  } catch (error) {
+    console.error("Error in getValidacionSat controller:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+export default { crearComprobante, getValidacionSat };
