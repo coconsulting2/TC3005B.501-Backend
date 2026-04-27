@@ -1,0 +1,95 @@
+---
+/**
+ * Author: Emiliano Deyta Illescas
+ *
+ * Description:
+ * Comprobantes summary block for the approval detail screen
+ * (M2-007). Renders any receipts attached to the request along
+ * with the validation pill so the approver has the full picture
+ * before deciding. Falls back to a neutral empty state when the
+ * backend has not yet attached comprobantes — keeps the section
+ * predictable for QA across all environments.
+ *
+ * Each row stays readable at 320px because the columns collapse
+ * into a stacked layout on small viewports.
+ */
+
+interface Receipt {
+  receipt_id?: number | string;
+  gasto_tramo_id?: number | string;
+  receipt_type?: string;
+  amount?: number | string;
+  validation?: string;
+  submission_date?: string;
+}
+
+const { receipts = [] } = Astro.props as { receipts?: Receipt[] };
+
+const VALIDATION_STYLES: Record<string, { label: string; className: string }> = {
+  approved: { label: 'Aprobado', className: 'bg-success-50 text-success-500' },
+  pending: { label: 'Pendiente', className: 'bg-warning-50 text-warning-500' },
+  rejected: { label: 'Rechazado', className: 'bg-accent-50 text-accent-400' },
+};
+
+function formatMxn(value: unknown): string {
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN',
+    minimumFractionDigits: 2,
+  }).format(n);
+}
+---
+
+<section class="card-editorial p-5 sm:p-6">
+  <header class="mb-4">
+    <p class="eyebrow">Comprobantes</p>
+    <h2 class="font-editorial text-xl font-normal text-[var(--color-ink)] mt-1">
+      Documentos asociados
+    </h2>
+  </header>
+
+  {receipts.length === 0 ? (
+    <p class="text-sm text-[var(--color-ink-muted)]">
+      Aún no se han registrado comprobantes para esta solicitud.
+    </p>
+  ) : (
+    <ul class="divide-y divide-[var(--color-neutral-200)]">
+      {receipts.map((receipt) => {
+        const styleKey = (receipt.validation ?? '').toLowerCase();
+        const pill =
+          VALIDATION_STYLES[styleKey] ??
+          {
+            label: receipt.validation ?? 'Sin estado',
+            className: 'bg-[var(--color-surface-secondary)] text-[var(--color-ink-muted)]',
+          };
+        return (
+          <li class="py-3 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <div class="flex flex-col sm:flex-row sm:items-baseline sm:gap-3 min-w-0">
+              <span class="font-medium text-[var(--color-ink)] truncate">
+                {receipt.receipt_type ?? 'Comprobante'}
+              </span>
+              {receipt.receipt_id != null && (
+                <span class="text-xs text-[var(--color-ink-muted)] tabular-nums">
+                  #{receipt.receipt_id}
+                </span>
+              )}
+              {receipt.submission_date && (
+                <span class="text-xs text-[var(--color-ink-muted)]">
+                  {new Date(receipt.submission_date).toLocaleDateString('es-MX')}
+                </span>
+              )}
+            </div>
+            <div class="flex items-center justify-between sm:justify-end gap-3">
+              <span class="money-display text-sm text-[var(--color-ink)]">
+                {formatMxn(receipt.amount)}
+              </span>
+              <span class={`status-pill ${pill.className}`}>{pill.label}</span>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  )}
+</section>

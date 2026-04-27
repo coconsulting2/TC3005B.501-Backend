@@ -1,0 +1,16 @@
+---
+/**
+ * Author: Emiliano Deyta Illescas
+ *
+ * Description:
+ * Spec-compliant alias for the M2-007 approval inbox. The
+ * canonical path inside the codebase is `/autorizaciones`
+ * (already wired into the sidebar, route access list, and
+ * Cypress flows); `/aprobaciones` is the URL referenced in the
+ * task description, so this file forwards to the canonical
+ * page rather than duplicating the loader logic.
+ */
+export const prerender = false;
+
+return Astro.redirect("/autorizaciones");
+---

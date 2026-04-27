@@ -2,11 +2,15 @@
 /**
  * Author: Diego Ortega Fernandez
  * Updated: Editorial Finance design system
+ * Updated (M2-007): Emiliano Deyta Illescas
+ *   — wraps the inbox in ApprovalsInbox so N1 / N2 can filter
+ *     pending requests by date, monto and tipo before drilling
+ *     into the detail page.
  */
 
 import MainLayout from "@layouts/MainLayout.astro";
 import EditorialHeader from "@components/EditorialHeader.astro";
-import AuthRequestsList from "@/components/RequestsLists/AuthRequestsList";
+import ApprovalsInbox from "@components/ApprovalsInbox";
 import TableFallback from "@/components/Table/TableFallback.astro";
 
 import type { UserRole } from "@type/roles";
@@ -29,21 +33,23 @@ const requests = await (async () => {
 })();
 ---
 
-<MainLayout title="Autorizaciones pendientes" data={{ userName, buttonLabel, role }}>
+<MainLayout title="Bandeja de aprobaciones" data={{ userName, buttonLabel, role }}>
   <div>
     {requests && requests.length === 0 ? (
       <TableFallback />
     ) : (
-      <EditorialHeader
-        eyebrow="Coco / Aprobaciones"
-        title={`Autorizaciones de ${userName}`}
-        subtitle="Solicitudes pendientes de autorizar"
-      />
-      <AuthRequestsList
-        client:only="react"
-        data={requests}
-        role={role}
-      />
+      <>
+        <EditorialHeader
+          eyebrow="Coco / Aprobaciones"
+          title={`Bandeja de ${userName}`}
+          subtitle="Solicitudes pendientes de autorizar"
+        />
+        <ApprovalsInbox
+          client:only="react"
+          data={requests}
+          role={role}
+        />
+      </>
     )}
   </div>
 </MainLayout>

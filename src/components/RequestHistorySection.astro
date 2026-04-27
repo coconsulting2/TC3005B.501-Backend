@@ -1,0 +1,89 @@
+---
+/**
+ * Author: Emiliano Deyta Illescas
+ *
+ * Description:
+ * Status-history timeline for the approval detail screen
+ * (M2-007). Renders chronological status changes on the
+ * request — who acted, when, and what they changed it to.
+ * Falls back to a neutral empty state when no history is
+ * attached so the section is predictable when the backend
+ * hasn't populated this field yet.
+ */
+
+interface HistoryEvent {
+  status?: string;
+  status_label?: string;
+  actor?: string;
+  actor_name?: string;
+  user_name?: string;
+  date?: string;
+  timestamp?: string;
+  note?: string;
+  comment?: string;
+}
+
+const { events = [] } = Astro.props as { events?: HistoryEvent[] };
+
+function formatTimestamp(value: unknown): string {
+  if (!value) return '';
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString('es-MX', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+---
+
+<section class="card-editorial p-5 sm:p-6">
+  <header class="mb-4">
+    <p class="eyebrow">Historial</p>
+    <h2 class="font-editorial text-xl font-normal text-[var(--color-ink)] mt-1">
+      Recorrido de la solicitud
+    </h2>
+  </header>
+
+  {events.length === 0 ? (
+    <p class="text-sm text-[var(--color-ink-muted)]">
+      Esta solicitud aún no tiene movimientos registrados.
+    </p>
+  ) : (
+    <ol class="relative border-l border-[var(--color-neutral-200)] pl-5 space-y-4">
+      {events.map((event) => {
+        const label = event.status_label ?? event.status ?? 'Estado actualizado';
+        const actor =
+          event.actor_name ?? event.user_name ?? event.actor ?? '';
+        const stamp = formatTimestamp(event.timestamp ?? event.date);
+        const note = event.note ?? event.comment ?? '';
+        return (
+          <li class="relative">
+            <span
+              aria-hidden="true"
+              class="absolute -left-[27px] top-2 w-2.5 h-2.5 rounded-full bg-primary-500"
+            ></span>
+            <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1">
+              <p class="text-sm font-medium text-[var(--color-ink)]">{label}</p>
+              {stamp && (
+                <p class="text-xs text-[var(--color-ink-muted)] tabular-nums">
+                  {stamp}
+                </p>
+              )}
+            </div>
+            {actor && (
+              <p class="text-xs text-[var(--color-ink-muted)] mt-0.5">{actor}</p>
+            )}
+            {note && (
+              <p class="text-sm text-[var(--color-ink-secondary)] mt-1 border-l-2 border-[var(--color-neutral-300)] pl-3">
+                {note}
+              </p>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  )}
+</section>

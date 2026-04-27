@@ -1,55 +1,87 @@
 ---
 /**
  * Author: Julia Maria Stephanie Duenkelsbuehler Castillo Y Nicole Davila
- * 
- * Description: This Astro page renders an application approval screen.
- * It includes sections for travel details and buttons for authorization and rejection.
+ * Updated (M2-007): Emiliano Deyta Illescas
+ *   — adds comprobantes / historial sections to the detail view,
+ *     hides the action buttons for non-approver (notification)
+ *     roles and ensures the surviving Aprobar / Rechazar buttons
+ *     keep a 44px minimum tap area on mobile.
+ *
+ * Description: Renders the detailed view of a travel request and the
+ * approve / reject affordances when the current role is allowed to
+ * authorize the request.
  */
 
 import { getCookie } from '@/data/cookies';
 import RequestDetail from '@components/RequestDetail.astro';
+import RequestComprobantesSection from '@components/RequestComprobantesSection.astro';
+import RequestHistorySection from '@components/RequestHistorySection.astro';
 import TravelRequestActionWrapper from '@components/TravelRequestActionWrapper.tsx';
+import { canAuthorizeRequest } from '@utils/canAuthorize';
+import type { UserRole } from '@type/roles';
 
 /** Backend: PUT .../authorize-travel-request/:request_id/:user_id — debe ser el ID del autorizador en sesión. */
 const authorizerUserId = getCookie('id', Astro.cookies);
+const role: UserRole = (getCookie('role', Astro.cookies) as UserRole) ?? '';
 const { request } = Astro.props;
 const id = request.request_id;
+const canAct = canAuthorizeRequest(role);
+const receipts = Array.isArray(request?.receipts) ? request.receipts : [];
+const history = Array.isArray(request?.status_history)
+  ? request.status_history
+  : Array.isArray(request?.history)
+    ? request.history
+    : [];
 ---
 <main class="flex flex-col">
-  <div>
+  <div class="flex flex-col gap-6">
     <RequestDetail
       request={request}
       title={`SOLICITUD #${request.request_id}`}
       subtitle="Detalles de la solicitud"
     />
-    <div class="flex justify-end gap-4 mt-8">
-      <TravelRequestActionWrapper
-        client:only="react"
-        request_id={id}
-        endpoint="/authorizer/authorize-travel-request"
-        user_id={authorizerUserId}
-        title="Confirmar autorización"
-        message="¿Está seguro de que desea autorizar esta solicitud?"
-        redirection="/dashboard"
-        modal_type="success"
-        token={getCookie("token", Astro.cookies)}
-        >
-        Aceptar
-      </TravelRequestActionWrapper>
 
-      <TravelRequestActionWrapper
-        client:only="react"
-        request_id={id}
-        endpoint="/authorizer/decline-travel-request"
-        user_id={authorizerUserId}
-        title="Rechazar autorización"
-        message="¿Está seguro de que desea rechazar esta solicitud?"
-        redirection="/dashboard"
-        modal_type="warning"
-        token={getCookie("token", Astro.cookies)}
+    <RequestComprobantesSection receipts={receipts} />
+    <RequestHistorySection events={history} />
+
+    {canAct ? (
+      <div class="flex flex-col sm:flex-row sm:justify-end gap-3 sm:gap-4 mt-2">
+        <TravelRequestActionWrapper
+          client:only="react"
+          request_id={id}
+          endpoint="/authorizer/authorize-travel-request"
+          user_id={authorizerUserId}
+          title="Confirmar autorización"
+          message="¿Está seguro de que desea autorizar esta solicitud?"
+          redirection="/dashboard"
+          modal_type="success"
+          token={getCookie("token", Astro.cookies)}
         >
-        Rechazar
-      </TravelRequestActionWrapper>
-    </div>
+          Aceptar
+        </TravelRequestActionWrapper>
+
+        <TravelRequestActionWrapper
+          client:only="react"
+          request_id={id}
+          endpoint="/authorizer/decline-travel-request"
+          user_id={authorizerUserId}
+          title="Rechazar autorización"
+          message="¿Está seguro de que desea rechazar esta solicitud?"
+          redirection="/dashboard"
+          modal_type="warning"
+          token={getCookie("token", Astro.cookies)}
+        >
+          Rechazar
+        </TravelRequestActionWrapper>
+      </div>
+    ) : (
+      <div
+        role="note"
+        class="rounded-[var(--radius-md)] border border-[var(--color-neutral-200)] bg-[var(--color-surface-secondary)] px-4 py-3 text-sm text-[var(--color-ink-secondary)]"
+      >
+        Esta vista es de <strong>solo lectura</strong> para tu rol. Los botones
+        de aprobación están reservados para los autorizadores N1 y N2.
+      </div>
+    )}
   </div>
 </main>

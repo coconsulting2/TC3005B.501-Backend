@@ -52,7 +52,7 @@ export default function ModalWrapper({
         onClick={() => {
           if (!disabled) setIsOpen(true);
         }}
-        className={`${buttonClassName} pointer-events-auto transition-transform duration-200 hover:scale-105`}
+        className={`${buttonClassName} pointer-events-auto transition-transform duration-200 hover:scale-105 min-h-11 min-w-11`}
         style={disabled ? { opacity: 0.5, pointerEvents: "none" } : undefined}
       >
         {children}
