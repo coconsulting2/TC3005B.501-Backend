@@ -52,4 +52,53 @@ export const handlers = [
   http.delete(`${API}/applicant/delete-receipt/:id`, () => {
     return HttpResponse.json({ ok: true });
   }),
+
+  http.get(`${API}/admin/roles`, () => {
+    return HttpResponse.json([
+      {
+        role_id: 1,
+        name: "Administrador",
+        permissions: ["admin.roles.gestionar"],
+        max_authorization_amount: null,
+        expiration_date: null,
+        is_admin: true,
+        active_users_count: 2,
+      },
+    ]);
+  }),
+
+  http.post(`${API}/admin/roles`, () => {
+    return HttpResponse.json({
+      role_id: 99,
+      name: "Nuevo rol",
+      permissions: [],
+      max_authorization_amount: null,
+      expiration_date: null,
+      is_admin: false,
+      active_users_count: 0,
+    });
+  }),
+
+  http.put(`${API}/admin/roles/:id`, () => {
+    return HttpResponse.json({ ok: true });
+  }),
+
+  http.post(`${API}/workflow/simulate`, () => {
+    return HttpResponse.json({
+      input: { monto: 0, tipo_gasto: "viaje_nacional", destino: "nacional" },
+      steps: [
+        {
+          level: 1,
+          role: "remote",
+          role_label: "Aprobador remoto",
+          limit: null,
+          status: "pending",
+        },
+      ],
+      total_levels: 1,
+      auto_approved: false,
+      escalation_triggered: false,
+      summary: "Respuesta del backend simulada.",
+    });
+  }),
 ];
