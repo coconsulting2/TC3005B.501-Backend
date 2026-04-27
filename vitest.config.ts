@@ -56,6 +56,9 @@ export default defineConfig({
         "src/components/XmlExpenseForm.tsx",
         "src/components/ResumenTramos.tsx",
         "src/components/UploadReceiptFiles.tsx",
+        "src/components/RolesAdmin.tsx",
+        "src/components/SimuladorWorkflow.tsx",
+        "src/components/RequestsLists/AuthRequestsList.tsx",
       ],
       thresholds: {
         lines: 70,
