@@ -18,10 +18,10 @@
     "build:ts": "bunx tsc -p tsconfig.build.json",
     "typecheck:new": "bunx tsc -p tsconfig.src-ts.json --noEmit",
     "build": "node scripts/verify-build.mjs",
-    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage --testPathIgnorePatterns=/node_modules|\\.e2e\\.test\\.",
-    "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch --testPathIgnorePatterns=/node_modules|\\.e2e\\.test\\.",
-    "docker:test": "docker compose -f docker-compose.dev.yml exec -T -e NODE_OPTIONS=--experimental-vm-modules backend bunx jest --coverage --testPathIgnorePatterns='/node_modules|\\.e2e\\.test\\.'",
-    "docker:test:watch": "docker compose -f docker-compose.dev.yml exec -e NODE_OPTIONS=--experimental-vm-modules backend bunx jest --watch --testPathIgnorePatterns='/node_modules|\\.e2e\\.test\\.'",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage",
+    "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch",
+    "docker:test": "docker compose -f docker-compose.dev.yml exec -T -e NODE_OPTIONS=--experimental-vm-modules backend bunx jest --coverage",
+    "docker:test:watch": "docker compose -f docker-compose.dev.yml exec -e NODE_OPTIONS=--experimental-vm-modules backend bunx jest --watch",
     "docker:prisma": "docker compose -f docker-compose.dev.yml exec -T backend bunx prisma",
     "test:e2e": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js tests --verbose --detectOpenHandles --testTimeout=60000 --testMatch=**/*.e2e.test*.{js,ts}",
     "test:e2e:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js tests --watch --verbose --detectOpenHandles --testTimeout=60000 --testMatch=**/*.e2e.test*.{js,ts}",
@@ -95,7 +95,8 @@
       "middleware/authErrors.js"
     ],
     "testPathIgnorePatterns": [
-      "/node_modules/"
+      "/node_modules/",
+      "\\.e2e\\.test\\."
     ]
   },
   "prisma": {
