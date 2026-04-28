@@ -111,29 +111,29 @@ const toVerify = requests.filter((r: any) =>
           const isLast = index === requests.length - 1;
 
           return (
-            <div class={`px-6 py-4 flex items-center justify-between gap-6 ${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''} hover:bg-[var(--color-surface-secondary)] transition-colors`}>
-              <!-- Left: Number + Info -->
-              <div class="flex items-center gap-4 flex-1 min-w-0">
-                <span class="font-editorial text-lg text-[var(--color-ink-muted)] tabular-nums w-6 text-right">
+            <div class={`px-4 sm:px-6 py-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between lg:gap-6 ${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''} hover:bg-[var(--color-surface-secondary)] transition-colors`}>
+              <!-- Izquierda: número + destino/fechas (ancho completo en móvil) -->
+              <div class="flex gap-3 sm:gap-4 min-w-0 w-full lg:flex-1 lg:items-center">
+                <span class="font-editorial text-lg text-[var(--color-ink-muted)] tabular-nums w-8 shrink-0 text-right pt-0.5">
                   {String(index + 1).padStart(2, '0')}
                 </span>
-                <a href={`/detalles-solicitud/${request.request_id}`} class="flex-1 min-w-0">
-                  <p class="font-medium text-[var(--color-ink)] truncate">
+                <a href={`/detalles-solicitud/${request.request_id}`} class="block min-w-0 flex-1">
+                  <p class="font-medium text-[var(--color-ink)] break-words">
                     {request.destination_country}
                   </p>
-                  <p class="text-xs text-[var(--color-ink-muted)] mt-0.5">
+                  <p class="text-xs text-[var(--color-ink-muted)] mt-1 leading-snug">
                     #{request.request_id} &middot; {request.beginning_date} &ndash; {request.ending_date}
                   </p>
                 </a>
               </div>
 
-              <!-- Status pill -->
-              <span class={`status-pill ${statusMap[request.status] || 'status-pill--review'}`}>
-                {request.status}
-              </span>
+              <!-- Pastilla + acciones: debajo en móvil; fila en lg -->
+              <div class="flex flex-wrap items-center gap-2 sm:gap-3 w-full min-w-0 pl-11 lg:pl-0 lg:w-auto lg:max-w-full lg:flex-shrink-0 lg:justify-end">
+                <span class={`status-pill shrink-0 max-w-full ${statusMap[request.status] || 'status-pill--review'}`}>
+                  {request.status}
+                </span>
 
-              <!-- Actions -->
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap ml-auto lg:ml-0">
                 {isEditable && (
                   <a href={`/editar-solicitud/${request.request_id}`}>
                     <Button variant="border" color="primary" size="small">
@@ -160,6 +160,7 @@ const toVerify = requests.filter((r: any) =>
                     </div>
                   </CancelRequestModal>
                 )}
+              </div>
               </div>
             </div>
           );

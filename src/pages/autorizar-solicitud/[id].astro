@@ -30,8 +30,20 @@ try {
   return Astro.redirect('/404');
 }
 
+let canAuthorize = false;
+try {
+  const me = await apiRequest<{ permissions?: string[] }>(`/user/me/permissions`, {
+    cookies: Astro.cookies,
+  });
+  canAuthorize =
+    Array.isArray(me.permissions) &&
+    me.permissions.includes("travel_request:authorize");
+} catch {
+  canAuthorize = false;
+}
+
 ---
 
 <MainLayout title={`Solicitud #${request.request_id}`} data={{ userName, buttonLabel, role }} >
-  <RequestApproval request={request} />
+  <RequestApproval request={request} canAuthorize={canAuthorize} />
 </MainLayout>

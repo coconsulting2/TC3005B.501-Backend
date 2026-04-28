@@ -1,31 +1,36 @@
 ---
 /**
- * Author: Julia Maria Stephanie Duenkelsbuehler Castillo Y Nicole Davila
- * Updated (M2-007): Emiliano Deyta Illescas
- *   — adds comprobantes / historial sections to the detail view,
- *     hides the action buttons for non-approver (notification)
- *     roles and ensures the surviving Aprobar / Rechazar buttons
- *     keep a 44px minimum tap area on mobile.
+ * Authors: Julia Maria Stephanie Duenkelsbuehler Castillo, Nicole Davila.
+ * Actualizado (M2-007): Emiliano Deyta Illescas — secciones comprobantes e historial;
+ * solo lectura para roles sin travel_request:authorize; botones accesibles.
  *
- * Description: Renders the detailed view of a travel request and the
- * approve / reject affordances when the current role is allowed to
- * authorize the request.
+ * Detalle de solicitud de viaje para autorización.
  */
 
-import { getCookie } from '@/data/cookies';
-import RequestDetail from '@components/RequestDetail.astro';
-import RequestComprobantesSection from '@components/RequestComprobantesSection.astro';
-import RequestHistorySection from '@components/RequestHistorySection.astro';
-import TravelRequestActionWrapper from '@components/TravelRequestActionWrapper.tsx';
-import { canAuthorizeRequest } from '@utils/canAuthorize';
-import type { UserRole } from '@type/roles';
+import { getCookie } from "@data/cookies";
+import RequestDetail from "@components/RequestDetail.astro";
+import RequestComprobantesSection from "@components/RequestComprobantesSection.astro";
+import RequestHistorySection from "@components/RequestHistorySection.astro";
+import TravelRequestActionWrapper from "@components/TravelRequestActionWrapper.tsx";
 
-/** Backend: PUT .../authorize-travel-request/:request_id/:user_id — debe ser el ID del autorizador en sesión. */
-const authorizerUserId = getCookie('id', Astro.cookies);
-const role: UserRole = (getCookie('role', Astro.cookies) as UserRole) ?? '';
-const { request } = Astro.props;
+interface Props {
+  request: Record<string, unknown> & {
+    request_id: number;
+    receipts?: unknown;
+    status_history?: unknown;
+    history?: unknown;
+  };
+  canAuthorize: boolean;
+}
+
+const { request, canAuthorize } = Astro.props;
+
+/** Backend: PUT .../authorize-travel-request — user_id debe ser el del autorizador en sesión. */
+const authorizerUserId = getCookie("id", Astro.cookies);
 const id = request.request_id;
-const canAct = canAuthorizeRequest(role);
+
+const canAct = canAuthorize;
+
 const receipts = Array.isArray(request?.receipts) ? request.receipts : [];
 const history = Array.isArray(request?.status_history)
   ? request.status_history
@@ -33,6 +38,7 @@ const history = Array.isArray(request?.status_history)
     ? request.history
     : [];
 ---
+
 <main class="flex flex-col">
   <div class="flex flex-col gap-6">
     <RequestDetail
@@ -44,44 +50,47 @@ const history = Array.isArray(request?.status_history)
     <RequestComprobantesSection receipts={receipts} />
     <RequestHistorySection events={history} />
 
-    {canAct ? (
-      <div class="flex flex-col sm:flex-row sm:justify-end gap-3 sm:gap-4 mt-2">
-        <TravelRequestActionWrapper
-          client:only="react"
-          request_id={id}
-          endpoint="/authorizer/authorize-travel-request"
-          user_id={authorizerUserId}
-          title="Confirmar autorización"
-          message="¿Está seguro de que desea autorizar esta solicitud?"
-          redirection="/dashboard"
-          modal_type="success"
-          token={getCookie("token", Astro.cookies)}
-        >
-          Aceptar
-        </TravelRequestActionWrapper>
+    {
+      canAct ? (
+        <div class="flex flex-col gap-3 mt-2 sm:flex-row sm:justify-end sm:gap-4">
+          <TravelRequestActionWrapper
+            client:only="react"
+            request_id={id}
+            endpoint="/authorizer/authorize-travel-request"
+            user_id={authorizerUserId}
+            title="Confirmar autorización"
+            message="¿Está seguro de que desea autorizar esta solicitud?"
+            redirection="/dashboard"
+            modal_type="success"
+            token={getCookie("token", Astro.cookies)}
+          >
+            Aceptar
+          </TravelRequestActionWrapper>
 
-        <TravelRequestActionWrapper
-          client:only="react"
-          request_id={id}
-          endpoint="/authorizer/decline-travel-request"
-          user_id={authorizerUserId}
-          title="Rechazar autorización"
-          message="¿Está seguro de que desea rechazar esta solicitud?"
-          redirection="/dashboard"
-          modal_type="warning"
-          token={getCookie("token", Astro.cookies)}
+          <TravelRequestActionWrapper
+            client:only="react"
+            request_id={id}
+            endpoint="/authorizer/decline-travel-request"
+            user_id={authorizerUserId}
+            title="Rechazar autorización"
+            message="¿Está seguro de que desea rechazar esta solicitud?"
+            redirection="/dashboard"
+            modal_type="warning"
+            token={getCookie("token", Astro.cookies)}
+          >
+            Rechazar
+          </TravelRequestActionWrapper>
+        </div>
+      ) : (
+        <div
+          role="note"
+          class="rounded-[var(--radius-md)] border border-[var(--color-neutral-200)] bg-[var(--color-surface-secondary)] px-4 py-3 text-sm text-[var(--color-ink-secondary)] max-w-xl"
         >
-          Rechazar
-        </TravelRequestActionWrapper>
-      </div>
-    ) : (
-      <div
-        role="note"
-        class="rounded-[var(--radius-md)] border border-[var(--color-neutral-200)] bg-[var(--color-surface-secondary)] px-4 py-3 text-sm text-[var(--color-ink-secondary)]"
-      >
-        Esta vista es de <strong>solo lectura</strong> para tu rol. Los botones
-        de aprobación están reservados para los autorizadores N1 y N2.
-      </div>
-    )}
+          Esta vista es de <strong>solo lectura</strong> para tu rol. Solo quienes
+          tienen permiso para autorizar solicitudes de viaje pueden usar Aceptar o
+          Rechazar.
+        </div>
+      )
+    }
   </div>
 </main>

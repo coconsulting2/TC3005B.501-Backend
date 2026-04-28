@@ -21,12 +21,29 @@ import { apiRequest } from "@/utils/apiClient";
 import { requestAllowsReceiptUpload } from "@utils/receiptUploadAccess";
 
 const { id } = Astro.params;
-let request = null;
+/** Datos de GET /accounts-payable/get-expense-validations/:id */
+let request: {
+  request_status_id?: number;
+  request_status_name?: string;
+  Expenses: Array<Record<string, unknown>>;
+} | null = null;
+let comprobantesError: string | null = null;
 try {
   request = await apiRequest(`/accounts-payable/get-expense-validations/${id}`, { cookies: Astro.cookies });
-} catch (error) {
+} catch (e: unknown) {
+  const detail = e && typeof e === "object" && "detail" in e ? (e as { detail?: { status?: number } }).detail : undefined;
+  const st = detail?.status;
+  if (st === 404) {
+    return Astro.redirect("/404");
+  }
+  if (st === 401) {
+    return Astro.redirect("/login");
+  }
+  comprobantesError =
+    st === 403
+      ? "Tu usuario no tiene permiso para ver esta vista de comprobantes. Si eres Cuentas por pagar, recarga la app tras actualizar; si el problema continúa, vuelve al listado de comprobaciones."
+      : "No se pudo cargar el detalle (error al consultar el servidor). Vuelve al listado e inténtalo de nuevo.";
   request = null;
-  return Astro.redirect('/404');
 }
 
 const StateColors: Record<string, string> = {
@@ -35,12 +52,28 @@ const StateColors: Record<string, string> = {
   'Pendiente': 'status-pill--pending',
 };
 
+const requestStatusId = request ? Number(request.request_status_id) : NaN;
 /** Solo en estado 6 (Comprobación gastos del viaje) se puede enviar a validación (PUT send-expense-validation). */
-const canSendForValidation = Number(request?.request_status_id) === 6;
-const canUploadReceipts = requestAllowsReceiptUpload(request?.request_status_id);
+const canSendForValidation = requestStatusId === 6;
+/** En 7 ya se envió a CxP: el botón no aplica; mostramos confirmación, no un “fallo” de UI. */
+const alreadySentToAccountsPayable = requestStatusId === 7;
+const canUploadReceipts = request ? requestAllowsReceiptUpload(request.request_status_id) : false;
+const listHref = role === "Cuentas por pagar" ? "/comprobaciones" : "/comprobar-gastos";
 ---
 
 <MainLayout title={`Comprobantes de la solicitud #${id}`} data={{ userName, role, buttonLabel }}>
+  {comprobantesError ? (
+    <main class="p-6 max-w-lg mx-auto">
+      <p class="text-sm text-[var(--color-ink)] mb-4">{comprobantesError}</p>
+      <a
+        href={listHref}
+        class="text-sm font-medium text-primary-500 hover:text-primary-600 underline"
+      >
+        Volver al listado de comprobantes
+      </a>
+    </main>
+  ) : (
+  <>
   <main>
     <EditorialHeader
       eyebrow={`Coco / Comprobantes / #${id}`}
@@ -61,10 +94,10 @@ const canUploadReceipts = requestAllowsReceiptUpload(request?.request_status_id)
     </EditorialHeader>
 
     <section class="card-editorial overflow-hidden">
-      {request.Expenses.length > 0 ? (
+      {request && request.Expenses.length > 0 ? (
         <div>
           {request.Expenses.map((expense: any, index: number) => {
-            const isLast = index === request.Expenses.length - 1;
+            const isLast = index === request!.Expenses.length - 1;
             return (
               <div class={`px-6 py-5 flex items-center justify-between gap-4 ${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''}`}>
                 <div class="flex items-center gap-4 flex-1 min-w-0">
@@ -106,7 +139,26 @@ const canUploadReceipts = requestAllowsReceiptUpload(request?.request_status_id)
   </main>
 
   <div class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 max-w-sm">
-    {!canSendForValidation && (
+    {alreadySentToAccountsPayable && (
+      <div
+        class="text-xs text-right bg-[var(--color-surface-white)] border border-success-200 rounded-[var(--radius-md)] px-3 py-2 shadow-sm"
+        role="status"
+      >
+        <p class="text-[var(--color-ink)] font-medium">Comprobantes en validación</p>
+        <p class="text-[var(--color-ink-muted)] mt-1">
+          Ya enviaste los comprobantes a cuentas por pagar. No hace falta volver a <strong class="text-[var(--color-ink)]">Mandar a validar</strong>.
+        </p>
+      </div>
+    )}
+    {!alreadySentToAccountsPayable && !canSendForValidation && requestStatusId > 7 && (
+      <p class="text-xs text-[var(--color-ink-muted)] text-right bg-[var(--color-surface-white)] border border-[var(--color-neutral-200)] rounded-[var(--radius-md)] px-3 py-2 shadow-sm">
+        La solicitud ya avanzó de fase; mandar a validar no aplica.
+        {request?.request_status_name && (
+          <> Estado actual: <strong>{request.request_status_name}</strong>.</>
+        )}
+      </p>
+    )}
+    {!alreadySentToAccountsPayable && !canSendForValidation && requestStatusId < 6 && (
       <p class="text-xs text-[var(--color-ink-muted)] text-right bg-[var(--color-surface-white)] border border-[var(--color-neutral-200)] rounded-[var(--radius-md)] px-3 py-2 shadow-sm">
         Solo puedes mandar a validar cuando la solicitud está en <strong>Comprobación gastos del viaje</strong>.
         {request?.request_status_name && (
@@ -114,18 +166,22 @@ const canUploadReceipts = requestAllowsReceiptUpload(request?.request_status_id)
         )}
       </p>
     )}
-    <ValidateReceiptStatus
-      client:only="react"
-      request_id={Number(id)}
-      title="Confirmar envío"
-      message="¿Está seguro de que desea mandar estos comprobantes?"
-      redirection="/dashboard"
-      modal_type="success"
-      variant="filled"
-      disabled={!canSendForValidation}
-      token={getCookie("token", Astro.cookies)}
-    >
-      Mandar a validar
-    </ValidateReceiptStatus>
+    {!alreadySentToAccountsPayable && (canSendForValidation || requestStatusId < 6) && (
+      <ValidateReceiptStatus
+        client:only="react"
+        request_id={Number(id)}
+        title="Confirmar envío"
+        message="¿Está seguro de que desea mandar estos comprobantes?"
+        redirection="/dashboard"
+        modal_type="success"
+        variant="filled"
+        disabled={!canSendForValidation}
+        token={getCookie("token", Astro.cookies)}
+      >
+        Mandar a validar
+      </ValidateReceiptStatus>
+    )}
   </div>
+  </>
+  )}
 </MainLayout>

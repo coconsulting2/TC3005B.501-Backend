@@ -13,9 +13,9 @@ import MaterialIcon from "@components/MaterialIcon.astro";
 const isCurrentRoute = Astro.url.pathname === "/perfil-usuario";
 ---
 
-<header class="flex justify-between items-center bg-[var(--color-surface-white)] border-b border-[var(--color-neutral-200)] px-4 md:px-6 h-14">
+<header class="flex min-h-14 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-[var(--color-neutral-200)] bg-[var(--color-surface-white)] px-3 py-2 sm:px-4 md:h-14 md:flex-nowrap md:gap-x-3 md:px-6 md:py-0">
   <!-- Left: Hamburger (mobile) + Logo + Brand -->
-  <div class="flex items-center gap-3">
+  <div class="flex min-w-0 flex-1 items-center gap-2 sm:gap-3 md:min-w-[auto] md:flex-none">
     <button id="menu-btn" class="md:hidden flex items-center justify-center w-11 h-11 rounded-[var(--radius-md)] hover:bg-[var(--color-surface-secondary)] transition-colors">
       <MaterialIcon icon="menu" color="currentColor" />
     </button>
@@ -30,14 +30,14 @@ const isCurrentRoute = Astro.url.pathname === "/perfil-usuario";
   </div>
 
   <!-- Right: Role + Actions + User -->
-  <div class="flex items-center gap-3">
-    <!-- User Role Badge -->
-    <span class="status-pill bg-[var(--color-surface-secondary)] text-[var(--color-ink-secondary)] border border-[var(--color-neutral-200)] hidden sm:inline-flex">
+  <div class="flex shrink-0 items-center gap-1.5 sm:gap-2 md:gap-3">
+    <!-- Rol: solo desde lg para no pisar logo/cierre en móvil-tablet -->
+    <span class="status-pill hidden max-w-[10rem] truncate border border-[var(--color-neutral-200)] bg-[var(--color-surface-secondary)] text-[var(--color-ink-secondary)] lg:inline-flex" title={buttonLabel}>
       {buttonLabel}
     </span>
 
     <!-- Actions -->
-    <div class="flex items-center gap-1">
+    <div class="flex items-center gap-0.5 sm:gap-1">
       <LogoutButton client:load>
         <div class="p-2 rounded-[var(--radius-md)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-ink)] transition-colors cursor-pointer">
           <MaterialIcon icon="logout" color="currentColor" />
@@ -46,7 +46,7 @@ const isCurrentRoute = Astro.url.pathname === "/perfil-usuario";
     </div>
 
     <!-- User Info -->
-    <div class="flex items-center gap-3 pl-2 border-l border-[var(--color-neutral-200)]">
+    <div class="flex items-center gap-2 border-[var(--color-neutral-200)] pl-1 sm:gap-3 sm:border-l sm:pl-2 md:pl-3">
       <span class="text-sm font-medium text-[var(--color-ink)] hidden md:block">
         {userName}
       </span>

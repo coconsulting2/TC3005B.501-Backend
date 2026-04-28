@@ -6,7 +6,7 @@ import Button from "@components/Button.tsx";
 import { submitTravelExpense } from "@components/SubmitTravelWarper";
 import ModalWrapper from "@components/ModalWrapper.tsx";
 import { apiRequest } from "@utils/apiClient";
-import { extractCfdiUuidFromXml } from "@utils/cfdiXml";
+import { extractCfdiTotalFromXml, extractCfdiUuidFromXml } from "@utils/cfdiXml";
 import { showAppAlert } from "@utils/appAlert";
 
 const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL;
@@ -62,6 +62,22 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
 
   const dropZoneRef = useRef<FileDropZoneHandle>(null);
   const showDevPanel = isDevTaxPreviewEnabled();
+
+  const onXmlFileChange = (file: File | null) => {
+    setXmlFile(file);
+    if (!file || isInternational) return;
+    void (async () => {
+      try {
+        const text = await file.text();
+        const total = extractCfdiTotalFromXml(text);
+        if (total != null) {
+          setMonto(total.toFixed(2));
+        }
+      } catch {
+        /* XML no legible: el usuario sigue pudiendo escribir el monto a mano */
+      }
+    })();
+  };
 
   const handleSubmit = async () => {
     try {
@@ -271,7 +287,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         token={token}
         isInternational={isInternational}
         onPdfChange={setPdfFile}
-        onXmlChange={setXmlFile}
+        onXmlChange={onXmlFileChange}
       />
 
       {/* ── Actions ── */}

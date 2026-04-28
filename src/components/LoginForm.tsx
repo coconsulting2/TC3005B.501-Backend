@@ -3,9 +3,9 @@
  * Identidad: "Editorial Finance"
  *
  * Layout:
- *  • Mobile  → panel oscuro como banner compacto centrado arriba
- *              + form abajo con scroll (flex-1)
- *  • Desktop: 50/50. Panel izq.: self-stretch, sin items-center; md: flex-1 entre hero y pie.
+ *  • Mobile  → panel oscuro mínimo (sin lista valor); sin scroll en el hero.
+ *              Formulario flex-1 (scroll solo si no cabe en pantallas muy bajas).
+ *  • Desktop: 50/50. Panel izq.: self-stretch; md: flex-1 entre hero y pie.
  */
 
 import React, { useState } from "react";
@@ -135,9 +135,8 @@ export default function LoginForm() {
 
       <div
         className={[
-          "relative z-0 flex w-full min-w-0 flex-col self-stretch p-8 text-center",
-          "shrink-0",
-          "md:min-h-0 md:h-full md:w-1/2 md:shrink-0 md:py-6 md:pl-6 md:pr-6",
+          "relative z-0 flex w-full min-w-0 shrink-0 flex-col self-stretch px-4 pb-2 pt-3 text-center",
+          "md:h-full md:w-1/2 md:min-h-0 md:shrink-0 md:p-8 md:py-6 md:pl-6 md:pr-6",
           "lg:py-8 lg:pl-8 lg:pr-8",
         ].join(" ")}
         style={{
@@ -148,7 +147,7 @@ export default function LoginForm() {
       >
         <div className="flex w-full shrink-0 justify-center">
           <div className="md:hidden">
-            <CocoLogo size={32} />
+            <CocoLogo size={28} />
           </div>
           <div className="hidden md:block">
             <CocoLogo size={36} />
@@ -157,7 +156,7 @@ export default function LoginForm() {
 
         {/* text-wrap balance/pretty eliminado: en algunos motores forza caja ~min-content. */}
         <div
-          className="mt-5 w-full min-w-0 self-stretch md:mt-3 md:min-h-0 md:flex-1 md:flex md:w-full md:min-w-0 md:flex-col md:items-stretch md:justify-center"
+          className="mt-3 w-full min-w-0 self-stretch max-md:mt-2 md:mt-3 md:min-h-0 md:flex-1 md:flex md:w-full md:min-w-0 md:flex-col md:items-stretch md:justify-center"
         >
           <div
             className="mx-auto w-full min-w-0 max-w-3xl"
@@ -173,67 +172,68 @@ export default function LoginForm() {
                 width: "100%",
                 maxWidth: "100%",
               }}
-              className="box-border block w-full min-w-0 text-[1.5rem] leading-[1.2] md:text-[1.75rem] md:leading-[1.2] lg:text-[1.9rem] xl:text-[2rem] xl:leading-[1.12]"
+              className="box-border block w-full min-w-0 text-[1.125rem] leading-[1.25] sm:text-[1.35rem] md:text-[1.75rem] md:leading-[1.2] lg:text-[1.9rem] xl:text-[2rem] xl:leading-[1.12]"
             >
               Agendar viajes no debería ser tan complicado
             </h1>
 
             <div
-              className="mt-3 h-[1.5px] w-8 bg-[var(--color-primary-500)] mx-auto md:mt-4"
+              className="mt-2 h-[1.5px] w-8 bg-[var(--color-primary-500)] mx-auto md:mt-4"
               aria-hidden
             />
 
-            <p
-              className="mt-4 w-full max-w-full md:mt-5"
-              style={{
-                fontSize: "0.8125rem",
-                lineHeight: 1.4,
-                color: "rgba(255,255,255,0.45)",
-                fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)",
-                letterSpacing: "0.04em",
-              }}
-            >
-              Lo que puedes hacer con Coco:
-            </p>
+            {/* Solo desktop: copy + lista (en móvil se oculta para dejar sitio al formulario) */}
+            <div className="hidden md:block">
+              <p
+                className="mt-5 w-full max-w-full"
+                style={{
+                  fontSize: "0.8125rem",
+                  lineHeight: 1.4,
+                  color: "rgba(255,255,255,0.45)",
+                  fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)",
+                  letterSpacing: "0.04em",
+                }}
+              >
+                Lo que puedes hacer con Coco:
+              </p>
 
-            <ul
-              className="m-0 mt-2.5 w-full min-w-0 list-none space-y-1.5 p-0 sm:mt-3 sm:space-y-2"
-              role="list"
-              style={{
-                fontSize: "0.8125rem",
-                lineHeight: 1.4,
-                color: "rgba(255,255,255,0.7)",
-                fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)",
-                width: "100%",
-                maxWidth: "100%",
-              }}
-            >
-              {VALUE_PROPS.map((line) => (
-                <li
-                  key={line}
-                  className="flex w-full min-w-0 max-w-full items-start justify-center gap-3"
-                >
-                  <span
-                    className="mt-[0.35em] block shrink-0"
-                    style={{
-                      width: 5,
-                      height: 5,
-                      backgroundColor: "var(--color-primary-300, #6B7D52)",
-                      borderRadius: 1,
-                    }}
-                    aria-hidden
-                  />
-                  <span className="min-w-0 flex-1 text-center md:text-left">
-                    {line}
-                  </span>
-                </li>
-              ))}
-            </ul>
+              <ul
+                className="m-0 mt-3 w-full min-w-0 list-none space-y-2 p-0"
+                role="list"
+                style={{
+                  fontSize: "0.8125rem",
+                  lineHeight: 1.4,
+                  color: "rgba(255,255,255,0.7)",
+                  fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)",
+                  width: "100%",
+                  maxWidth: "100%",
+                }}
+              >
+                {VALUE_PROPS.map((line) => (
+                  <li
+                    key={line}
+                    className="flex w-full min-w-0 max-w-full items-start justify-center gap-3 md:justify-start"
+                  >
+                    <span
+                      className="mt-[0.35em] block shrink-0"
+                      style={{
+                        width: 5,
+                        height: 5,
+                        backgroundColor: "var(--color-primary-300, #6B7D52)",
+                        borderRadius: 1,
+                      }}
+                      aria-hidden
+                    />
+                    <span className="min-w-0 flex-1 text-left">{line}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
 
         <p
-          className="mt-4 w-full shrink-0 text-center sm:mt-5 md:mt-3"
+          className="mt-1.5 w-full shrink-0 text-center md:mt-3 max-md:text-[0.625rem]"
           style={{
             fontSize: "0.6875rem",
             letterSpacing: "0.08em",
@@ -249,14 +249,13 @@ export default function LoginForm() {
       {/* ═══════════════════════════════════════════════════════════════
        *  PANEL CLARO — Formulario
        *
-       *  Mobile:  flex-1, scroll vertical si no cabe
+       *  Mobile:  flex-1, contenido arriba; scroll solo si viewport muy bajo
        *  Desktop: w-1/2, min-w-[340px], centrado
        * ═══════════════════════════════════════════════════════════════ */}
       <div
         className={[
-          "flex w-full min-h-0 flex-1 flex-col justify-center",
-          "overflow-y-auto px-8 py-4 min-[500px]:py-6 md:max-h-dvh md:py-8",
-          "md:w-1/2 md:min-w-[340px] md:px-12 lg:px-16",
+          "flex w-full min-h-0 flex-1 flex-col justify-start md:justify-center",
+          "overflow-y-auto overscroll-contain px-6 py-2 min-[500px]:px-8 min-[500px]:py-5 md:max-h-dvh md:w-1/2 md:min-w-[340px] md:py-8 md:px-12 lg:px-16",
         ].join(" ")}
         style={{ backgroundColor: COLOR_SURFACE }}
       >
@@ -276,12 +275,11 @@ export default function LoginForm() {
 
           {/* Título */}
           <h2
+            className="mt-1 text-[1.35rem] leading-tight md:mt-1.5 md:text-2xl"
             style={{
-              marginTop: 6,
               fontFamily:
                 "var(--font-editorial, Fraunces, 'Instrument Serif', Georgia, serif)",
               fontWeight: 400,
-              fontSize: "1.5rem",
               letterSpacing: "-0.01em",
               color: COLOR_BG_DARK,
             }}
@@ -291,8 +289,8 @@ export default function LoginForm() {
 
           {/* Subtítulo */}
           <p
+            className="mt-1 md:mt-1"
             style={{
-              marginTop: 4,
               fontSize: "0.8125rem",
               color: "rgba(10,10,10,0.55)",
               fontFamily: "var(--font-sans, Inter, system-ui, sans-serif)",
@@ -302,9 +300,9 @@ export default function LoginForm() {
           </p>
 
           {/* ── Form ── */}
-          <form onSubmit={handleSubmit} style={{ marginTop: 32 }}>
+          <form onSubmit={handleSubmit} className="mt-5 md:mt-8">
             {/* Usuario */}
-            <div style={{ marginBottom: 24 }}>
+            <div className="mb-4 md:mb-6">
               <label htmlFor="username" style={labelStyle}>
                 Usuario
               </label>
@@ -327,7 +325,7 @@ export default function LoginForm() {
             </div>
 
             {/* Contraseña */}
-            <div style={{ marginBottom: 32 }}>
+            <div className="mb-5 md:mb-8">
               <div
                 style={{
                   display: "flex",
@@ -402,10 +400,8 @@ export default function LoginForm() {
 
           {/* Footer */}
           <p
+            className="mt-5 text-center text-[0.75rem] md:mt-10"
             style={{
-              marginTop: 40,
-              textAlign: "center",
-              fontSize: "0.75rem",
               color: "rgba(10,10,10,0.4)",
             }}
           >
@@ -416,13 +412,10 @@ export default function LoginForm() {
           </p>
 
           <p
+            className="mt-2 hidden text-center text-[0.6875rem] tracking-wide text-[rgba(10,10,10,0.3)] md:mt-5 md:block"
             style={{
-              marginTop: 20,
-              textAlign: "center",
-              fontSize: "0.6875rem",
               letterSpacing: "0.06em",
               textTransform: "uppercase",
-              color: "rgba(10,10,10,0.3)",
             }}
           >
             CocoAPI v0.4.2

@@ -110,9 +110,27 @@ const { title, data, showMessages = false } = Astro.props;
       }
 
       @media (max-width: 767px) {
-        #app {
-          grid-template-areas: "header" "content";
+        /* Una sola columna: sin columna de mensajes (evita huecos y barras raras) */
+        #app.list-messages {
           grid-template-columns: 1fr;
+          grid-template-areas:
+            "header"
+            "content";
+        }
+
+        #app {
+          grid-template-areas:
+            "header"
+            "content";
+          grid-template-columns: 1fr;
+        }
+
+        #messages {
+          display: none;
+        }
+
+        #content {
+          min-height: 0;
         }
 
         #sidebar {
