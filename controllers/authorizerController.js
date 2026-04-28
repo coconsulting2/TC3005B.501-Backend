@@ -37,8 +37,17 @@ const getAlerts = async (req, res) => {
 const authorizeTravelRequest = async (req, res) => {
   const { request_id, user_id } = req.params;
 
+  if (Number(req.user.user_id) !== Number(user_id)) {
+    return res
+      .status(403)
+      .json({ error: "No puedes actuar en nombre de otro usuario" });
+  }
+
   try {
-    const { new_status } = await authorizerServices.authorizeRequest(Number(request_id), Number(user_id));
+    const { new_status, outcome } = await authorizerServices.authorizeRequest(
+      Number(request_id),
+      Number(user_id),
+    );
     try {
       const { user_email, user_name, status } = await mailData(request_id);
       await Mail(user_email, user_name, request_id, status);
@@ -47,7 +56,8 @@ const authorizeTravelRequest = async (req, res) => {
     }
     return res.status(200).json({
       message: "Request status updated successfully",
-      new_status
+      new_status,
+      outcome: outcome ?? "APROBADO",
     });
   } catch (error) {
     if (error.status) {
@@ -67,8 +77,20 @@ const authorizeTravelRequest = async (req, res) => {
 const declineTravelRequest = async (req, res) => {
   const { request_id, user_id } = req.params;
 
+  if (Number(req.user.user_id) !== Number(user_id)) {
+    return res
+      .status(403)
+      .json({ error: "No puedes actuar en nombre de otro usuario" });
+  }
+
+  const comentario = req.body?.comentario ?? req.body?.comment;
+
   try {
-    const result = await authorizerServices.declineRequest(Number(request_id), Number(user_id));
+    const result = await authorizerServices.declineRequest(
+      Number(request_id),
+      Number(user_id),
+      comentario,
+    );
     try {
       const { user_email, user_name, status } = await mailData(request_id);
       await Mail(user_email, user_name, request_id, status);

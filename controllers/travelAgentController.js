@@ -29,8 +29,15 @@ const attendTravelRequest = async (req, res) => {
             return res.status(400).json({ error: "Failed to update travel request status" });
         }
 
-        const { user_email, user_name, request_id, status } = await mailData(requestId);
-        await Mail(user_email, user_name, request_id, status);
+        try {
+            const { user_email, user_name, request_id, status } = await mailData(requestId);
+            await Mail(user_email, user_name, request_id, status);
+        } catch (mailErr) {
+            console.warn(
+                "[attendTravelRequest / travel-agent] Estado actualizado; correo no enviado:",
+                mailErr?.message || mailErr
+            );
+        }
 
         return res.status(200).json({
             message: "Travel request status updated successfully",

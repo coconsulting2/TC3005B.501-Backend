@@ -89,8 +89,15 @@ const validateReceiptsHandler = async (req, res) => {
 
     try {
         const result = await AccountsPayableService.validateReceiptsAndUpdateStatus(requestId);
-        const { user_email, user_name, status } = await mailData(requestId);
-        await Mail(user_email, user_name, requestId, status);
+        try {
+            const { user_email, user_name, status } = await mailData(requestId);
+            await Mail(user_email, user_name, requestId, status);
+        } catch (mailErr) {
+            console.warn(
+                "[validateReceiptsHandler] Validación finalizada; correo no enviado:",
+                mailErr?.message || mailErr
+            );
+        }
         res.status(200).json(result);
     } catch (error) {
         console.error("Error in validateReceiptsHandler:", error);
