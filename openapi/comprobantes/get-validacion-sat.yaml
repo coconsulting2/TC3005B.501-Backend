@@ -1,0 +1,85 @@
+paths:
+  /comprobantes/{id}/validacion-sat:
+    get:
+      summary: Obtener ultimo estado SAT de un CFDI por recibo
+      description: |
+        Devuelve el ultimo estado SAT almacenado para el CFDI asociado al `receipt_id`.
+        No dispara una consulta nueva al SAT; responde con los datos persistidos en BD.
+      tags:
+        - Comprobantes
+      security:
+        - TokenAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID del recibo (receipt_id)
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Estado SAT recuperado correctamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [vigente, cancelado, no_encontrado]
+                  verified_at:
+                    type: string
+                    format: date-time
+                required: [status, verified_at]
+              example:
+                status: vigente
+                verified_at: "2026-04-22T10:00:00.000Z"
+        "401":
+          description: Token ausente o invalido
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                  message:
+                    type: string
+                  error:
+                    type: string
+        "403":
+          description: Rol sin permisos para consultar este recurso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusCode:
+                    type: integer
+                  message:
+                    type: string
+                  error:
+                    type: string
+        "404":
+          description: No existe CFDI con validacion SAT para ese recibo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: No SAT validation found for this receipt
+        "500":
+          description: Error interno del servidor
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+              example:
+                error: Internal server error
