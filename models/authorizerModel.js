@@ -2,7 +2,10 @@
  * @module authorizerModel
  * @description Data access layer for authorizer-related queries using Prisma.
  */
+import { SolicitudHistorialAccion } from "@prisma/client";
 import prisma from "../database/config/prisma.js";
+
+export { SolicitudHistorialAccion };
 
 const Authorizer = {
   /**
@@ -76,9 +79,58 @@ const Authorizer = {
       select: {
         requestStatusId: true,
         workflowPreSnapshot: true,
+        requestedFee: true,
+        userId: true,
       },
     });
     return row;
+  },
+
+  /**
+   * @param {number} userId
+   * @returns {Promise<number|null>} null = sin tope configurado en el rol
+   */
+  async getUserMaxApprovalAmount(userId) {
+    const user = await prisma.user.findUnique({
+      where: { userId: Number(userId) },
+      include: { role: true },
+    });
+    const v = user?.role?.maxApprovalAmount;
+    if (v === undefined || v === null) {
+      return null;
+    }
+    return Number(v);
+  },
+
+  /**
+   * Transición atómica: actualiza Request y registra solicitud_historial (M2-005).
+   * @param {number} requestId
+   * @param {{ statusId: number, workflowPreSnapshot?: object | null }} patch
+   * @param {number} actorUserId
+   * @param {import("@prisma/client").SolicitudHistorialAccion} accion
+   * @param {string|null} [comentario]
+   */
+  async applyWorkflowAction(requestId, patch, actorUserId, accion, comentario = null) {
+    const rid = Number(requestId);
+    const uid = Number(actorUserId);
+    await prisma.$transaction(async (tx) => {
+      const data = { requestStatusId: Number(patch.statusId) };
+      if (Object.prototype.hasOwnProperty.call(patch, "workflowPreSnapshot")) {
+        data.workflowPreSnapshot = patch.workflowPreSnapshot;
+      }
+      await tx.request.update({
+        where: { requestId: rid },
+        data,
+      });
+      await tx.solicitudHistorial.create({
+        data: {
+          requestId: rid,
+          userId: uid,
+          accion,
+          comentario: comentario ?? null,
+        },
+      });
+    });
   },
 
   /**

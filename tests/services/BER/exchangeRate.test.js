@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import axios from "axios";
 import exchangeRateService from "../../../services/exchangeRateService.js";
+import { mutedConsoleWarnError } from "../../utils/muteConsole.js";
 
 /**
  * @typedef {Object} ExchangeRateResult
@@ -65,24 +66,28 @@ describe("ExchangeRateService", () => {
         fromCache: false
       };
 
-      jest.spyOn(exchangeRateService, "getCachedRate").mockResolvedValue(null);
-      jest.spyOn(exchangeRateService, "getWiseRate").mockRejectedValue(new Error("Wise API failed"));
-      jest.spyOn(exchangeRateService, "getDOFRate").mockResolvedValue(mockDOFRate);
-      jest.spyOn(exchangeRateService, "cacheRate").mockResolvedValue();
+      await mutedConsoleWarnError(async () => {
+        jest.spyOn(exchangeRateService, "getCachedRate").mockResolvedValue(null);
+        jest.spyOn(exchangeRateService, "getWiseRate").mockRejectedValue(new Error("Wise API failed"));
+        jest.spyOn(exchangeRateService, "getDOFRate").mockResolvedValue(mockDOFRate);
+        jest.spyOn(exchangeRateService, "cacheRate").mockResolvedValue();
 
-      const result = await exchangeRateService.getExchangeRate("USD", "MXN");
+        const result = await exchangeRateService.getExchangeRate("USD", "MXN");
 
-      expect(result).toEqual(mockDOFRate);
-      expect(exchangeRateService.getDOFRate).toHaveBeenCalledWith("USD", "MXN");
-      expect(exchangeRateService.cacheRate).toHaveBeenCalledWith("USD", "MXN", 17.6, "DOF");
+        expect(result).toEqual(mockDOFRate);
+        expect(exchangeRateService.getDOFRate).toHaveBeenCalledWith("USD", "MXN");
+        expect(exchangeRateService.cacheRate).toHaveBeenCalledWith("USD", "MXN", 17.6, "DOF");
+      });
     });
 
     it("should throw error when both APIs fail", async () => {
-      jest.spyOn(exchangeRateService, "getCachedRate").mockResolvedValue(null);
-      jest.spyOn(exchangeRateService, "getWiseRate").mockRejectedValue(new Error("Wise API failed"));
-      jest.spyOn(exchangeRateService, "getDOFRate").mockRejectedValue(new Error("DOF API failed"));
+      await mutedConsoleWarnError(async () => {
+        jest.spyOn(exchangeRateService, "getCachedRate").mockResolvedValue(null);
+        jest.spyOn(exchangeRateService, "getWiseRate").mockRejectedValue(new Error("Wise API failed"));
+        jest.spyOn(exchangeRateService, "getDOFRate").mockRejectedValue(new Error("DOF API failed"));
 
-      await expect(exchangeRateService.getExchangeRate("USD", "MXN")).rejects.toThrow("Both Wise and DOF APIs failed");
+        await expect(exchangeRateService.getExchangeRate("USD", "MXN")).rejects.toThrow("Both Wise and DOF APIs failed");
+      });
     });
   });
 
@@ -114,13 +119,15 @@ describe("ExchangeRateService", () => {
 
   describe("getRateHistory", () => {
     it("rejects non-YYYY-MM-DD date input before making outbound request", async () => {
-      const axiosGetSpy = jest.spyOn(axios, "get").mockResolvedValue({ data: {} });
+      await mutedConsoleWarnError(async () => {
+        const axiosGetSpy = jest.spyOn(axios, "get").mockResolvedValue({ data: {} });
 
-      await expect(
-        exchangeRateService.getRateHistory("USD", "MXN", "2026-04-01/../../secret", "2026-04-10")
-      ).rejects.toThrow("startDate must use YYYY-MM-DD format");
+        await expect(
+          exchangeRateService.getRateHistory("USD", "MXN", "2026-04-01/../../secret", "2026-04-10")
+        ).rejects.toThrow("startDate must use YYYY-MM-DD format");
 
-      expect(axiosGetSpy).not.toHaveBeenCalled();
+        expect(axiosGetSpy).not.toHaveBeenCalled();
+      });
     });
 
     it("constructs history endpoint URL from trusted segments", async () => {

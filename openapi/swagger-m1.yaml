@@ -14,6 +14,7 @@ tags:
   - name: TipoCambio
   - name: Viajes
   - name: ExportContable
+  - name: Solicitudes
 paths:
   /api/comprobantes/{receipt_id}:
     post:
@@ -399,6 +400,199 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+  /api/solicitudes/{id}/aprobar:
+    post:
+      tags: [Solicitudes]
+      summary: Aprobar solicitud (workflow N1/N2, permiso travel_request:authorize)
+      description: |
+        Equivalente funcional a `can_approve`. Usa `requested_fee` y `Role.max_approval_amount`;
+        si el monto supera el tope del aprobador y existe nivel N2, escala automáticamente (estado ESCALADO en historial).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Aprobación o escalamiento aplicado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  new_status:
+                    type: string
+                  outcome:
+                    type: string
+                    enum: [APROBADO, ESCALADO]
+        "400":
+          description: Solicitud no en estado de autorización o actor inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token ausente o invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "403":
+          description: Sin permiso travel_request:authorize
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "404":
+          description: Solicitud no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Monto fuera de tope sin nivel al que escalar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno
+
+  /api/solicitudes/{id}/rechazar:
+    post:
+      tags: [Solicitudes]
+      summary: Rechazar solicitud (comentario obligatorio)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comentario]
+              properties:
+                comentario:
+                  type: string
+                  minLength: 1
+                  description: Motivo del rechazo (obligatorio)
+      responses:
+        "200":
+          description: Solicitud rechazada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  new_status:
+                    type: string
+        "400":
+          description: Comentario vacío o estado inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token ausente o invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "403":
+          description: Sin permiso de autorización
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "404":
+          description: Solicitud no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno
+
+  /api/solicitudes/{id}/reasignar:
+    post:
+      tags: [Solicitudes]
+      summary: Reasignar aprobador en snapshot N1/N2
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, motivo]
+              properties:
+                userId:
+                  type: integer
+                  minimum: 1
+                  description: ID del usuario destino (rol N1 o N2)
+                motivo:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Reasignación registrada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "400":
+          description: Validación fallida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token ausente o invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "403":
+          description: Sin permiso
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "404":
+          description: Solicitud no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno
 
 components:
   securitySchemes:
