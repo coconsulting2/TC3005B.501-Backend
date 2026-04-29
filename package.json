@@ -66,6 +66,7 @@
     "mongo-sanitize": "^1.1.0",
     "mongodb": "^5.0.0",
     "multer": "^2.0.1",
+    "node-cron": "^4.2.1",
     "nodemailer": "^7.0.3",
     "soap": "^1.8.0",
     "swagger-ui-express": "^5.0.1"
