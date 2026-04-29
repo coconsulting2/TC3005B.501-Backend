@@ -57,8 +57,51 @@ model User {
   solicitudHistorial   SolicitudHistorial[]
   userPermissions      UserPermission[]
   userPermissionGroups UserPermissionGroup[]
+  preference           UserPreference?
+  notifications        Notification[]
+  pushSubscriptions    PushSubscription[]
 
   @@map("User")
+}
+
+/// User notification preferences (M3-006). One-to-one with User.
+model UserPreference {
+  userId       Int     @id @map("user_id")
+  emailNotif   Boolean @default(true) @map("email_notif")
+  appNotif     Boolean @default(true) @map("app_notif")
+  browserNotif Boolean @default(true) @map("browser_notif")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("user_preference")
+}
+
+/// In-app notification (M3-006). Displayed in the notification bell.
+model Notification {
+  notificationId Int      @id @default(autoincrement()) @map("notification_id")
+  userId         Int      @map("user_id")
+  message        String   @db.VarChar(255)
+  isRead         Boolean  @default(false) @map("is_read")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt(sort: Desc)])
+  @@map("notification")
+}
+
+/// Browser push subscription (M3-006). Stores Web Push API subscription data.
+model PushSubscription {
+  id       Int    @id @default(autoincrement())
+  userId   Int    @map("user_id")
+  endpoint String @db.Text
+  p256dh   String @db.Text
+  auth     String @db.Text
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([userId, endpoint])
+  @@map("push_subscription")
 }
 
 model RequestStatus {

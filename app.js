@@ -16,6 +16,7 @@ import gastoTramoRoutes from "./routes/gastoTramoRoutes.js";
 import exchangeRateRoutes from "./routes/exchangeRateRoutes.js";
 import permissionRoutes from "./routes/permissionRoutes.js";
 import solicitudWorkflowRoutes from "./routes/solicitudWorkflowRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
@@ -79,6 +80,7 @@ app.use("/api/files", fileRoutes);
 app.use("/api/comprobantes", comprobantesRoutes);
 app.use("/api/viajes", gastoTramoRoutes);
 app.use("/api/exchange-rate", exchangeRateRoutes);
+app.use("/api/notifications", notificationRoutes);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerM1Document));
 
 // Centralized auth error handler — must be registered after all routes

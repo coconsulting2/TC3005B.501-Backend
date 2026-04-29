@@ -2,10 +2,13 @@
  * @module mail
  * @description Email notification service using Nodemailer and Gmail SMTP.
  * Sends a styled HTML email to the applicant whenever their travel request status changes.
+ * Respects the user's email notification preference (M3-006).
  */
 require("dotenv").config();
 const nodemailer = require("nodemailer");
+const { PrismaClient } = require("@prisma/client");
 
+const prisma = new PrismaClient();
 const currentDate = new Date().toJSON().slice(0, 10);
 
 const transporter = nodemailer.createTransport({
@@ -20,6 +23,9 @@ const transporter = nodemailer.createTransport({
 
 /**
  * Sends an HTML email notifying the applicant of a travel request status change.
+ * Checks the user's email notification preference before sending.
+ * If the user has disabled email notifications, the send is silently skipped.
+ *
  * @param {string} email - Recipient email address (decrypted before calling)
  * @param {string} username - Recipient's display name
  * @param {string|number} request_id - ID of the travel request
@@ -28,6 +34,22 @@ const transporter = nodemailer.createTransport({
  * @throws {Error} If Nodemailer fails to send the email
  */
 const Mail = async (email, username, request_id, status) => {
+  // --- M3-006: Check email preference ---
+  try {
+    const user = await prisma.user.findFirst({
+      where: { email },
+      include: { preference: true },
+    });
+
+    // If user has a preference record and emailNotif is false, skip
+    if (user?.preference && user.preference.emailNotif === false) {
+      return;
+    }
+  } catch (prefError) {
+    // If preference lookup fails, proceed with sending (fail-open for emails)
+    console.error("Could not check email preference, sending anyway:", prefError);
+  }
+
   const mailOptions = {
     from: 'Portal de Viajes" <tu-correo@gmail.com>',
     to: email,
