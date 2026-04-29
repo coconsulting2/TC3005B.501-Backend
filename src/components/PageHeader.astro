@@ -1,7 +1,7 @@
 ---
 /**
  * Author: Julia Maria Stephanie Duenkelsbuehler Castillo
- * Updated: Editorial Finance design system
+ * Updated: Editorial Finance design system + Notification Bell (M3-006)
  *
  * Top navigation bar — clean, minimal, 1px bottom border.
  */
@@ -9,8 +9,11 @@
 const { userName, buttonLabel } = Astro.props;
 import LogoutButton from "@components/Logout.tsx";
 import MaterialIcon from "@components/MaterialIcon.astro";
+import NotificationBell from "@components/NotificationBell.tsx";
+import { getCookie } from "@data/cookies";
 
 const isCurrentRoute = Astro.url.pathname === "/perfil-usuario";
+const userId = getCookie("id", Astro.cookies);
 ---
 
 <header class="flex min-h-14 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-[var(--color-neutral-200)] bg-[var(--color-surface-white)] px-3 py-2 sm:px-4 md:h-14 md:flex-nowrap md:gap-x-3 md:px-6 md:py-0">
@@ -38,6 +41,7 @@ const isCurrentRoute = Astro.url.pathname === "/perfil-usuario";
 
     <!-- Actions -->
     <div class="flex items-center gap-0.5 sm:gap-1">
+      <NotificationBell client:load userId={userId} />
       <LogoutButton client:load>
         <div class="p-2 rounded-[var(--radius-md)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-ink)] transition-colors cursor-pointer">
           <MaterialIcon icon="logout" color="currentColor" />
@@ -62,3 +66,4 @@ const isCurrentRoute = Astro.url.pathname === "/perfil-usuario";
     </div>
   </div>
 </header>
+

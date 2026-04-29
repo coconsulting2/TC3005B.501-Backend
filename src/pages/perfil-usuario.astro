@@ -1,12 +1,13 @@
 ---
 /**
  * Author: Michael Devlyn
- * Updated: Editorial Finance design system
+ * Updated: Editorial Finance design system + Notification Preferences (M3-006)
  */
 
 import MainLayout from "@layouts/HeaderLayout.astro";
 import EditorialHeader from "@components/EditorialHeader.astro";
 import Button from "@components/Button.astro";
+import NotificationPreferences from "@components/NotificationPreferences.tsx";
 
 import type { UserRole } from "@type/roles";
 import { getCookie } from "@data/cookies";
@@ -73,7 +74,7 @@ const userData = await apiRequest(`/user/get-user-data/${userId}`, { cookies: As
     </section>
 
     <!-- Position Information -->
-    <section class="card-editorial p-6">
+    <section class="card-editorial p-6 mb-6">
       <h2 class="font-editorial text-lg font-normal text-[var(--color-ink)] mb-5">
         Información de empleado
       </h2>
@@ -89,5 +90,14 @@ const userData = await apiRequest(`/user/get-user-data/${userId}`, { cookies: As
         </div>
       </div>
     </section>
+
+    <!-- Notification Preferences (M3-006) -->
+    <section class="card-editorial p-6">
+      <h2 class="font-editorial text-lg font-normal text-[var(--color-ink)] mb-5">
+        Preferencias de Notificación
+      </h2>
+      <NotificationPreferences client:load userId={userId} />
+    </section>
   </div>
 </MainLayout>
+
