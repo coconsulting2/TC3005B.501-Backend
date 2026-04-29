@@ -12,6 +12,7 @@ import https from "https";
 
 import { connectMongo } from "./services/fileStorage.js";
 import { connectPostgres } from "./database/config/prisma.js";
+import { startApprovalSubstituteCron } from "./services/approvalSubstituteCron.js";
 
 import app from "./app.js";
 
@@ -19,6 +20,9 @@ const PORT = process.env.PORT || 3000;
 
 connectMongo().catch((error) => console.error("Failed to connect to MongoDB:", error));
 connectPostgres().catch((error) => console.error("Failed to connect to PostgreSQL:", error));
+startApprovalSubstituteCron().catch((error) =>
+  console.error("Failed to start approval substitutes cron:", error),
+);
 
 const privateKey = fs.readFileSync("./certs/server.key", "utf8");
 const certificate = fs.readFileSync("./certs/server.crt", "utf8");
