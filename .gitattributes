@@ -5,3 +5,4 @@
 *.template   text eol=lf
 Dockerfile   text eol=lf
 docker/*     text eol=lf
+*.prisma     text eol=lf

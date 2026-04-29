@@ -1,0 +1,80 @@
+{
+  "info": {
+    "_postman_id": "c2f8b4a1-m2-005-solicitudes",
+    "name": "CocoConsulting — Solicitudes workflow (aprobar / rechazar / reasignar)",
+    "description": "Endpoints M2-005 bajo `/api/solicitudes`. Requieren JWT con permiso `travel_request:authorize`.\n\n**CSRF:** el backend exige header `csrf-token` en POST (salvo login). Flujo típico:\n1. Login (`POST /api/user/login`) — Postman guarda cookies si activas el cookie jar.\n2. `GET /api/user/csrf-token` — copia `csrfToken` del JSON a la variable de colección `csrf_token`.\n3. Ejecuta aprobar / rechazar / reasignar.\n\n**Variables de colección:** `base_url`, `token` (Bearer), `csrf_token`, `request_id`.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "https://localhost:3000" },
+    { "key": "token", "value": "" },
+    { "key": "csrf_token", "value": "" },
+    { "key": "request_id", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "00 Auth — obtener CSRF",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/api/user/csrf-token",
+        "description": "Respuesta: `{ \"csrfToken\": \"...\" }`. Copia el valor a la variable `csrf_token` de la colección."
+      },
+      "response": []
+    },
+    {
+      "name": "01 POST Aprobar solicitud",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "csrf-token", "value": "{{csrf_token}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
+        "url": "{{base_url}}/api/solicitudes/{{request_id}}/aprobar",
+        "description": "Aprueba en el estado actual (N1/N2 según workflow). Monto vs `Role.max_approval_amount` puede devolver escalamiento (200 + `outcome: ESCALADO`)."
+      },
+      "response": []
+    },
+    {
+      "name": "02 POST Rechazar solicitud",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "csrf-token", "value": "{{csrf_token}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"comentario\": \"Motivo del rechazo (obligatorio)\"\n}"
+        },
+        "url": "{{base_url}}/api/solicitudes/{{request_id}}/rechazar",
+        "description": "`comentario` obligatorio (400 si vacío)."
+      },
+      "response": []
+    },
+    {
+      "name": "03 POST Reasignar aprobador",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}", "type": "text" },
+          { "key": "Content-Type", "value": "application/json", "type": "text" },
+          { "key": "csrf-token", "value": "{{csrf_token}}", "type": "text" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": 2,\n  \"motivo\": \"Motivo de la reasignación\"\n}"
+        },
+        "url": "{{base_url}}/api/solicitudes/{{request_id}}/reasignar",
+        "description": "`userId`: usuario destino con rol N1 o N2. `motivo` obligatorio."
+      },
+      "response": []
+    }
+  ]
+}

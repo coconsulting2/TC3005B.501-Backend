@@ -10,6 +10,8 @@ datasource db {
 model Role {
   roleId               Int                   @id @default(autoincrement()) @map("role_id")
   roleName             String                @unique @map("role_name") @db.VarChar(20)
+  /// Tope de monto (requested_fee) que este rol puede aprobar en un paso; null = sin tope explícito.
+  maxApprovalAmount    Float?                @map("max_approval_amount")
   users                User[]
   rolePermissions      RolePermission[]
   rolePermissionGroups RolePermissionGroup[]
@@ -52,6 +54,7 @@ model User {
   role                 Role?                 @relation(fields: [roleId], references: [roleId])
   department           Department?           @relation(fields: [departmentId], references: [departmentId])
   requests             Request[]
+  solicitudHistorial   SolicitudHistorial[]
   userPermissions      UserPermission[]
   userPermissionGroups UserPermissionGroup[]
 
@@ -67,26 +70,52 @@ model RequestStatus {
 }
 
 model Request {
-  requestId            Int            @id @default(autoincrement()) @map("request_id")
-  userId               Int?           @map("user_id")
-  requestStatusId      Int            @default(1) @map("request_status_id")
-  notes                String?        @db.Text
-  requestedFee         Float?         @map("requested_fee")
-  imposedFee           Float?         @map("imposed_fee")
-  requestDays          Float?         @map("request_days")
-  workflowPreSnapshot  Json?          @map("workflow_pre_snapshot")
-  workflowPostSnapshot Json?          @map("workflow_post_snapshot")
-  creationDate         DateTime       @default(now()) @map("creation_date")
-  lastModDate          DateTime       @default(now()) @updatedAt @map("last_mod_date")
-  active               Boolean        @default(true)
-  user                 User?          @relation(fields: [userId], references: [userId])
-  requestStatus        RequestStatus  @relation(fields: [requestStatusId], references: [requestStatusId])
+  requestId            Int                  @id @default(autoincrement()) @map("request_id")
+  userId               Int?                 @map("user_id")
+  requestStatusId      Int                  @default(1) @map("request_status_id")
+  notes                String?              @db.Text
+  requestedFee         Float?               @map("requested_fee")
+  imposedFee           Float?               @map("imposed_fee")
+  requestDays          Float?               @map("request_days")
+  workflowPreSnapshot  Json?                @map("workflow_pre_snapshot")
+  workflowPostSnapshot Json?                @map("workflow_post_snapshot")
+  creationDate         DateTime             @default(now()) @map("creation_date")
+  lastModDate          DateTime             @default(now()) @updatedAt @map("last_mod_date")
+  active               Boolean              @default(true)
+  user                 User?                @relation(fields: [userId], references: [userId])
+  requestStatus        RequestStatus        @relation(fields: [requestStatusId], references: [requestStatusId])
   alerts               Alert[]
   routeRequests        RouteRequest[]
   receipts             Receipt[]
   gastoTramos          GastoTramo[]
+  solicitudHistorial   SolicitudHistorial[]
 
   @@map("Request")
+}
+
+enum SolicitudHistorialAccion {
+  APROBADO
+  RECHAZADO
+  ESCALADO
+  REASIGNADO
+
+  @@map("solicitud_historial_accion")
+}
+
+/// Auditoría de acciones sobre solicitudes en workflow de autorización (M2-005).
+model SolicitudHistorial {
+  historialId Int                      @id @default(autoincrement()) @map("historial_id")
+  requestId   Int                      @map("request_id")
+  userId      Int                      @map("user_id")
+  accion      SolicitudHistorialAccion @map("accion")
+  comentario  String?                  @db.Text
+  createdAt   DateTime                 @default(now()) @map("created_at")
+
+  request Request @relation(fields: [requestId], references: [requestId], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([requestId, createdAt(sort: Desc)])
+  @@map("solicitud_historial")
 }
 
 model Alert {
