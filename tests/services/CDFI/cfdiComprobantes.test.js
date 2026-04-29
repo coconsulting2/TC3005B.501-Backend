@@ -12,6 +12,7 @@ import request from "supertest";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import { jest, describe, test, expect, beforeEach } from "@jest/globals";
+import { mutedConsoleWarnError } from "../../utils/muteConsole.js";
 
 dotenv.config();
 process.env.JWT_SECRET ??= "jest-secret-comprobantes-sat";
@@ -307,13 +308,15 @@ describe("POST /api/comprobantes/:receipt_id", () => {
   });
 
   test("503 si la consulta SAT falla tras reintentos", async () => {
-    consultarCfdiWithRetries.mockRejectedValue(new Error("SAT_UNAVAILABLE"));
-    const res = await request(app)
-      .post(`/api/comprobantes/${RECEIPT_ID}`)
-      .set(AUTH_HEADERS)
-      .send(validPayload);
-    expect(res.status).toBe(503);
-    expect(res.body.error).toMatch(/SAT|consultar/i);
+    await mutedConsoleWarnError(async () => {
+      consultarCfdiWithRetries.mockRejectedValue(new Error("SAT_UNAVAILABLE"));
+      const res = await request(app)
+        .post(`/api/comprobantes/${RECEIPT_ID}`)
+        .set(AUTH_HEADERS)
+        .send(validPayload);
+      expect(res.status).toBe(503);
+      expect(res.body.error).toMatch(/SAT|consultar/i);
+    });
   });
 
   test("409 si el UUID ya fue registrado", async () => {
@@ -344,13 +347,15 @@ describe("POST /api/comprobantes/:receipt_id", () => {
 
   // ── Atomicidad / rollback ──────────────────────────────
   test("500 y rollback si createCfdi falla", async () => {
-    ComprobantesModel.createCfdi.mockRejectedValue(new Error("DB connection lost"));
-    const res = await request(app)
-      .post(`/api/comprobantes/${RECEIPT_ID}`)
-      .set(AUTH_HEADERS)
-      .send(validPayload);
-    expect(res.status).toBe(500);
-    expect(res.body.error).toBe("Internal server error");
+    await mutedConsoleWarnError(async () => {
+      ComprobantesModel.createCfdi.mockRejectedValue(new Error("DB connection lost"));
+      const res = await request(app)
+        .post(`/api/comprobantes/${RECEIPT_ID}`)
+        .set(AUTH_HEADERS)
+        .send(validPayload);
+      expect(res.status).toBe(500);
+      expect(res.body.error).toBe("Internal server error");
+    });
   });
 });
 
@@ -458,18 +463,20 @@ describe("PUT /api/accounts-payable/validate-receipt/:receipt_id (SAT)", () => {
   });
 
   test("503 si la consulta SAT falla al aprobar", async () => {
-    AccountsPayable.findReceiptForValidation.mockResolvedValue({
-      receipt_id: 13,
-      validation: "Pendiente",
-      cfdiComprobante: mockCfdiApprove,
+    await mutedConsoleWarnError(async () => {
+      AccountsPayable.findReceiptForValidation.mockResolvedValue({
+        receipt_id: 13,
+        validation: "Pendiente",
+        cfdiComprobante: mockCfdiApprove,
+      });
+      consultarCfdiWithRetries.mockRejectedValue(new Error("SAT_UNAVAILABLE"));
+      const res = await request(app)
+        .put("/api/accounts-payable/validate-receipt/13")
+        .set(CPP_AUTH_HEADERS)
+        .send({ approval: 1 });
+      expect(res.status).toBe(503);
+      expect(AccountsPayable.validateReceipt).not.toHaveBeenCalled();
     });
-    consultarCfdiWithRetries.mockRejectedValue(new Error("SAT_UNAVAILABLE"));
-    const res = await request(app)
-      .put("/api/accounts-payable/validate-receipt/13")
-      .set(CPP_AUTH_HEADERS)
-      .send({ approval: 1 });
-    expect(res.status).toBe(503);
-    expect(AccountsPayable.validateReceipt).not.toHaveBeenCalled();
   });
 
   test("200 al aprobar con Vigente y actualiza acuse", async () => {

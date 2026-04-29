@@ -16,3 +16,20 @@ export async function mutedConsoleLogs(fn) {
         logSpy.mockRestore();
     }
 }
+
+/**
+ * Suppresses `console.warn` and `console.error` for the duration of `fn`
+ * (e.g. expected failure paths that still log in production code).
+ * @param {() => Promise<unknown>} fn
+ * @returns {Promise<unknown>}
+ */
+export async function mutedConsoleWarnError(fn) {
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+    const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+    try {
+        return await fn();
+    } finally {
+        warnSpy.mockRestore();
+        errorSpy.mockRestore();
+    }
+}

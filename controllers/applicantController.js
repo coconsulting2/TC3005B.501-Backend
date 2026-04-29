@@ -198,8 +198,15 @@ export const cancelTravelRequest = async (req, res) => {
 
   try {
     const result = await cancelTravelRequestValidation(Number(request_id));
-    const { user_email, user_name, status } = await mailData(request_id);
-    await Mail(user_email, user_name, request_id, status);
+    try {
+      const { user_email, user_name, status } = await mailData(request_id);
+      await Mail(user_email, user_name, request_id, status);
+    } catch (mailErr) {
+      console.warn(
+        "[cancelTravelRequest] Cancelación guardada; correo no enviado:",
+        mailErr?.message || mailErr
+      );
+    }
     return res.status(200).json(result);
   } catch (error) {
     if (error.status) {
@@ -311,8 +318,15 @@ export const confirmDraftTravelRequest = async (req, res) => {
 
   try {
     const result = await Applicant.confirmDraftTravelRequest(userId, requestId);
-    const { user_email, user_name, status } = await mailData(requestId);
-    await Mail(user_email, user_name, requestId, status);
+    try {
+      const { user_email, user_name, status } = await mailData(requestId);
+      await Mail(user_email, user_name, requestId, status);
+    } catch (mailErr) {
+      console.warn(
+        "[confirmDraftTravelRequest] Borrador confirmado; correo no enviado:",
+        mailErr?.message || mailErr
+      );
+    }
     return res.status(200).json(result);
   } catch (error) {
     if (error.status) {
@@ -335,8 +349,15 @@ export const sendExpenseValidation = async (req, res) => {
   try {
     const result = await sendReceiptsForValidation(requestId);
     if (!result.already_submitted) {
-      const { user_email, user_name, status } = await mailData(requestId);
-      await Mail(user_email, user_name, requestId, status);
+      try {
+        const { user_email, user_name, status } = await mailData(requestId);
+        await Mail(user_email, user_name, requestId, status);
+      } catch (mailErr) {
+        console.warn(
+          "[sendExpenseValidation] Comprobantes enviados a validación; correo no enviado:",
+          mailErr?.message || mailErr
+        );
+      }
     }
     return res.status(200).json(result);
   } catch (error) {

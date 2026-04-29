@@ -15,6 +15,7 @@ import comprobantesRoutes from "./routes/comprobantesRoutes.js";
 import gastoTramoRoutes from "./routes/gastoTramoRoutes.js";
 import exchangeRateRoutes from "./routes/exchangeRateRoutes.js";
 import permissionRoutes from "./routes/permissionRoutes.js";
+import solicitudWorkflowRoutes from "./routes/solicitudWorkflowRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
@@ -68,6 +69,7 @@ if (process.env.NODE_ENV !== "test") {
 
 app.use("/api/applicant", applicantRoutes);
 app.use("/api/authorizer", authorizerRoutes);
+app.use("/api/solicitudes", solicitudWorkflowRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/travel-agent", travelAgentRoutes);
 app.use("/api/admin", adminRoutes);
