@@ -118,6 +118,15 @@ const PERMISSION_GROUPS = [
       "user:view_self",
     ],
   },
+  {
+    groupName: "TravelNotifyOnly",
+    description: "Solo alertas y lectura de solicitudes — sin autorizar (M2-005)",
+    permissions: [
+      "travel_request:view_any",
+      "authorizer:view_alerts",
+      "user:view_self",
+    ],
+  },
 ];
 
 const ROLE_GROUP_ASSIGNMENTS = {
@@ -127,6 +136,7 @@ const ROLE_GROUP_ASSIGNMENTS = {
   "Agencia de viajes":   ["TravelAgencyOps"],
   "Cuentas por pagar":   ["AccountsPayableOps"],
   "Administrador":       ["OrgAdmin"],
+  "Observador":          ["TravelNotifyOnly"],
 };
 
 /**
@@ -197,8 +207,18 @@ async function main() {
       { roleName: "N1" },
       { roleName: "N2" },
       { roleName: "Administrador" },
+      { roleName: "Observador" },
     ],
     skipDuplicates: true,
+  });
+
+  await prisma.role.updateMany({
+    where: { roleName: "N1" },
+    data: { maxApprovalAmount: 50_000 },
+  });
+  await prisma.role.updateMany({
+    where: { roleName: "N2" },
+    data: { maxApprovalAmount: 500_000 },
   });
 
   // Alert Messages
