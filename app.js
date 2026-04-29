@@ -32,8 +32,8 @@ import yaml from "js-yaml";
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const swaggerM1Path = path.join(__dirname, "openapi", "swagger-m1.yaml");
-const swaggerM1Document = yaml.load(fs.readFileSync(swaggerM1Path, "utf8"));
+// Serve openapi directory statically for Swagger UI to fetch YAMLs
+app.use("/openapi", express.static(path.join(__dirname, "openapi")));
 
 const corsOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
@@ -79,7 +79,16 @@ app.use("/api/files", fileRoutes);
 app.use("/api/comprobantes", comprobantesRoutes);
 app.use("/api/viajes", gastoTramoRoutes);
 app.use("/api/exchange-rate", exchangeRateRoutes);
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerM1Document));
+const swaggerOptions = {
+    explorer: true,
+    swaggerOptions: {
+        urls: [
+            { url: "/openapi/swagger-m1.yaml", name: "Modulo 1 - Core" },
+            { url: "/openapi/swagger-m2.yaml", name: "Modulo 2 - Admin & Workflow" }
+        ]
+    }
+};
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(null, swaggerOptions));
 
 // Centralized auth error handler — must be registered after all routes
 app.use(handleAuthError);
