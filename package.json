@@ -1,6 +1,6 @@
 {
   "name": "tc3005b-501-backend",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "API and Database for the conection and the functioning of the trip management system portal developed in course TC3005B by group 501.",
   "main": "index.js",
