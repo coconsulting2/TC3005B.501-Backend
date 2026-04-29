@@ -10,22 +10,25 @@ import { generalRateLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
 
+// Apply rate limiting before authentication to protect auth checks from request floods
+router.use(generalRateLimiter);
+
 // All notification routes require authentication
 router.use(authenticateToken);
 
 // --- VAPID public key (needed before subscribing) ---
-router.get("/vapid-public-key", generalRateLimiter, ctrl.getVapidKey);
+router.get("/vapid-public-key", ctrl.getVapidKey);
 
 // --- Preferences ---
-router.get("/preferences/:userId", generalRateLimiter, ctrl.getPreferences);
-router.put("/preferences/:userId", generalRateLimiter, ctrl.updatePreferences);
+router.get("/preferences/:userId", ctrl.getPreferences);
+router.put("/preferences/:userId", ctrl.updatePreferences);
 
 // --- Push subscription ---
-router.post("/subscribe", generalRateLimiter, ctrl.subscribe);
+router.post("/subscribe", ctrl.subscribe);
 
 // --- Notifications ---
-router.get("/:userId", generalRateLimiter, ctrl.getNotifications);
-router.get("/:userId/unread-count", generalRateLimiter, ctrl.getUnreadCount);
-router.put("/:id/read", generalRateLimiter, ctrl.markAsRead);
+router.get("/:userId", ctrl.getNotifications);
+router.get("/:userId/unread-count", ctrl.getUnreadCount);
+router.put("/:id/read", ctrl.markAsRead);
 
 export default router;
