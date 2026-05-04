@@ -1,6 +1,6 @@
 {
   "name": "tc3005b-501-backend",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "API and Database for the conection and the functioning of the trip management system portal developed in course TC3005B by group 501.",
   "main": "index.js",
@@ -66,9 +66,11 @@
     "mongo-sanitize": "^1.1.0",
     "mongodb": "^5.0.0",
     "multer": "^2.0.1",
+    "node-cron": "^4.2.1",
     "nodemailer": "^7.0.3",
     "soap": "^1.8.0",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
