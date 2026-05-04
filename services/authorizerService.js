@@ -8,6 +8,7 @@ import {
   statusAfterN1Approval,
   statusAfterN2Approval,
 } from "./workflowRulesEngine.js";
+import * as policyExceptionService from "./policyExceptionService.js";
 
 /**
  * @param {object | null} snapshot
@@ -110,6 +111,22 @@ const authorizeRequest = async (request_id, user_id) => {
   const roleName = await Authorizer.getUserRoleName(user_id);
   if (!roleName) {
     throw { status: 404, message: "User not found" };
+  }
+
+  // M2-006 RF-45: bloquear aprobación si hay excepciones de política pendientes.
+  try {
+    const pending = await policyExceptionService.listPendingForRequest(request_id);
+    if (pending && pending.length > 0) {
+      throw {
+        status: 409,
+        message: "Resuelva las excepciones de política pendientes antes de aprobar la solicitud.",
+      };
+    }
+  } catch (e) {
+    if (e && e.status) throw e;
+    // Si la consulta falla por motivos de infra, no bloqueamos la aprobación
+    // (defense-in-depth: el chequeo es preventivo, no autoridad final).
+    console.warn("authorizerService: pending exception check failed:", e?.message || e);
   }
 
   const snap = ctx.workflowPreSnapshot;
@@ -372,8 +389,21 @@ const reassignRequest = async (
   return { message: "Tarea reasignada correctamente" };
 };
 
+/**
+ * Decide a policy exception (M2-006 RF-45). Delegates to policyExceptionService
+ * but lives here so the controller layer has a single workflow entry-point.
+ * @param {number} exception_id
+ * @param {"APPROVED" | "REJECTED"} decision
+ * @param {number} user_id
+ * @param {string|null} note
+ */
+const decideException = async (exception_id, decision, user_id, note) => {
+  return policyExceptionService.decideException(exception_id, decision, user_id, note);
+};
+
 export default {
   authorizeRequest,
   declineRequest,
   reassignRequest,
+  decideException,
 };

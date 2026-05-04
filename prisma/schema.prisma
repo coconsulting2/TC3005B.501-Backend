@@ -38,28 +38,31 @@ model AlertMessage {
 }
 
 model User {
-  userId               Int                   @id @default(autoincrement()) @map("user_id")
-  roleId               Int?                  @map("role_id")
-  departmentId         Int?                  @map("department_id")
-  orgId                BigInt?               @map("org_id")
-  userName             String                @unique @map("user_name") @db.VarChar(60)
-  password             String                @db.VarChar(60)
-  workstation          String                @db.VarChar(20)
-  email                String                @unique @db.VarChar(254)
-  phoneNumber          String?               @map("phone_number") @db.VarChar(254)
-  wallet               Float                 @default(0.00)
-  creationDate         DateTime              @default(now()) @map("creation_date")
-  lastModDate          DateTime              @default(now()) @updatedAt @map("last_mod_date")
-  active               Boolean               @default(true)
-  role                 Role?                 @relation(fields: [roleId], references: [roleId])
-  department           Department?           @relation(fields: [departmentId], references: [departmentId])
-  requests             Request[]
-  solicitudHistorial   SolicitudHistorial[]
-  userPermissions      UserPermission[]
-  userPermissionGroups UserPermissionGroup[]
-  preference           UserPreference?
-  notifications        Notification[]
-  pushSubscriptions    PushSubscription[]
+  userId                       Int                      @id @default(autoincrement()) @map("user_id")
+  roleId                       Int?                     @map("role_id")
+  departmentId                 Int?                     @map("department_id")
+  orgId                        BigInt?                  @map("org_id")
+  userName                     String                   @unique @map("user_name") @db.VarChar(60)
+  password                     String                   @db.VarChar(60)
+  workstation                  String                   @db.VarChar(20)
+  email                        String                   @unique @db.VarChar(254)
+  phoneNumber                  String?                  @map("phone_number") @db.VarChar(254)
+  wallet                       Float                    @default(0.00)
+  creationDate                 DateTime                 @default(now()) @map("creation_date")
+  lastModDate                  DateTime                 @default(now()) @updatedAt @map("last_mod_date")
+  active                       Boolean                  @default(true)
+  role                         Role?                    @relation(fields: [roleId], references: [roleId])
+  department                   Department?              @relation(fields: [departmentId], references: [departmentId])
+  requests                     Request[]
+  solicitudHistorial           SolicitudHistorial[]
+  userPermissions              UserPermission[]
+  userPermissionGroups         UserPermissionGroup[]
+  preference                   UserPreference?
+  notifications                Notification[]
+  pushSubscriptions            PushSubscription[]
+  policyExceptionsRequested    PolicyException[]        @relation("PolicyExceptionRequester")
+  policyExceptionsDecided      PolicyException[]        @relation("PolicyExceptionDecider")
+  reimbursementTimeLimitEdits  ReimbursementTimeLimit[]
 
   @@map("User")
 }
@@ -113,26 +116,32 @@ model RequestStatus {
 }
 
 model Request {
-  requestId            Int                  @id @default(autoincrement()) @map("request_id")
-  userId               Int?                 @map("user_id")
-  requestStatusId      Int                  @default(1) @map("request_status_id")
-  notes                String?              @db.Text
-  requestedFee         Float?               @map("requested_fee")
-  imposedFee           Float?               @map("imposed_fee")
-  requestDays          Float?               @map("request_days")
-  workflowPreSnapshot  Json?                @map("workflow_pre_snapshot")
-  workflowPostSnapshot Json?                @map("workflow_post_snapshot")
-  creationDate         DateTime             @default(now()) @map("creation_date")
-  lastModDate          DateTime             @default(now()) @updatedAt @map("last_mod_date")
-  active               Boolean              @default(true)
-  user                 User?                @relation(fields: [userId], references: [userId])
-  requestStatus        RequestStatus        @relation(fields: [requestStatusId], references: [requestStatusId])
-  alerts               Alert[]
-  routeRequests        RouteRequest[]
-  receipts             Receipt[]
-  gastoTramos          GastoTramo[]
-  solicitudHistorial   SolicitudHistorial[]
+  requestId                Int                  @id @default(autoincrement()) @map("request_id")
+  userId                   Int?                 @map("user_id")
+  requestStatusId          Int                  @default(1) @map("request_status_id")
+  notes                    String?              @db.Text
+  requestedFee             Float?               @map("requested_fee")
+  imposedFee               Float?               @map("imposed_fee")
+  requestDays              Float?               @map("request_days")
+  workflowPreSnapshot      Json?                @map("workflow_pre_snapshot")
+  workflowPostSnapshot     Json?                @map("workflow_post_snapshot")
+  /// Fecha de fin de viaje (denormalizada de la última Route.endingDate). Usada por el cron de bloqueo de plazo (M2-006 RF-39).
+  tripEndDate              DateTime?            @map("trip_end_date") @db.Date
+  /// Política de viáticos congelada al envío (M2-006 RF-46: cambios de política no afectan solicitudes ya enviadas).
+  policyEvaluationSnapshot Json?                @map("policy_evaluation_snapshot")
+  creationDate             DateTime             @default(now()) @map("creation_date")
+  lastModDate              DateTime             @default(now()) @updatedAt @map("last_mod_date")
+  active                   Boolean              @default(true)
+  user                     User?                @relation(fields: [userId], references: [userId])
+  requestStatus            RequestStatus        @relation(fields: [requestStatusId], references: [requestStatusId])
+  alerts                   Alert[]
+  routeRequests            RouteRequest[]
+  receipts                 Receipt[]
+  gastoTramos              GastoTramo[]
+  solicitudHistorial       SolicitudHistorial[]
+  policyExceptions         PolicyException[]
 
+  @@index([requestStatusId, tripEndDate])
   @@map("Request")
 }
 
@@ -224,9 +233,10 @@ model RouteRequest {
 }
 
 model ReceiptType {
-  receiptTypeId   Int       @id @default(autoincrement()) @map("receipt_type_id")
-  receiptTypeName String    @unique @map("receipt_type_name") @db.VarChar(20)
-  receipts        Receipt[]
+  receiptTypeId    Int                @id @default(autoincrement()) @map("receipt_type_id")
+  receiptTypeName  String             @unique @map("receipt_type_name") @db.VarChar(20)
+  receipts         Receipt[]
+  policyExpenseCaps PolicyExpenseCap[]
 
   @@map("Receipt_Type")
 }
@@ -257,10 +267,11 @@ model Receipt {
   cfdiFecha       DateTime?        @map("cfdi_fecha")
   cfdiTotal       Float?           @map("cfdi_total")
   cfdiImpuestos   String?          @map("cfdi_impuestos") @db.Text
-  receiptType     ReceiptType?     @relation(fields: [receiptTypeId], references: [receiptTypeId])
-  request         Request?         @relation(fields: [requestId], references: [requestId])
-  cfdiComprobante CfdiComprobante?
-  gastoTramo      GastoTramo?
+  receiptType      ReceiptType?      @relation(fields: [receiptTypeId], references: [receiptTypeId])
+  request          Request?          @relation(fields: [requestId], references: [requestId])
+  cfdiComprobante  CfdiComprobante?
+  gastoTramo       GastoTramo?
+  policyExceptions PolicyException[]
 
   @@map("Receipt")
 }
@@ -330,6 +341,130 @@ model GastoTramo {
   receipt Receipt @relation(fields: [receiptId], references: [receiptId])
 
   @@map("gasto_tramo")
+}
+
+// =====================================================================
+// M2-006 — Motor de reglas de reembolso
+// US-06 (RF-37/38/39 — plazo configurable) + US-12 (RF-42..46 — políticas)
+// =====================================================================
+
+/// Categoría de empleado para políticas de viáticos (M2-006 RF-42).
+/// Ortogonal a Role (RBAC). Ej.: Ejecutivo, Gerente, Analista, Trainee.
+model EmployeeCategory {
+  categoryId   Int            @id @default(autoincrement()) @map("category_id")
+  orgId        BigInt         @map("org_id")
+  code         String         @db.VarChar(40)
+  name         String         @db.VarChar(80)
+  description  String?        @db.VarChar(254)
+  active       Boolean        @default(true)
+  createdAt    DateTime       @default(now()) @map("created_at")
+  policies     TravelPolicy[]
+
+  @@unique([orgId, code])
+  @@index([orgId, active])
+  @@map("employee_category")
+}
+
+/// Política de viáticos por organización (M2-006 RF-42, RF-46).
+/// Aplicabilidad: categoría de empleado + alcance de destino + centro de costos.
+/// Vigencia controla cuándo aplica (RF-46). El motor congela la política aplicada
+/// en Request.policyEvaluationSnapshot al envío para no retroactividad.
+model TravelPolicy {
+  policyId         Int                @id @default(autoincrement()) @map("policy_id")
+  orgId            BigInt             @map("org_id")
+  name             String             @db.VarChar(120)
+  categoryId       Int?               @map("category_id")
+  /// Alcance de destino: "nacional" | "internacional" | "any"
+  destinationScope String             @default("any") @map("destination_scope") @db.VarChar(20)
+  /// Centro de costos como string libre — alineado a Department.costsCenter.
+  /// Cuando exista entidad CostCenter (M3-005), agregar costCenterId Int? additive.
+  costsCenter      String?            @map("costs_center") @db.VarChar(20)
+  dailyPerDiem     Decimal?           @map("daily_per_diem") @db.Decimal(18, 4)
+  currency         String             @default("MXN") @db.VarChar(3)
+  validFrom        DateTime           @map("valid_from") @db.Date
+  validTo          DateTime?          @map("valid_to") @db.Date
+  active           Boolean            @default(true)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @default(now()) @updatedAt @map("updated_at")
+  category         EmployeeCategory?  @relation(fields: [categoryId], references: [categoryId])
+  expenseCaps      PolicyExpenseCap[]
+  exceptions       PolicyException[]
+
+  @@index([orgId, active, validFrom, validTo])
+  @@index([orgId, costsCenter])
+  @@map("travel_policy")
+}
+
+/// Tope por tipo de gasto dentro de una política (M2-006 RF-43).
+/// capUnit define la unidad: per_night (hospedaje), per_trip (vuelo), per_day (comidas), per_event (otros).
+model PolicyExpenseCap {
+  capId         Int          @id @default(autoincrement()) @map("cap_id")
+  policyId      Int          @map("policy_id")
+  receiptTypeId Int          @map("receipt_type_id")
+  capAmount     Decimal      @map("cap_amount") @db.Decimal(18, 4)
+  capUnit       String       @map("cap_unit") @db.VarChar(20)
+  currency      String       @default("MXN") @db.VarChar(3)
+  policy        TravelPolicy @relation(fields: [policyId], references: [policyId], onDelete: Cascade)
+  receiptType   ReceiptType  @relation(fields: [receiptTypeId], references: [receiptTypeId])
+
+  @@unique([policyId, receiptTypeId, capUnit])
+  @@map("policy_expense_cap")
+}
+
+enum PolicyExceptionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("policy_exception_status")
+}
+
+/// Excepción a política de viáticos solicitada por el solicitante y resuelta por aprobador (M2-006 RF-44, RF-45).
+/// La justificación es texto libre obligatorio (>=10 chars). Status APPROVED permite
+/// que Receipt.refund quede en true aunque exceda la política.
+model PolicyException {
+  exceptionId   Int                   @id @default(autoincrement()) @map("exception_id")
+  requestId     Int                   @map("request_id")
+  receiptId     Int?                  @map("receipt_id")
+  policyId      Int?                  @map("policy_id")
+  capId         Int?                  @map("cap_id")
+  amountClaimed Decimal               @map("amount_claimed") @db.Decimal(18, 4)
+  amountAllowed Decimal?              @map("amount_allowed") @db.Decimal(18, 4)
+  excessAmount  Decimal               @map("excess_amount") @db.Decimal(18, 4)
+  justification String                @db.Text
+  status        PolicyExceptionStatus @default(PENDING)
+  requestedById Int                   @map("requested_by_id")
+  decidedById   Int?                  @map("decided_by_id")
+  decidedAt     DateTime?             @map("decided_at")
+  decisionNote  String?               @map("decision_note") @db.Text
+  createdAt     DateTime              @default(now()) @map("created_at")
+
+  request     Request       @relation(fields: [requestId], references: [requestId], onDelete: Cascade)
+  receipt     Receipt?      @relation(fields: [receiptId], references: [receiptId], onDelete: SetNull)
+  policy      TravelPolicy? @relation(fields: [policyId], references: [policyId])
+  requestedBy User          @relation("PolicyExceptionRequester", fields: [requestedById], references: [userId])
+  decidedBy   User?         @relation("PolicyExceptionDecider", fields: [decidedById], references: [userId])
+
+  @@index([requestId, status])
+  @@index([status, createdAt(sort: Desc)])
+  @@map("policy_exception")
+}
+
+/// Configuración por organización del plazo para comprobar gastos (M2-006 RF-37).
+/// Default 14 días desde Request.tripEndDate. blockOnExpiry controla si el cron
+/// y el upload-policy bloquean automáticamente al vencer.
+model ReimbursementTimeLimit {
+  limitId       Int       @id @default(autoincrement()) @map("limit_id")
+  orgId         BigInt    @unique @map("org_id")
+  daysAfterTrip Int       @default(14) @map("days_after_trip")
+  graceDays     Int       @default(0) @map("grace_days")
+  blockOnExpiry Boolean   @default(true) @map("block_on_expiry")
+  active        Boolean   @default(true)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+  updatedById   Int?      @map("updated_by_id")
+  updatedBy     User?     @relation(fields: [updatedById], references: [userId])
+
+  @@map("reimbursement_time_limit")
 }
 
 /// Reglas de workflow por organización (M2-004). Evaluación al alta de solicitud nueva.
