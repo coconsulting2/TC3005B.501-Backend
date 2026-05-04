@@ -26,6 +26,13 @@ await jest.unstable_mockModule("../../models/authorizerModel.js", () => ({
   default: mockModel,
 }));
 
+// M2-006 — el servicio ahora consulta excepciones pendientes antes de aprobar.
+const mockPolicyExceptionService = {
+  listPendingForRequest: jest.fn().mockResolvedValue([]),
+  decideException: jest.fn().mockResolvedValue({}),
+};
+await jest.unstable_mockModule("../../services/policyExceptionService.js", () => mockPolicyExceptionService);
+
 const { default: authorizerService } = await import(
   "../../services/authorizerService.js"
 );
@@ -33,6 +40,7 @@ const { default: authorizerService } = await import(
 beforeEach(() => {
   jest.clearAllMocks();
   mockModel.applyWorkflowAction.mockResolvedValue(undefined);
+  mockPolicyExceptionService.listPendingForRequest.mockResolvedValue([]);
 });
 
 describe("declineRequest", () => {
@@ -103,5 +111,47 @@ describe("authorizeRequest — escalamiento por monto", () => {
       ACC.APROBADO,
       null,
     );
+  });
+});
+
+describe("authorizeRequest — M2-006 PolicyException PENDING", () => {
+  test("bloquea aprobación si hay excepciones PENDING (409)", async () => {
+    mockModel.getRequestAuthorizationContext.mockResolvedValue({
+      requestStatusId: 2,
+      workflowPreSnapshot: { levels: [1], n1UserId: 10 },
+      requestedFee: 1000,
+      userId: 99,
+    });
+    mockModel.getUserRoleName.mockResolvedValue("N1");
+    mockModel.getUserMaxApprovalAmount.mockResolvedValue(50_000);
+    mockPolicyExceptionService.listPendingForRequest.mockResolvedValue([{ exceptionId: 1 }]);
+
+    await expect(authorizerService.authorizeRequest(5, 10)).rejects.toMatchObject({
+      status: 409,
+      message: expect.stringContaining("excepciones de política"),
+    });
+    expect(mockModel.applyWorkflowAction).not.toHaveBeenCalled();
+  });
+
+  test("aprueba normalmente si no hay excepciones PENDING", async () => {
+    mockModel.getRequestAuthorizationContext.mockResolvedValue({
+      requestStatusId: 2,
+      workflowPreSnapshot: { levels: [1], n1UserId: 10 },
+      requestedFee: 1000,
+      userId: 99,
+    });
+    mockModel.getUserRoleName.mockResolvedValue("N1");
+    mockModel.getUserMaxApprovalAmount.mockResolvedValue(50_000);
+    mockPolicyExceptionService.listPendingForRequest.mockResolvedValue([]);
+
+    const result = await authorizerService.authorizeRequest(5, 10);
+    expect(result.outcome).toBe("APROBADO");
+  });
+
+  test("decideException delega a policyExceptionService", async () => {
+    mockPolicyExceptionService.decideException.mockResolvedValue({ exceptionId: 7, status: "APPROVED" });
+    const result = await authorizerService.decideException(7, "APPROVED", 10, "ok");
+    expect(result.exceptionId).toBe(7);
+    expect(mockPolicyExceptionService.decideException).toHaveBeenCalledWith(7, "APPROVED", 10, "ok");
   });
 });

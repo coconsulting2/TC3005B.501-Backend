@@ -6,6 +6,7 @@ import prisma from "../database/config/prisma.js";
 import { formatRoutes, getRequestDays, getCountryId, getCityId } from "../services/applicantService.js";
 import { createRequestInsertAlert } from "../services/createRequestInsertAlert.js";
 import { buildRequestWorkflowSnapshots } from "../services/buildRequestWorkflowSnapshots.js";
+import { applyRefundContextToRequest } from "../services/applyRefundContext.js";
 import { initialStatusFromLevels } from "../services/workflowRulesEngine.js";
 
 const Applicant = {
@@ -91,7 +92,7 @@ const Applicant = {
     return await prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({
         where: { userId: Number(userId) },
-        include: { role: true },
+        include: { role: true, department: true },
       });
 
       const destinationCountryIds = [];
@@ -162,6 +163,13 @@ const Applicant = {
           },
         });
       }
+
+      // M2-006 — denormaliza tripEndDate y congela política aplicable.
+      await applyRefundContextToRequest(tx, request.requestId, {
+        costsCenter: user.department?.costsCenter ?? null,
+      }).catch((e) => {
+        console.warn("createTravelRequest: applyRefundContext failed:", e?.message || e);
+      });
 
       return {
         requestId: request.requestId,
@@ -584,7 +592,7 @@ const Applicant = {
     return await prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({
         where: { userId: Number(userId) },
-        include: { role: true },
+        include: { role: true, department: true },
       });
 
       const reqRow = await tx.request.findUnique({
@@ -632,6 +640,13 @@ const Applicant = {
             }
             : {}),
         },
+      });
+
+      // M2-006 — denormaliza tripEndDate y congela política aplicable.
+      await applyRefundContextToRequest(tx, Number(requestId), {
+        costsCenter: user.department?.costsCenter ?? null,
+      }).catch((e) => {
+        console.warn("confirmDraftTravelRequest: applyRefundContext failed:", e?.message || e);
       });
 
       return {
