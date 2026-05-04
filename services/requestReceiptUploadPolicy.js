@@ -2,8 +2,12 @@
  * Reglas de negocio: alta de comprobantes (PDF/XML, fila Receipt, CFDI)
  * solo después de que N2 haya aprobado (request_status_id >= 4).
  * Hasta validación de comprobantes (7); terminales 8–10 no permiten carga.
+ *
+ * M2-006 RF-39: además, bloquea cuando el plazo de reembolso (default 14 días
+ * desde tripEndDate) está vencido y la organización tiene blockOnExpiry=true.
  */
 import Applicant from "../models/applicantModel.js";
+import { assertCanSubmitReceipts } from "./reimbursementTimeService.js";
 
 export const MIN_STATUS_FOR_RECEIPT_UPLOAD = 4;
 export const MAX_STATUS_FOR_RECEIPT_UPLOAD = 7;
@@ -35,4 +39,6 @@ export async function assertRequestAllowsReceiptUpload(requestId) {
     err.status = 403;
     throw err;
   }
+  // M2-006 RF-39 — defensa en profundidad complementaria al cron refundDeadlineJob.
+  await assertCanSubmitReceipts(Number(requestId));
 }

@@ -12,6 +12,7 @@ import https from "https";
 
 import { connectMongo } from "./services/fileStorage.js";
 import { connectPostgres } from "./database/config/prisma.js";
+import { startScheduler } from "./services/scheduler/index.js";
 
 import app from "./app.js";
 
@@ -19,6 +20,9 @@ const PORT = process.env.PORT || 3000;
 
 connectMongo().catch((error) => console.error("Failed to connect to MongoDB:", error));
 connectPostgres().catch((error) => console.error("Failed to connect to PostgreSQL:", error));
+
+// M2-006 — Scheduler de jobs cron (escalation + refund deadline). Activado con SCHEDULER_ENABLED=true.
+startScheduler();
 
 const privateKey = fs.readFileSync("./certs/server.key", "utf8");
 const certificate = fs.readFileSync("./certs/server.crt", "utf8");
