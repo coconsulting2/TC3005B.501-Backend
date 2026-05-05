@@ -1,0 +1,449 @@
+openapi: 3.0.3
+info:
+  title: CocoAPI - Modulo 2
+  version: 1.0.0
+  description: |
+    Documentacion de endpoints del Modulo 2.
+    Incluye CRUD de roles y permisos, endpoints de aprobacion/rechazo de solicitudes, y utilidades de workflow.
+servers:
+  - url: https://localhost:3000
+    description: Local HTTPS
+tags:
+  - name: Roles
+  - name: Permisos
+  - name: Solicitudes
+  - name: Workflow
+paths:
+  /api/admin/roles:
+    get:
+      tags: [Roles]
+      summary: Listar todos los roles
+      description: Retorna la lista de roles definidos en el sistema.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de roles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Role"
+    post:
+      tags: [Roles]
+      summary: Crear nuevo rol
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleCreateInput"
+      responses:
+        "201":
+          description: Rol creado exitosamente
+  /api/admin/roles/{id}:
+    put:
+      tags: [Roles]
+      summary: Actualizar un rol existente
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleUpdateInput"
+      responses:
+        "200":
+          description: Rol actualizado
+    delete:
+      tags: [Roles]
+      summary: Eliminar un rol
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rol eliminado
+
+  /api/admin/permissions:
+    get:
+      tags: [Permisos]
+      summary: Listar todos los permisos
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista de permisos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Permission"
+    post:
+      tags: [Permisos]
+      summary: Crear nuevo permiso
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PermissionCreateInput"
+      responses:
+        "201":
+          description: Permiso creado
+  /api/admin/permissions/{id}:
+    patch:
+      tags: [Permisos]
+      summary: Actualizar un permiso
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PermissionUpdateInput"
+      responses:
+        "200":
+          description: Permiso actualizado
+    delete:
+      tags: [Permisos]
+      summary: Desactivar un permiso
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Permiso desactivado
+
+  /api/solicitudes/{id}/aprobar:
+    post:
+      tags: [Solicitudes]
+      summary: Aprobar solicitud (workflow N1/N2, permiso travel_request:authorize)
+      description: |
+        Equivalente funcional a `can_approve`. Usa `requested_fee` y `Role.max_approval_amount`;
+        si el monto supera el tope del aprobador y existe nivel N2, escala automáticamente (estado ESCALADO en historial).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Aprobación o escalamiento aplicado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  new_status:
+                    type: string
+                  outcome:
+                    type: string
+                    enum: [APROBADO, ESCALADO]
+        "400":
+          description: Solicitud no en estado de autorización o actor inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token ausente o invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "403":
+          description: Sin permiso travel_request:authorize
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "404":
+          description: Solicitud no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Monto fuera de tope sin nivel al que escalar
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno
+
+  /api/solicitudes/{id}/rechazar:
+    post:
+      tags: [Solicitudes]
+      summary: Rechazar solicitud (comentario obligatorio)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comentario]
+              properties:
+                comentario:
+                  type: string
+                  minLength: 1
+                  description: Motivo del rechazo (obligatorio)
+      responses:
+        "200":
+          description: Solicitud rechazada
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  new_status:
+                    type: string
+        "400":
+          description: Comentario vacío o estado inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token ausente o invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "403":
+          description: Sin permiso de autorización
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "404":
+          description: Solicitud no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error interno
+
+  /api/workflow/simulate:
+    post:
+      tags: [Workflow]
+      summary: Simular evaluación de reglas de workflow
+      description: Permite probar el nivel de aprobación (N1/N2) y topes requeridos para un monto y parámetros dados.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkflowSimulateRequest"
+      responses:
+        "200":
+          description: Resultado de la simulación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkflowSimulateResponse"
+        "400":
+          description: Parametros invalidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/config/roles/import:
+    post:
+      tags: [Roles]
+      summary: Importar configuracion de roles de forma masiva
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                roles:
+                  type: array
+                  items:
+                    $ref: "#/components/schemas/RoleCreateInput"
+      responses:
+        "200":
+          description: Roles importados correctamente
+        "400":
+          description: JSON de importacion invalido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Role:
+      type: object
+      properties:
+        roleId:
+          type: integer
+        roleName:
+          type: string
+        maxApprovalAmount:
+          type: number
+          nullable: true
+    RoleCreateInput:
+      type: object
+      required: [roleName]
+      properties:
+        roleName:
+          type: string
+        maxApprovalAmount:
+          type: number
+          nullable: true
+    RoleUpdateInput:
+      type: object
+      properties:
+        roleName:
+          type: string
+        maxApprovalAmount:
+          type: number
+          nullable: true
+    Permission:
+      type: object
+      properties:
+        permissionId:
+          type: integer
+        code:
+          type: string
+        resource:
+          type: string
+        action:
+          type: string
+        description:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+    PermissionCreateInput:
+      type: object
+      required: [code, resource, action]
+      properties:
+        code:
+          type: string
+        resource:
+          type: string
+        action:
+          type: string
+        description:
+          type: string
+          nullable: true
+    PermissionUpdateInput:
+      type: object
+      properties:
+        resource:
+          type: string
+        action:
+          type: string
+        description:
+          type: string
+          nullable: true
+        active:
+          type: boolean
+    WorkflowSimulateRequest:
+      type: object
+      required: [orgId, requestedFee, ruleType]
+      properties:
+        orgId:
+          type: integer
+        requestedFee:
+          type: number
+        ruleType:
+          type: string
+        paramValue:
+          type: string
+          nullable: true
+    WorkflowSimulateResponse:
+      type: object
+      properties:
+        requiredApprovalLevel:
+          type: integer
+        rulesEvaluated:
+          type: array
+          items:
+            type: object
+            properties:
+              ruleId:
+                type: integer
+              matched:
+                type: boolean
+              action:
+                type: string
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    AuthErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        error:
+          type: string
+      required: [statusCode, message, error]

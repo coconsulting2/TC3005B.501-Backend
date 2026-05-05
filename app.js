@@ -20,29 +20,28 @@ import notificationRoutes from "./routes/notificationRoutes.js";
 import policyRoutes, { employeeCategoryRouter } from "./routes/policyRoutes.js";
 import refundRoutes from "./routes/refundRoutes.js";
 import inboxRoutes from "./routes/inboxRoutes.js";
+import approvalSubstituteRoutes from "./routes/approvalSubstituteRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import csrf from "csurf";
+import path from "path";
+import { fileURLToPath } from "url";
+import swaggerUi from "swagger-ui-express";
 
 // JSON serialization patch for Prisma BigInt fields (M2-006: orgId, etc.).
 // Express's res.json uses JSON.stringify which throws on BigInt by default.
 // eslint-disable-next-line no-extend-native
 BigInt.prototype.toJSON = function () { return this.toString(); };
-import csrf from "csurf";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import swaggerUi from "swagger-ui-express";
-import yaml from "js-yaml";
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const swaggerM1Path = path.join(__dirname, "openapi", "swagger-m1.yaml");
-const swaggerM1Document = yaml.load(fs.readFileSync(swaggerM1Path, "utf8"));
+// Serve openapi directory statically for Swagger UI to fetch YAMLs
+app.use("/openapi", express.static(path.join(__dirname, "openapi")));
 
 const corsOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
@@ -82,6 +81,7 @@ app.use("/api/authorizer", authorizerRoutes);
 // no se interprete como /:id/aprobar.
 app.use("/api/solicitudes", inboxRoutes);
 app.use("/api/solicitudes", solicitudWorkflowRoutes);
+app.use("/api/approval-substitutes", approvalSubstituteRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/travel-agent", travelAgentRoutes);
 app.use("/api/admin", adminRoutes);
@@ -96,7 +96,17 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/policies", policyRoutes);
 app.use("/api/employee-categories", employeeCategoryRouter);
 app.use("/api/refunds", refundRoutes);
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerM1Document));
+
+const swaggerOptions = {
+    explorer: true,
+    swaggerOptions: {
+        urls: [
+            { url: "/openapi/swagger-m1.yaml", name: "Modulo 1 - Core" },
+            { url: "/openapi/swagger-m2.yaml", name: "Modulo 2 - Admin & Workflow" }
+        ]
+    }
+};
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(null, swaggerOptions));
 
 // Centralized auth error handler — must be registered after all routes
 app.use(handleAuthError);
