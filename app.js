@@ -17,6 +17,9 @@ import exchangeRateRoutes from "./routes/exchangeRateRoutes.js";
 import permissionRoutes from "./routes/permissionRoutes.js";
 import solicitudWorkflowRoutes from "./routes/solicitudWorkflowRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import policyRoutes, { employeeCategoryRouter } from "./routes/policyRoutes.js";
+import refundRoutes from "./routes/refundRoutes.js";
+import inboxRoutes from "./routes/inboxRoutes.js";
 import approvalSubstituteRoutes from "./routes/approvalSubstituteRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
@@ -25,11 +28,14 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import csrf from "csurf";
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import swaggerUi from "swagger-ui-express";
-import yaml from "js-yaml";
+
+// JSON serialization patch for Prisma BigInt fields (M2-006: orgId, etc.).
+// Express's res.json uses JSON.stringify which throws on BigInt by default.
+// eslint-disable-next-line no-extend-native
+BigInt.prototype.toJSON = function () { return this.toString(); };
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -71,6 +77,9 @@ if (process.env.NODE_ENV !== "test") {
 
 app.use("/api/applicant", applicantRoutes);
 app.use("/api/authorizer", authorizerRoutes);
+// M2-006: inbox debe registrarse antes que solicitudWorkflowRoutes para que /inbox
+// no se interprete como /:id/aprobar.
+app.use("/api/solicitudes", inboxRoutes);
 app.use("/api/solicitudes", solicitudWorkflowRoutes);
 app.use("/api/approval-substitutes", approvalSubstituteRoutes);
 app.use("/api/user", userRoutes);
@@ -83,6 +92,10 @@ app.use("/api/comprobantes", comprobantesRoutes);
 app.use("/api/viajes", gastoTramoRoutes);
 app.use("/api/exchange-rate", exchangeRateRoutes);
 app.use("/api/notifications", notificationRoutes);
+// M2-006 — Refund rule engine
+app.use("/api/policies", policyRoutes);
+app.use("/api/employee-categories", employeeCategoryRouter);
+app.use("/api/refunds", refundRoutes);
 
 const swaggerOptions = {
     explorer: true,
