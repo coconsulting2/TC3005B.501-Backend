@@ -60,6 +60,11 @@ const PERMISSION_CATALOG = [
   { code: "permission_group:manage",    resource: "permission_group", action: "manage",   description: "Manage permission groups and their members" },
   { code: "role:manage_permissions",    resource: "role",             action: "manage_permissions", description: "Grant or revoke permissions on roles" },
   { code: "user:manage_permissions",    resource: "user",             action: "manage_permissions", description: "Grant or revoke permissions on users" },
+
+  // M2-006 — Refund rule engine (RF-37..39, RF-42..46)
+  { code: "policy:read",                 resource: "policy",  action: "read",                 description: "Read travel policies, expense caps and reimbursement time limits" },
+  { code: "policy:manage",               resource: "policy",  action: "manage",               description: "Create/update/delete travel policies, employee categories and reimbursement time limits" },
+  { code: "expense:authorize_exception", resource: "expense", action: "authorize_exception", description: "Approve or reject policy exceptions on receipts" },
 ];
 
 const PERMISSION_GROUPS = [
@@ -71,6 +76,7 @@ const PERMISSION_GROUPS = [
       "travel_request:edit_own", "travel_request:submit", "travel_request:cancel",
       "receipt:upload", "receipt:delete_own", "receipt:view_sat",
       "expense:view", "expense:submit",
+      "policy:read",
       "user:view_self",
     ],
   },
@@ -84,6 +90,7 @@ const PERMISSION_GROUPS = [
       "receipt:upload", "receipt:delete_own", "receipt:view_sat",
       "expense:view", "expense:submit",
       "authorizer:view_alerts",
+      "policy:read", "expense:authorize_exception",
       "user:view_self",
     ],
   },
@@ -105,16 +112,18 @@ const PERMISSION_GROUPS = [
       "receipt:validate", "receipt:view_sat",
       "expense:view",
       "travel_request:view_any",
+      "policy:read",
       "user:view_self",
     ],
   },
   {
     groupName: "OrgAdmin",
-    description: "Administrador — gestiona usuarios, permisos, roles",
+    description: "Administrador — gestiona usuarios, permisos, roles, políticas",
     permissions: [
       "user:list", "user:create", "user:edit",
       "permission:read", "permission:write", "permission_group:manage",
       "role:manage_permissions", "user:manage_permissions",
+      "policy:read", "policy:manage",
       "user:view_self",
     ],
   },
@@ -190,6 +199,77 @@ async function seedPermissions() {
   }
 
   console.warn("Permissions catalog seeded.");
+}
+
+/**
+ * Idempotently seeds reimbursement time limits, employee categories and a sample
+ * travel policy per organization (M2-006). Looks up distinct orgIds from existing
+ * Users; if no orgs are seeded yet, exits silently.
+ */
+async function seedRefundDefaults() {
+  console.warn("Seeding refund defaults (M2-006)...");
+
+  const orgs = await prisma.user.findMany({
+    where: { orgId: { not: null } },
+    distinct: ["orgId"],
+    select: { orgId: true },
+  });
+
+  if (orgs.length === 0) {
+    console.warn("No organizations found yet — skipping refund defaults.");
+    return;
+  }
+
+  const hospedaje = await prisma.receiptType.findUnique({ where: { receiptTypeName: "Hospedaje" } });
+  const comida    = await prisma.receiptType.findUnique({ where: { receiptTypeName: "Comida" } });
+  const vuelo     = await prisma.receiptType.findUnique({ where: { receiptTypeName: "Vuelo" } });
+
+  for (const { orgId } of orgs) {
+    // Reimbursement time limit (RF-37, default 14 días desde trip_end_date)
+    await prisma.reimbursementTimeLimit.upsert({
+      where: { orgId },
+      update: {},
+      create: { orgId, daysAfterTrip: 14, graceDays: 0, blockOnExpiry: true },
+    });
+
+    // Employee category sample (RF-42)
+    const category = await prisma.employeeCategory.upsert({
+      where: { orgId_code: { orgId, code: "EJECUTIVO" } },
+      update: {},
+      create: { orgId, code: "EJECUTIVO", name: "Ejecutivo", description: "Personal con autorización ejecutiva" },
+    });
+
+    // Sample travel policy (RF-42, RF-43, RF-46) — only create if not exists for this org
+    const existingPolicy = await prisma.travelPolicy.findFirst({
+      where: { orgId, name: "Política base nacional 2026" },
+    });
+    if (!existingPolicy) {
+      const policy = await prisma.travelPolicy.create({
+        data: {
+          orgId,
+          name: "Política base nacional 2026",
+          categoryId: category.categoryId,
+          destinationScope: "nacional",
+          dailyPerDiem: 1500,
+          currency: "MXN",
+          validFrom: new Date("2026-01-01"),
+          validTo: null,
+          active: true,
+        },
+      });
+
+      const caps = [];
+      if (hospedaje) caps.push({ policyId: policy.policyId, receiptTypeId: hospedaje.receiptTypeId, capAmount: 2500, capUnit: "per_night", currency: "MXN" });
+      if (comida)    caps.push({ policyId: policy.policyId, receiptTypeId: comida.receiptTypeId,    capAmount: 800,  capUnit: "per_day",   currency: "MXN" });
+      if (vuelo)     caps.push({ policyId: policy.policyId, receiptTypeId: vuelo.receiptTypeId,     capAmount: 8000, capUnit: "per_trip",  currency: "MXN" });
+
+      if (caps.length > 0) {
+        await prisma.policyExpenseCap.createMany({ data: caps, skipDuplicates: true });
+      }
+    }
+  }
+
+  console.warn("Refund defaults seeded.");
 }
 
 /**
@@ -388,7 +468,17 @@ async function main() {
     }
 
     console.warn("Dummy data seeded.");
+
+    // M2-006 dev convenience — los users del CSV no traen org_id; asignamos 1n
+    // así seedRefundDefaults puede crear políticas y plazos para esa org.
+    await prisma.user.updateMany({
+      where: { orgId: null },
+      data: { orgId: 1n },
+    });
   }
+
+  // M2-006 — Refund defaults (idempotent; runs after users so orgIds exist).
+  await seedRefundDefaults();
 }
 
 main()
