@@ -13,6 +13,7 @@ import https from "https";
 import { connectMongo } from "./services/fileStorage.js";
 import { connectPostgres } from "./database/config/prisma.js";
 import { startScheduler } from "./services/scheduler/index.js";
+import { startApprovalSubstituteCron } from "./services/approvalSubstituteCron.js";
 
 import app from "./app.js";
 
@@ -20,6 +21,9 @@ const PORT = process.env.PORT || 3000;
 
 connectMongo().catch((error) => console.error("Failed to connect to MongoDB:", error));
 connectPostgres().catch((error) => console.error("Failed to connect to PostgreSQL:", error));
+startApprovalSubstituteCron().catch((error) =>
+  console.error("Failed to start approval substitutes cron:", error),
+);
 
 // M2-006 — Scheduler de jobs cron (escalation + refund deadline). Activado con SCHEDULER_ENABLED=true.
 startScheduler();
