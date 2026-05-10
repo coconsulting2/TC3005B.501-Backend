@@ -82,6 +82,30 @@ export class InsufficientPermissionsError extends AuthError {
 }
 
 /**
+ * Thrown when the API key is missing, unknown, expired, or revoked.
+ */
+export class InvalidApiKeyError extends AuthError {
+  /**
+   *
+   */
+  constructor() {
+    super(401, "Invalid or revoked API key", "INVALID_API_KEY");
+  }
+}
+
+/**
+ * Thrown when the API key is valid but its scope lacks a required permission code.
+ */
+export class InsufficientApiKeyScopeError extends AuthError {
+  /**
+   *
+   */
+  constructor() {
+    super(403, "API key scope does not allow this operation", "INSUFFICIENT_API_KEY_SCOPE");
+  }
+}
+
+/**
  * Centralized handler for auth errors. Sends standardized JSON responses.
  * Non-auth errors are forwarded to the next Express error handler.
  *
