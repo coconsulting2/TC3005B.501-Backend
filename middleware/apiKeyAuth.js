@@ -43,7 +43,7 @@ export async function resolveActiveApiKey(plainKey) {
   if (!plainKey || typeof plainKey !== "string") {
     throw new InvalidApiKeyError();
   }
-  const keyHash = apiKeyService.hashApiKey(plainKey);
+  const keyHash = await apiKeyService.hashApiKey(plainKey);
   const row = await apiKeyModel.findApiKeyByHash(keyHash);
   if (!row) {
     throw new InvalidApiKeyError();

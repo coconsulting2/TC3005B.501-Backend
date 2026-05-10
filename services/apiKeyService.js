@@ -5,24 +5,32 @@
  * scope JSON y comprobaciones de scope para el middleware.
  *
  * Nota de diseño sobre el hash:
- * Las API keys son tokens opacos de 256 bits de entropía generados con CSPRNG
- * (`crypto.randomBytes(32)`), no contraseñas humanas. Para este perfil de
- * amenaza la práctica estándar es un hash rápido (GitHub, Stripe). Para
- * además mitigar el escenario "fuga de BD sin fuga de la app" usamos
- * **HMAC-SHA256 con un pepper del servidor** (`API_KEY_HASH_PEPPER`, fallback
- * `JWT_SECRET`): el atacante necesita BD y pepper para forjar el hash.
- * No usamos bcrypt/scrypt porque la verificación corre por request y un KDF
- * lento haría inviable cualquier integración de alta frecuencia.
+ * Las API keys son tokens opacos de 256 bits generados con CSPRNG
+ * (`crypto.randomBytes(32)`), no contraseñas humanas. Aun así usamos un KDF
+ * fuerte reconocido por CodeQL: **scrypt** con un *pepper* del servidor
+ * (`API_KEY_HASH_PEPPER`, fallback `JWT_SECRET`) actuando como salt fijo.
+ * El pepper como salt mantiene el hash determinista — necesario para
+ * resolver la clave por índice único en `key_hash` (lookup O(1)) — y al
+ * mismo tiempo obliga al atacante a poseer BD y pepper para precomputar.
+ * Usamos la versión asíncrona para no bloquear el event loop.
  */
-import { createHmac, randomBytes } from "node:crypto";
+import { scrypt as _scrypt, randomBytes } from "node:crypto";
+import { promisify } from "node:util";
 import * as apiKeyModel from "../models/apiKeyModel.js";
+
+const scryptAsync = promisify(_scrypt);
 
 const KEY_PREFIX = "cck_";
 const HASH_HEX_LEN = 64;
 
+// 32 bytes → 64 hex chars (encaja en api_keys.key_hash VARCHAR(64)).
+const SCRYPT_KEYLEN = 32;
+// Parámetros estándar OWASP: ~50–80 ms por hash en hardware típico.
+const SCRYPT_OPTIONS = Object.freeze({ N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 });
+
 /**
- * Devuelve el pepper para HMAC. Falla rápido si no hay secreto configurado
- * (en producción debe ser independiente de JWT_SECRET para mejor segregación).
+ * Devuelve el pepper. Falla rápido si no hay secreto adecuado.
+ * En producción debe ser independiente de JWT_SECRET para segregar dominios.
  *
  * @returns {string}
  */
@@ -37,14 +45,16 @@ function getApiKeyHashPepper() {
 }
 
 /**
- * Calcula HMAC-SHA256 hex del secreto plano usando un pepper del servidor.
- * Es lo único que se persiste en `api_keys.key_hash`.
+ * Calcula scrypt(plainKey, pepper) y devuelve hex (lo único que se persiste).
+ * Es determinista por diseño (mismo pepper ⇒ mismo hash) para permitir lookup
+ * por índice único en `api_keys.key_hash`.
  *
  * @param {string} plainKey
- * @returns {string} 64 chars hex en minúsculas
+ * @returns {Promise<string>} 64 chars hex en minúsculas
  */
-export function hashApiKey(plainKey) {
-  return createHmac("sha256", getApiKeyHashPepper()).update(plainKey, "utf8").digest("hex");
+export async function hashApiKey(plainKey) {
+  const buf = await scryptAsync(plainKey, getApiKeyHashPepper(), SCRYPT_KEYLEN, SCRYPT_OPTIONS);
+  return buf.toString("hex");
 }
 
 /**
@@ -125,7 +135,7 @@ export async function generateApiKeyForOrg({ orgId, scope, expiresAt, createdBy 
   // Reintenta ante choques improbables del índice único sobre key_hash.
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const plainKey = generatePlainApiKey();
-    const keyHash = hashApiKey(plainKey);
+    const keyHash = await hashApiKey(plainKey);
     if (keyHash.length !== HASH_HEX_LEN) {
       throw new Error("unexpected hash length");
     }
