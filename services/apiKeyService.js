@@ -3,21 +3,48 @@
  * @description Lógica de negocio para claves API por organización: generación
  * (secreto devuelto una sola vez), revocación, listados, normalización del
  * scope JSON y comprobaciones de scope para el middleware.
+ *
+ * Nota de diseño sobre el hash:
+ * Las API keys son tokens opacos de 256 bits de entropía generados con CSPRNG
+ * (`crypto.randomBytes(32)`), no contraseñas humanas. Para este perfil de
+ * amenaza la práctica estándar es un hash rápido (GitHub, Stripe). Para
+ * además mitigar el escenario "fuga de BD sin fuga de la app" usamos
+ * **HMAC-SHA256 con un pepper del servidor** (`API_KEY_HASH_PEPPER`, fallback
+ * `JWT_SECRET`): el atacante necesita BD y pepper para forjar el hash.
+ * No usamos bcrypt/scrypt porque la verificación corre por request y un KDF
+ * lento haría inviable cualquier integración de alta frecuencia.
  */
-import { createHash, randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import * as apiKeyModel from "../models/apiKeyModel.js";
 
 const KEY_PREFIX = "cck_";
 const HASH_HEX_LEN = 64;
 
 /**
- * Calcula SHA-256 hex del secreto plano. Es lo único que se persiste en BD.
+ * Devuelve el pepper para HMAC. Falla rápido si no hay secreto configurado
+ * (en producción debe ser independiente de JWT_SECRET para mejor segregación).
+ *
+ * @returns {string}
+ */
+function getApiKeyHashPepper() {
+  const pepper = process.env.API_KEY_HASH_PEPPER || process.env.JWT_SECRET;
+  if (!pepper || typeof pepper !== "string" || pepper.length < 16) {
+    throw new Error(
+      "API_KEY_HASH_PEPPER (or JWT_SECRET fallback) must be set with >=16 chars to hash API keys",
+    );
+  }
+  return pepper;
+}
+
+/**
+ * Calcula HMAC-SHA256 hex del secreto plano usando un pepper del servidor.
+ * Es lo único que se persiste en `api_keys.key_hash`.
  *
  * @param {string} plainKey
  * @returns {string} 64 chars hex en minúsculas
  */
 export function hashApiKey(plainKey) {
-  return createHash("sha256").update(plainKey, "utf8").digest("hex");
+  return createHmac("sha256", getApiKeyHashPepper()).update(plainKey, "utf8").digest("hex");
 }
 
 /**
