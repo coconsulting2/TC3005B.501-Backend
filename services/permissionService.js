@@ -54,6 +54,36 @@ export async function loadEffectivePermissions(userId) {
   return Array.from(codes);
 }
 
+/**
+ * Permisos efectivos que tendría un usuario solo por su rol (sin grants directos).
+ * Útil para vista previa de importación / onboarding.
+ *
+ * @param {number} roleId - Rol
+ * @returns {Promise<string[]>} Códigos de permiso activos, ordenados
+ */
+export async function loadEffectivePermissionsForRole(roleId) {
+  const role = await permissionModel.findRoleWithPermissions(roleId);
+  if (!role) return [];
+
+  const codes = new Set();
+
+  const addPerm = (p) => {
+    if (p && p.active) codes.add(p.code);
+  };
+
+  for (const rp of role.rolePermissions || []) {
+    addPerm(rp.permission);
+  }
+  for (const rpg of role.rolePermissionGroups || []) {
+    if (!rpg.group || !rpg.group.active) continue;
+    for (const item of rpg.group.items || []) {
+      addPerm(item.permission);
+    }
+  }
+
+  return Array.from(codes).sort((a, b) => a.localeCompare(b));
+}
+
 // ─── Permission catalog ─────────────────────────────────────────────────────
 
 /**

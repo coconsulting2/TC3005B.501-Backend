@@ -76,6 +76,21 @@ describe("authMiddleware", () => {
       expect(req.user.role).toBe("Solicitante");
     });
 
+    test("should attach decoded user when JWT is only in cookies.token (httpOnly)", async () => {
+      const token = generateToken();
+      const req = mockReq({
+        cookies: { token },
+      });
+      const res = mockRes();
+      const next = mockNext();
+
+      await authenticateToken(req, res, next);
+
+      expect(next).toHaveBeenCalledWith();
+      expect(req.user).toBeDefined();
+      expect(req.user.user_id).toBe(1);
+    });
+
     test("should forward MissingTokenError when no Authorization header is present", async () => {
       const req = mockReq();
       const res = mockRes();

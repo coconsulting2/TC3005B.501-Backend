@@ -38,17 +38,21 @@ const TOKEN_GRACE_PERIOD_END = process.env.TOKEN_GRACE_PERIOD_END
   : Date.now() + 24 * 60 * 60 * 1000;
 
 /**
- * Extracts the Bearer token from the Authorization header
+ * JWT desde `Authorization: Bearer` o cookie httpOnly `token` (login).
+ * Peticiones credencialed 4321→3000 envían la cookie aunque JS no pueda leerla.
  *
  * @param {import("express").Request} req - Express request
- * @returns {string|null} The raw JWT string or null if absent
+ * @returns {string|null} JWT crudo o null
  */
 const extractToken = (req) => {
   const header = req.headers.authorization;
-  if (!header || !header.startsWith("Bearer ")) {
-    return null;
+  if (header && header.startsWith("Bearer ")) {
+    return header.split(" ")[1];
   }
-  return header.split(" ")[1];
+  if (req.cookies && typeof req.cookies.token === "string" && req.cookies.token.length > 0) {
+    return req.cookies.token;
+  }
+  return null;
 };
 
 /**
@@ -75,7 +79,7 @@ const verifyToken = (token) => {
 };
 
 /**
- * Core authentication middleware. Validates the JWT from the Authorization header,
+ * Core authentication middleware. Validates the JWT (Bearer o cookie `token`),
  * checks IP binding, and attaches decoded user to req.user.
  *
  * In development, if MOCK_AUTH is enabled and no Bearer token is sent, it uses a mock user.
