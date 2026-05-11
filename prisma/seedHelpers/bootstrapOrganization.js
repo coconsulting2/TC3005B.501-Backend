@@ -113,6 +113,7 @@ const DITTA_SUPER_ADMIN_GROUP = {
     "accounting_catalog:read", "accounting_catalog:write",
     "notification_template:read", "notification_template:write",
     "receipt_type:write", "alert_message:write",
+    "onboarding:import",
     "user:view_self",
   ],
 };

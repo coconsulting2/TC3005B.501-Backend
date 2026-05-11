@@ -101,6 +101,9 @@ const PERMISSION_CATALOG = [
 
   { code: "receipt_type:write",  resource: "receipt_type",  action: "write" },
   { code: "alert_message:write", resource: "alert_message", action: "write" },
+
+  // Onboarding import (M3-007)
+  { code: "onboarding:import", resource: "onboarding", action: "import" },
 ];
 
 async function seedGlobalPermissions() {

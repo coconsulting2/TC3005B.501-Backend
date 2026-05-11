@@ -24,6 +24,7 @@ import approvalSubstituteRoutes from "./routes/approvalSubstituteRoutes.js";
 import apiKeyRoutes from "./routes/apiKeyRoutes.js";
 import externalApiKeyRoutes from "./routes/externalApiKeyRoutes.js";
 import organizationRoutes from "./routes/organizationRoutes.js";
+import onboardingImportRoutes from "./routes/onboardingImportRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
@@ -104,6 +105,8 @@ app.use("/api/keys", apiKeyRoutes);
 app.use("/api/external", externalApiKeyRoutes);
 // Multi-tenant: gestión de organizaciones (Ditta only para crear/listar; admins de org leen/editan la propia).
 app.use("/api/organizations", organizationRoutes);
+// M3-007 — Importación masiva de usuarios para onboarding (JSON / CSV, strategy pattern).
+app.use("/api/onboarding/import", onboardingImportRoutes);
 
 const swaggerOptions = {
     explorer: true,

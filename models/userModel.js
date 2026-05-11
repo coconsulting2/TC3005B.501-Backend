@@ -169,9 +169,16 @@ const User = {
    * @returns {Promise<Object|undefined>} User row or undefined.
    */
   async getUserUsername(username) {
-    const user = await prisma.user.findUnique({
-      where: { userName: username },
-      include: { role: true, organization: true },
+    // Login ocurre sin tenantContext ni GUC de Postgres. La política RLS en User
+    // exige organization_id = current_setting(...) o bypass; sin SET la fila no
+    // aparece y el login siempre devuelve 401. Transacción + bypass local solo
+    // para esta lectura (no filtra al pool).
+    const user = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.bypass_tenant', 'on', true)`;
+      return tx.user.findUnique({
+        where: { userName: username },
+        include: { role: true, organization: true },
+      });
     });
 
     if (!user) return undefined;

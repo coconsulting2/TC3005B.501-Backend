@@ -1,9 +1,22 @@
 import crypto from "crypto";
 const AES_SECRET_KEY = process.env.AES_SECRET_KEY;
 
+/**
+ * Formato histórico adminService.encrypt: IV 16 bytes en hex (32 caracteres) + ciphertext base64.
+ * Usuarios creados por seed/Prisma/import guardan email/teléfono en claro → no debemos llamar a createDecipheriv.
+ */
+function looksLikeEncryptedIvPlusBase64(str) {
+  if (typeof str !== "string" || str.length <= 32) return false;
+  return /^[0-9a-f]{32}$/i.test(str.slice(0, 32));
+}
+
 export const decrypt = (encryptedData) => {
   try {
     if (!encryptedData || typeof encryptedData !== "string") {
+      return encryptedData;
+    }
+
+    if (!looksLikeEncryptedIvPlusBase64(encryptedData)) {
       return encryptedData;
     }
 
