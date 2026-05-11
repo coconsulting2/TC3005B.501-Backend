@@ -368,6 +368,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'workflow_rules_org_id_fkey') THEN
     ALTER TABLE "workflow_rules" ADD CONSTRAINT "workflow_rules_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "organizaciones"("id") ON DELETE CASCADE;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.table_constraints WHERE constraint_name = 'api_keys_org_id_fkey') THEN
+    ALTER TABLE "api_keys" ADD CONSTRAINT "api_keys_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "organizaciones"("id") ON DELETE CASCADE;
+  END IF;
 END
 $$;
 
@@ -571,7 +574,8 @@ BEGIN
       ('accounting_doc_types',    'organization_id'),
       ('accounting_societies',    'organization_id'),
       ('organization_integrations','organization_id'),
-      ('notification_templates',  'organization_id')
+      ('notification_templates',  'organization_id'),
+      ('api_keys',                 'org_id')
     ) AS x(t, org_col)
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
@@ -647,6 +651,26 @@ CREATE POLICY tenant_isolation_via_role ON "Role_Permission_Group"
       SELECT 1 FROM "Role" r
       WHERE r."role_id" = "Role_Permission_Group"."role_id"
       AND r."organization_id" = NULLIF(current_setting('app.current_organization_id', true), '')::bigint
+    )
+  );
+
+ALTER TABLE "api_key_logs" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation_via_api_key ON "api_key_logs";
+CREATE POLICY tenant_isolation_via_api_key ON "api_key_logs"
+  USING (
+    current_setting('app.bypass_tenant', true) = 'on'
+    OR EXISTS (
+      SELECT 1 FROM "api_keys" ak
+      WHERE ak."id" = "api_key_logs"."key_id"
+      AND ak."org_id" = NULLIF(current_setting('app.current_organization_id', true), '')::bigint
+    )
+  )
+  WITH CHECK (
+    current_setting('app.bypass_tenant', true) = 'on'
+    OR EXISTS (
+      SELECT 1 FROM "api_keys" ak
+      WHERE ak."id" = "api_key_logs"."key_id"
+      AND ak."org_id" = NULLIF(current_setting('app.current_organization_id', true), '')::bigint
     )
   );
 
