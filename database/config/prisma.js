@@ -5,10 +5,16 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { triggerExtension } from "../../prisma/middleware.js";
+import { tenantExtension } from "../../prisma/tenantExtension.js";
 
 const client = new PrismaClient();
 const disable_triggers = process.env.PRISMA_DISABLE_TRIGGERS === "true" && process.env.NODE_ENV === 'test';
-const prisma = disable_triggers ? client : client.$extends(triggerExtension);
+
+// Orden: triggers primero (replica triggers MariaDB), tenant scoping al final
+// para que las inserciones de triggers también respeten el orgId activo.
+let extended = disable_triggers ? client : client.$extends(triggerExtension);
+extended = extended.$extends(tenantExtension);
+const prisma = extended;
 
 async function connectPostgres() {
     try {

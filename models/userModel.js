@@ -171,7 +171,7 @@ const User = {
   async getUserUsername(username) {
     const user = await prisma.user.findUnique({
       where: { userName: username },
-      include: { role: true },
+      include: { role: true, organization: true },
     });
 
     if (!user) return undefined;
@@ -183,6 +183,9 @@ const User = {
       password: user.password,
       active: user.active,
       role_name: user.role?.roleName,
+      organization_id: user.organizationId,
+      organization_kind: user.organization?.kind,
+      organization_status: user.organization?.status,
     };
   },
 
