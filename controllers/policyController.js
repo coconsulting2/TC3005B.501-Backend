@@ -8,13 +8,13 @@ import * as policyAlertService from "../services/policyAlertService.js";
 
 async function resolveOrgId(req) {
   const userId = Number(req.user.user_id);
-  const user = await prisma.user.findUnique({ where: { userId }, select: { orgId: true } });
-  if (!user || user.orgId === null || user.orgId === undefined) {
+  const user = await prisma.user.findUnique({ where: { userId }, select: { organizationId: true } });
+  if (!user || user.organizationId === null || user.organizationId === undefined) {
     const err = new Error("Usuario sin organización asignada.");
     err.status = 403;
     throw err;
   }
-  return user.orgId;
+  return user.organizationId;
 }
 
 function handleError(res, error, label) {
@@ -30,13 +30,13 @@ function handleError(res, error, label) {
  */
 export const listPolicies = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
+    const organizationId = await resolveOrgId(req);
     const filters = {
       activeOnly: req.query.activeOnly !== "false",
       categoryId: req.query.categoryId ? Number(req.query.categoryId) : undefined,
       asOfDate: req.query.asOfDate || undefined,
     };
-    const rows = await policyService.listPolicies(orgId, filters);
+    const rows = await policyService.listPolicies(organizationId, filters);
     return res.status(200).json({ policies: rows });
   } catch (e) { return handleError(res, e, "policy.list"); }
 };
@@ -48,8 +48,8 @@ export const listPolicies = async (req, res) => {
  */
 export const getPolicy = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
-    const row = await policyService.getPolicy(Number(req.params.id), orgId);
+    const organizationId = await resolveOrgId(req);
+    const row = await policyService.getPolicy(Number(req.params.id), organizationId);
     if (!row) return res.status(404).json({ error: "Política no encontrada." });
     return res.status(200).json(row);
   } catch (e) { return handleError(res, e, "policy.get"); }
@@ -62,8 +62,8 @@ export const getPolicy = async (req, res) => {
  */
 export const createPolicy = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
-    const created = await policyService.createPolicy(orgId, req.body);
+    const organizationId = await resolveOrgId(req);
+    const created = await policyService.createPolicy(organizationId, req.body);
     return res.status(201).json(created);
   } catch (e) { return handleError(res, e, "policy.create"); }
 };
@@ -75,8 +75,8 @@ export const createPolicy = async (req, res) => {
  */
 export const updatePolicy = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
-    const updated = await policyService.updatePolicy(Number(req.params.id), orgId, req.body);
+    const organizationId = await resolveOrgId(req);
+    const updated = await policyService.updatePolicy(Number(req.params.id), organizationId, req.body);
     return res.status(200).json(updated);
   } catch (e) { return handleError(res, e, "policy.update"); }
 };
@@ -88,8 +88,8 @@ export const updatePolicy = async (req, res) => {
  */
 export const deactivatePolicy = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
-    await policyService.deactivatePolicy(Number(req.params.id), orgId);
+    const organizationId = await resolveOrgId(req);
+    await policyService.deactivatePolicy(Number(req.params.id), organizationId);
     return res.status(204).send();
   } catch (e) { return handleError(res, e, "policy.deactivate"); }
 };

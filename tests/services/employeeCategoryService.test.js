@@ -24,7 +24,7 @@ describe("employeeCategoryService", () => {
     mockPrisma.employeeCategory.findMany.mockResolvedValue([]);
     await svc.listCategories(1n);
     expect(mockPrisma.employeeCategory.findMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { orgId: 1n, active: true },
+      where: { organizationId: 1n, active: true },
     }));
   });
 
@@ -36,7 +36,7 @@ describe("employeeCategoryService", () => {
   });
 
   test("getCategory returns null when row belongs to a different org", async () => {
-    mockPrisma.employeeCategory.findUnique.mockResolvedValue({ categoryId: 5, orgId: 2n });
+    mockPrisma.employeeCategory.findUnique.mockResolvedValue({ categoryId: 5, organizationId: 2n });
     const result = await svc.getCategory(5, 1n);
     expect(result).toBeNull();
   });
@@ -50,7 +50,7 @@ describe("employeeCategoryService", () => {
     mockPrisma.employeeCategory.create.mockResolvedValue({ categoryId: 1 });
     await svc.createCategory(1n, { code: "  EJEC  ", name: "  Ejecutivo  ", description: "  desc " });
     expect(mockPrisma.employeeCategory.create).toHaveBeenCalledWith({
-      data: { orgId: 1n, code: "EJEC", name: "Ejecutivo", description: "desc", active: true },
+      data: { organizationId: 1n, code: "EJEC", name: "Ejecutivo", description: "desc", active: true },
     });
   });
 
@@ -60,7 +60,7 @@ describe("employeeCategoryService", () => {
   });
 
   test("deactivateCategory sets active=false", async () => {
-    mockPrisma.employeeCategory.findUnique.mockResolvedValue({ categoryId: 1, orgId: 1n, active: true });
+    mockPrisma.employeeCategory.findUnique.mockResolvedValue({ categoryId: 1, organizationId: 1n, active: true });
     mockPrisma.employeeCategory.update.mockResolvedValue({ active: false });
     const result = await svc.deactivateCategory(1, 1n);
     expect(result.active).toBe(false);

@@ -9,13 +9,13 @@ import { summarizeRequestPolicyResult } from "../services/refundRuleEngine.js";
 
 async function resolveOrgId(req) {
   const userId = Number(req.user.user_id);
-  const user = await prisma.user.findUnique({ where: { userId }, select: { orgId: true } });
-  if (!user || user.orgId === null) {
+  const user = await prisma.user.findUnique({ where: { userId }, select: { organizationId: true } });
+  if (!user || user.organizationId === null) {
     const err = new Error("Usuario sin organización asignada.");
     err.status = 403;
     throw err;
   }
-  return user.orgId;
+  return user.organizationId;
 }
 
 function handleError(res, error, label) {
@@ -31,8 +31,8 @@ function handleError(res, error, label) {
  */
 export const getTimeLimit = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
-    const cfg = await timeService.getOrgTimeLimit(orgId);
+    const organizationId = await resolveOrgId(req);
+    const cfg = await timeService.getOrgTimeLimit(organizationId);
     return res.status(200).json(cfg);
   } catch (e) { return handleError(res, e, "refund.getTimeLimit"); }
 };
@@ -44,9 +44,9 @@ export const getTimeLimit = async (req, res) => {
  */
 export const setTimeLimit = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
+    const organizationId = await resolveOrgId(req);
     const updatedById = Number(req.user.user_id);
-    await timeService.setOrgTimeLimit(orgId, req.body, updatedById);
+    await timeService.setOrgTimeLimit(organizationId, req.body, updatedById);
     return res.status(200).json({ message: "Configuración actualizada." });
   } catch (e) { return handleError(res, e, "refund.setTimeLimit"); }
 };
@@ -112,7 +112,7 @@ export const getRefundDashboardByUser = async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { userId: targetUserId },
-      select: { userId: true, wallet: true, orgId: true },
+      select: { userId: true, wallet: true, organizationId: true },
     });
     if (!user) return res.status(404).json({ error: "Usuario no encontrado." });
 
@@ -143,7 +143,7 @@ export const getRefundDashboardByUser = async (req, res) => {
 
     let pendingDeadlineWarning = null;
     for (const r of requests) {
-      if (!r.tripEndDate || !user.orgId) continue;
+      if (!r.tripEndDate || !user.organizationId) continue;
       try {
         const within = await timeService.isWithinDeadline(r.requestId);
         if (!within) {

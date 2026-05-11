@@ -47,7 +47,7 @@ export async function createException(payload) {
 
   const request = await prisma.request.findUnique({
     where: { requestId: Number(payload.requestId) },
-    select: { requestId: true, workflowPreSnapshot: true, userId: true },
+    select: { requestId: true, workflowPreSnapshot: true, userId: true, organizationId: true },
   });
   if (!request) {
     const err = new Error(`Solicitud ${payload.requestId} no encontrada.`);
@@ -57,6 +57,7 @@ export async function createException(payload) {
 
   const created = await prisma.policyException.create({
     data: {
+      organizationId: request.organizationId,
       requestId: Number(payload.requestId),
       receiptId: payload.receiptId ? Number(payload.receiptId) : null,
       policyId: payload.policyId ? Number(payload.policyId) : null,
@@ -103,7 +104,7 @@ export async function decideException(exceptionId, decision, decidedById, decisi
   }
   const exception = await prisma.policyException.findUnique({
     where: { exceptionId: Number(exceptionId) },
-    include: { request: { select: { workflowPreSnapshot: true, userId: true } } },
+    include: { request: { select: { workflowPreSnapshot: true, userId: true, organizationId: true } } },
   });
   if (!exception) {
     const err = new Error(`Excepción ${exceptionId} no encontrada.`);
@@ -145,6 +146,7 @@ export async function decideException(exceptionId, decision, decidedById, decisi
     }
     await tx.solicitudHistorial.create({
       data: {
+        organizationId: exception.request.organizationId,
         requestId: exception.requestId,
         userId: Number(decidedById),
         accion,

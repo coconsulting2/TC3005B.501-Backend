@@ -47,7 +47,7 @@ export async function checkReceiptBeforeSubmit(input) {
     select: {
       requestId: true,
       policyEvaluationSnapshot: true,
-      user: { select: { orgId: true } },
+      user: { select: { organizationId: true } },
       routeRequests: { include: { route: true } },
     },
   });
@@ -65,7 +65,7 @@ export async function checkReceiptBeforeSubmit(input) {
     // Reconstruir desde el snapshot inmovilizado (RF-46).
     policy = {
       policyId: snapshot.policyId,
-      orgId: request.user?.orgId ?? null,
+      organizationId: request.user?.organizationId ?? null,
       name: snapshot.name,
       categoryId: snapshot.categoryId ?? null,
       destinationScope: snapshot.destinationScope || "any",
@@ -77,9 +77,9 @@ export async function checkReceiptBeforeSubmit(input) {
       active: true,
     };
     caps = (snapshot.caps || []).map((c) => ({ ...c, policyId: snapshot.policyId }));
-  } else if (request.user && request.user.orgId) {
+  } else if (request.user && request.user.organizationId) {
     const policies = await prisma.travelPolicy.findMany({
-      where: { orgId: request.user.orgId, active: true },
+      where: { organizationId: request.user.organizationId, active: true },
       include: { expenseCaps: true },
     });
     policy = findApplicablePolicy(policies, {

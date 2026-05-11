@@ -88,7 +88,8 @@ export const triggerExtension = Prisma.defineExtension((client) =>
           if (
             oldReceipt &&
             result.validation === "Aprobado" &&
-            oldReceipt.validation !== "Aprobado"
+            oldReceipt.validation !== "Aprobado" &&
+            result.requestId != null
           ) {
             const request = await client.request.findUnique({
               where: { requestId: result.requestId },

@@ -25,7 +25,7 @@ describe("checkReceiptBeforeSubmit", () => {
 
   test("returns no-policy message when org has no applicable policy", async () => {
     mockPrisma.request.findUnique.mockResolvedValue({
-      requestId: 1, policyEvaluationSnapshot: null, user: { orgId: 1n }, routeRequests: [],
+      requestId: 1, policyEvaluationSnapshot: null, user: { organizationId: 1n }, routeRequests: [],
     });
     mockPrisma.travelPolicy.findMany.mockResolvedValue([]);
     const result = await svc.checkReceiptBeforeSubmit({ requestId: 1, receiptTypeId: 1, amount: 100 });
@@ -42,7 +42,7 @@ describe("checkReceiptBeforeSubmit", () => {
         currency: "MXN", validFrom: "2026-01-01", validTo: null,
         caps: [{ capId: 1, receiptTypeId: 1, capAmount: 1000, capUnit: "per_event", currency: "MXN" }],
       },
-      user: { orgId: 1n },
+      user: { organizationId: 1n },
       routeRequests: [],
     });
     const result = await svc.checkReceiptBeforeSubmit({ requestId: 1, receiptTypeId: 1, amount: 1500 });
@@ -59,7 +59,7 @@ describe("checkReceiptBeforeSubmit", () => {
         policyId: 99, name: "P", destinationScope: "any", currency: "MXN", validFrom: "2026-01-01", validTo: null,
         caps: [{ capId: 1, receiptTypeId: 1, capAmount: 2500, capUnit: "per_night", currency: "MXN" }],
       },
-      user: { orgId: 1n },
+      user: { organizationId: 1n },
       routeRequests: [],
     });
     const result = await svc.checkReceiptBeforeSubmit({ requestId: 1, receiptTypeId: 1, amount: 4000, nights: 2 });

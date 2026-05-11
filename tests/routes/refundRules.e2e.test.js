@@ -39,8 +39,19 @@ const authHeaders = (role) => ({
 });
 
 async function seedCatalogs() {
+  // Multi-tenant: org base (Ditta como ROOT id=1).
+  await prisma.organization.upsert({
+    where: { id: ORG_ID },
+    update: { kind: "ROOT", status: "ACTIVE" },
+    create: { id: ORG_ID, nombre: "Ditta", kind: "ROOT", status: "ACTIVE" },
+  });
   await prisma.role.createMany({
-    data: [{ roleName: "Solicitante" }, { roleName: "N1" }, { roleName: "N2" }, { roleName: "Administrador" }],
+    data: [
+      { organizationId: ORG_ID, roleName: "Solicitante" },
+      { organizationId: ORG_ID, roleName: "N1" },
+      { organizationId: ORG_ID, roleName: "N2" },
+      { organizationId: ORG_ID, roleName: "Administrador" },
+    ],
     skipDuplicates: true,
   });
   await prisma.requestStatus.createMany({
@@ -53,7 +64,11 @@ async function seedCatalogs() {
     skipDuplicates: true,
   });
   await prisma.receiptType.createMany({
-    data: [{ receiptTypeName: "Hospedaje" }, { receiptTypeName: "Comida" }, { receiptTypeName: "Vuelo" }],
+    data: [
+      { organizationId: ORG_ID, receiptTypeName: "Hospedaje" },
+      { organizationId: ORG_ID, receiptTypeName: "Comida" },
+      { organizationId: ORG_ID, receiptTypeName: "Vuelo" },
+    ],
     skipDuplicates: true,
   });
 }
@@ -70,9 +85,9 @@ async function seedUsers() {
   })) {
     await prisma.user.upsert({
       where: { userId },
-      update: { orgId: ORG_ID, roleId: roleIdByName[roleName] },
+      update: { organizationId: ORG_ID, roleId: roleIdByName[roleName] },
       create: {
-        userId, roleId: roleIdByName[roleName], orgId: ORG_ID,
+        userId, roleId: roleIdByName[roleName], organizationId: ORG_ID,
         userName: `e2e_${roleName.replace(/\s/g, "_")}_${userId}`,
         password: "x".repeat(60),
         workstation: "test", email: `e2e_${userId}@test.local`,
@@ -105,7 +120,7 @@ async function applyPermissionsForRoles() {
   };
 
   for (const [roleName, granted] of Object.entries(grants)) {
-    const role = await prisma.role.findUnique({ where: { roleName } });
+    const role = await prisma.role.findFirst({ where: { roleName, organizationId: ORG_ID } });
     for (const code of granted) {
       await prisma.rolePermission.upsert({
         where: { roleId_permissionId: { roleId: role.roleId, permissionId: codeToId[code] } },
@@ -233,6 +248,7 @@ describe("M2-006 E2E: /api/refunds — time-limit + exceptions flow", () => {
     // Crear request y receipt
     const req = await prisma.request.create({
       data: {
+        organizationId: ORG_ID,
         userId: USER_ID_BY_ROLE[ROLES.SOLICITING],
         requestStatusId: 6,
         requestedFee: 1000,
@@ -240,7 +256,7 @@ describe("M2-006 E2E: /api/refunds — time-limit + exceptions flow", () => {
       },
     });
     const receipt = await prisma.receipt.create({
-      data: { requestId: req.requestId, receiptTypeId: 1, amount: 5000, refund: false },
+      data: { organizationId: ORG_ID, requestId: req.requestId, receiptTypeId: 1, amount: 5000, refund: false },
     });
 
     const create = await request(app).post("/api/refunds/exceptions")
@@ -267,13 +283,14 @@ describe("M2-006 E2E: /api/refunds — time-limit + exceptions flow", () => {
   it("decideException by non-designated approver → 403", async () => {
     const req = await prisma.request.create({
       data: {
+        organizationId: ORG_ID,
         userId: USER_ID_BY_ROLE[ROLES.SOLICITING],
         requestStatusId: 6,
         workflowPreSnapshot: { n1UserId: USER_ID_BY_ROLE[ROLES.N1], levels: [1] },
       },
     });
     const receipt = await prisma.receipt.create({
-      data: { requestId: req.requestId, receiptTypeId: 1, amount: 100, refund: false },
+      data: { organizationId: ORG_ID, requestId: req.requestId, receiptTypeId: 1, amount: 100, refund: false },
     });
     const create = await request(app).post("/api/refunds/exceptions")
       .set(authHeaders(ROLES.SOLICITING))
@@ -302,12 +319,14 @@ describe("M2-006 E2E: /api/solicitudes/inbox", () => {
   it("returns requests filtered by N1's status (Primera Revisión)", async () => {
     await prisma.request.create({
       data: {
+        organizationId: ORG_ID,
         userId: USER_ID_BY_ROLE[ROLES.SOLICITING], requestStatusId: 2,
         requestedFee: 1000, notes: "for N1",
       },
     });
     await prisma.request.create({
       data: {
+        organizationId: ORG_ID,
         userId: USER_ID_BY_ROLE[ROLES.SOLICITING], requestStatusId: 3,
         requestedFee: 2000, notes: "for N2",
       },

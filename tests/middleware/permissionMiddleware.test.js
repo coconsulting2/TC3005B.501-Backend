@@ -123,19 +123,25 @@ describe("authorizeAnyPermission (OR semantics)", () => {
 });
 
 describe("requirePermission + requireAnyPermission composition", () => {
-  test("requirePermission returns [authenticateToken, loadPermissions, authorize]", () => {
+  // Tras el rollout multi-tenant, la cadena tiene 5 middlewares:
+  //   authenticateToken → tenantContextMiddleware → applyRlsForRequest → loadPermissions → authorize
+  test("requirePermission returns [auth, tenantContext, rls, loadPermissions, authorize]", () => {
     const chain = requirePermission("a", "b");
-    expect(chain).toHaveLength(3);
+    expect(chain).toHaveLength(5);
     expect(chain[0]).toBe(authenticateToken); // auth FIRST — no bypass
-    expect(chain[1]).toBe(loadPermissions);
-    expect(typeof chain[2]).toBe("function");
+    expect(typeof chain[1]).toBe("function"); // tenantContextMiddleware
+    expect(typeof chain[2]).toBe("function"); // applyRlsForRequest
+    expect(chain[3]).toBe(loadPermissions);
+    expect(typeof chain[4]).toBe("function"); // authorizePermission
   });
 
-  test("requireAnyPermission returns [authenticateToken, loadPermissions, authorizeAny]", () => {
+  test("requireAnyPermission returns [auth, tenantContext, rls, loadPermissions, authorizeAny]", () => {
     const chain = requireAnyPermission("a", "b");
-    expect(chain).toHaveLength(3);
+    expect(chain).toHaveLength(5);
     expect(chain[0]).toBe(authenticateToken);
-    expect(chain[1]).toBe(loadPermissions);
+    expect(typeof chain[1]).toBe("function");
     expect(typeof chain[2]).toBe("function");
+    expect(chain[3]).toBe(loadPermissions);
+    expect(typeof chain[4]).toBe("function");
   });
 });

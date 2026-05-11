@@ -34,6 +34,8 @@ const { default: app } = await import("../../../app.js");
 app.set("trust proxy", "loopback");
 
 const BASE = "/api/accounts-payable";
+// Multi-tenant: org de testing (Ditta como ROOT id=1).
+const TEST_ORG_ID = 1n;
 // Pin one user_id per role so the JWT subject resolves to a real DB row with
 // the right role — the granular permission middleware ignores the JWT's role
 // claim and looks up effective permissions by user_id. Seeded in seedCatalogs.
@@ -56,17 +58,24 @@ const authHeaders = (role = ROLES.ACCOUNTS_PAYABLE) => ({
 // ──────────────────────────────────────────────────────────
 
 async function seedCatalogs() {
+    // Multi-tenant: org base de testing (Ditta como ROOT id=1).
+    await prisma.organization.upsert({
+        where: { id: TEST_ORG_ID },
+        update: { kind: "ROOT", status: "ACTIVE" },
+        create: { id: TEST_ORG_ID, nombre: "Ditta", kind: "ROOT", status: "ACTIVE" },
+    });
+
     await prisma.role.createMany({
         data: [
-            { roleName: "Solicitante" },
-            { roleName: "Cuentas por pagar" },
-            { roleName: "N1" },
+            { organizationId: TEST_ORG_ID, roleName: "Solicitante" },
+            { organizationId: TEST_ORG_ID, roleName: "Cuentas por pagar" },
+            { organizationId: TEST_ORG_ID, roleName: "N1" },
         ],
         skipDuplicates: true,
     });
 
     await prisma.department.createMany({
-        data: [{ departmentName: "Sistemas", costsCenter: "102" }],
+        data: [{ organizationId: TEST_ORG_ID, departmentName: "Sistemas", costsCenter: "102" }],
         skipDuplicates: true,
     });
 
@@ -87,7 +96,10 @@ async function seedCatalogs() {
     });
 
     await prisma.receiptType.createMany({
-        data: [{ receiptTypeName: "Comida" }, { receiptTypeName: "Hospedaje" }],
+        data: [
+            { organizationId: TEST_ORG_ID, receiptTypeName: "Comida" },
+            { organizationId: TEST_ORG_ID, receiptTypeName: "Hospedaje" },
+        ],
         skipDuplicates: true,
     });
 
@@ -123,6 +135,7 @@ async function seedCatalogs() {
             password: "test",
             workstation: "test",
             email: `e2e-auth-cpp-${AUTH_USER_BY_ROLE[ROLES.ACCOUNTS_PAYABLE]}@example.com`,
+            organizationId: TEST_ORG_ID,
         },
     });
     await prisma.user.upsert({
@@ -135,6 +148,7 @@ async function seedCatalogs() {
             password: "test",
             workstation: "test",
             email: `e2e-auth-sol-${AUTH_USER_BY_ROLE[ROLES.SOLICITING]}@example.com`,
+            organizationId: TEST_ORG_ID,
         },
     });
 }
@@ -144,6 +158,7 @@ async function seedUser({ userName = "Pedro Castillo", costsCenter = "102" } = {
     const role = await prisma.role.findFirst({ where: { roleName: "Solicitante" } });
     return prisma.user.create({
         data: {
+            organizationId: TEST_ORG_ID,
             userName,
             email: `${userName.replace(/\s+/g, "").toLowerCase()}@test.local`,
             password: "x".repeat(12),
@@ -157,6 +172,7 @@ async function seedUser({ userName = "Pedro Castillo", costsCenter = "102" } = {
 async function seedFinalizedRequest({ userId, imposedFee = 1000 }) {
     return prisma.request.create({
         data: {
+            organizationId: TEST_ORG_ID,
             userId,
             requestStatusId: 8, // Finalizado
             requestedFee: imposedFee || 0,
@@ -171,6 +187,7 @@ async function seedReceiptWithCfdi({ requestId, subtotal, iva, total, moneda = "
     const receiptType = await prisma.receiptType.findFirst({ where: { receiptTypeName: "Comida" } });
     const receipt = await prisma.receipt.create({
         data: {
+            organizationId: TEST_ORG_ID,
             requestId,
             receiptTypeId: receiptType?.receiptTypeId,
             validation: "Aprobado",
@@ -180,6 +197,7 @@ async function seedReceiptWithCfdi({ requestId, subtotal, iva, total, moneda = "
     });
     await prisma.cfdiComprobante.create({
         data: {
+            organizationId: TEST_ORG_ID,
             receiptId: receipt.receiptId,
             uuid,
             fechaTimbrado: new Date("2026-04-29T12:00:00Z"),
@@ -354,7 +372,7 @@ describe("[E2E] M1-010 Accounting Export API", () => {
         it("[TC-E2E-07] 409 cuando el Request existe pero no esta Finalizado (status 1)", async () => {
             const user = await seedUser();
             const req = await prisma.request.create({
-                data: { userId: user.userId, requestStatusId: 1, imposedFee: 500 },
+                data: { organizationId: TEST_ORG_ID, userId: user.userId, requestStatusId: 1, imposedFee: 500 },
             });
             const res = await request(app)
                 .get(`${BASE}/accounting-export/${req.requestId}`)

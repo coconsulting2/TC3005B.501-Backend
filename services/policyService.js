@@ -42,7 +42,7 @@ function ensureValidDates(validFrom, validTo) {
 }
 
 /**
- * Detecta solapamiento exacto en tupla (orgId, categoryId, destinationScope, costsCenter, rangos).
+ * Detecta solapamiento exacto en tupla (organizationId, categoryId, destinationScope, costsCenter, rangos).
  * @param {object} tx - prisma client o transaction
  * @param {object} payload
  * @param {number} [excludePolicyId]
@@ -50,7 +50,7 @@ function ensureValidDates(validFrom, validTo) {
  */
 async function hasOverlap(tx, payload, excludePolicyId = null) {
   const where = {
-    orgId: payload.orgId,
+    organizationId: payload.organizationId,
     categoryId: payload.categoryId ?? null,
     destinationScope: payload.destinationScope,
     costsCenter: payload.costsCenter ?? null,
@@ -74,12 +74,12 @@ async function hasOverlap(tx, payload, excludePolicyId = null) {
 
 /**
  * Lists travel policies for an org with optional filters.
- * @param {bigint | number} orgId
+ * @param {bigint | number} organizationId
  * @param {{ activeOnly?: boolean, categoryId?: number, asOfDate?: Date | string }} [filters]
  * @returns {Promise<Array>}
  */
-export async function listPolicies(orgId, filters = {}) {
-  const where = { orgId };
+export async function listPolicies(organizationId, filters = {}) {
+  const where = { organizationId };
   if (filters.activeOnly !== false) where.active = true;
   if (filters.categoryId !== undefined && filters.categoryId !== null) where.categoryId = Number(filters.categoryId);
   if (filters.asOfDate) {
@@ -97,32 +97,32 @@ export async function listPolicies(orgId, filters = {}) {
 /**
  * Reads one policy with its caps, scoped to org.
  * @param {number} policyId
- * @param {bigint | number} orgId
+ * @param {bigint | number} organizationId
  * @returns {Promise<Object | null>}
  */
-export async function getPolicy(policyId, orgId) {
+export async function getPolicy(policyId, organizationId) {
   const row = await prisma.travelPolicy.findUnique({
     where: { policyId: Number(policyId) },
     include: { expenseCaps: true, category: true },
   });
-  if (!row || String(row.orgId) !== String(orgId)) return null;
+  if (!row || String(row.organizationId) !== String(organizationId)) return null;
   return row;
 }
 
 /**
  * Creates a new policy with its caps.
- * @param {bigint | number} orgId
+ * @param {bigint | number} organizationId
  * @param {object} payload
  * @returns {Promise<Object>}
  */
-export async function createPolicy(orgId, payload) {
+export async function createPolicy(organizationId, payload) {
   const scope = payload.destinationScope || "any";
   ensureScope(scope);
   ensureValidDates(payload.validFrom, payload.validTo);
   for (const c of payload.caps || []) ensureCapUnit(c.capUnit);
 
   const data = {
-    orgId,
+    organizationId,
     name: String(payload.name).trim(),
     categoryId: payload.categoryId ?? null,
     destinationScope: scope,
@@ -163,12 +163,12 @@ export async function createPolicy(orgId, payload) {
  * Updates a policy. Caps are replaced atomically (idempotent setExpenseCaps semantics).
  * Does NOT mutate Request.policyEvaluationSnapshot of previously sent requests (RF-46).
  * @param {number} policyId
- * @param {bigint | number} orgId
+ * @param {bigint | number} organizationId
  * @param {object} payload
  * @returns {Promise<Object>}
  */
-export async function updatePolicy(policyId, orgId, payload) {
-  const existing = await getPolicy(policyId, orgId);
+export async function updatePolicy(policyId, organizationId, payload) {
+  const existing = await getPolicy(policyId, organizationId);
   if (!existing) {
     const err = new Error(`Política ${policyId} no encontrada.`);
     err.status = 404;
@@ -192,7 +192,7 @@ export async function updatePolicy(policyId, orgId, payload) {
   if (payload.active !== undefined)           data.active = Boolean(payload.active);
 
   return prisma.$transaction(async (tx) => {
-    const checkPayload = { ...existing, ...data, orgId };
+    const checkPayload = { ...existing, ...data, organizationId };
     if (await hasOverlap(tx, checkPayload, policyId)) {
       const err = new Error("La actualización solaparía con otra política activa.");
       err.status = 409;
@@ -212,10 +212,10 @@ export async function updatePolicy(policyId, orgId, payload) {
 /**
  * Soft-deletes (active=false). Idempotent.
  * @param {number} policyId
- * @param {bigint | number} orgId
+ * @param {bigint | number} organizationId
  */
-export async function deactivatePolicy(policyId, orgId) {
-  const existing = await getPolicy(policyId, orgId);
+export async function deactivatePolicy(policyId, organizationId) {
+  const existing = await getPolicy(policyId, organizationId);
   if (!existing) {
     const err = new Error(`Política ${policyId} no encontrada.`);
     err.status = 404;
@@ -244,11 +244,11 @@ async function setExpenseCapsTx(tx, policyId, caps) {
 /**
  * Idempotent replacement of expense caps for a policy.
  * @param {number} policyId
- * @param {bigint | number} orgId
+ * @param {bigint | number} organizationId
  * @param {Array<{receiptTypeId:number, capAmount:number, capUnit:string, currency?:string}>} caps
  */
-export async function setExpenseCaps(policyId, orgId, caps) {
-  const existing = await getPolicy(policyId, orgId);
+export async function setExpenseCaps(policyId, organizationId, caps) {
+  const existing = await getPolicy(policyId, organizationId);
   if (!existing) {
     const err = new Error(`Política ${policyId} no encontrada.`);
     err.status = 404;
@@ -279,12 +279,12 @@ export async function snapshotPolicyForRequest(tx, requestId, ctx) {
   const db = tx || prisma;
   const req = await db.request.findUnique({
     where: { requestId: Number(requestId) },
-    select: { requestId: true, user: { select: { orgId: true } } },
+    select: { requestId: true, user: { select: { organizationId: true } } },
   });
-  if (!req || !req.user || !req.user.orgId) return { policyId: null, snapshot: null };
+  if (!req || !req.user || !req.user.organizationId) return { policyId: null, snapshot: null };
 
   const policies = await db.travelPolicy.findMany({
-    where: { orgId: req.user.orgId, active: true },
+    where: { organizationId: req.user.organizationId, active: true },
     include: { expenseCaps: true },
   });
   const policy = findApplicablePolicy(policies, {
@@ -294,7 +294,7 @@ export async function snapshotPolicyForRequest(tx, requestId, ctx) {
     evaluationDate: new Date(),
   });
   const caps = policy ? policy.expenseCaps : [];
-  const snapshot = buildPolicyEvaluationSnapshot(policy, caps, { requestId, orgId: req.user.orgId });
+  const snapshot = buildPolicyEvaluationSnapshot(policy, caps, { requestId, organizationId: req.user.organizationId });
 
   await db.request.update({
     where: { requestId: Number(requestId) },
