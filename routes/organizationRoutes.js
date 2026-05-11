@@ -13,8 +13,11 @@ import {
   postSuspend,
 } from "../controllers/organizationController.js";
 import { requirePermission, requireAnyPermission } from "../middleware/permissionMiddleware.js";
+import { generalRateLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
+
+router.use(generalRateLimiter);
 
 router.get("/me", requireAnyPermission("user:view_self"), getOrganizationMe);
 
