@@ -21,6 +21,8 @@ import policyRoutes, { employeeCategoryRouter } from "./routes/policyRoutes.js";
 import refundRoutes from "./routes/refundRoutes.js";
 import inboxRoutes from "./routes/inboxRoutes.js";
 import approvalSubstituteRoutes from "./routes/approvalSubstituteRoutes.js";
+import apiKeyRoutes from "./routes/apiKeyRoutes.js";
+import externalApiKeyRoutes from "./routes/externalApiKeyRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
@@ -96,6 +98,9 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/policies", policyRoutes);
 app.use("/api/employee-categories", employeeCategoryRouter);
 app.use("/api/refunds", refundRoutes);
+// API keys por organización (panel admin + endpoints externos para integraciones)
+app.use("/api/keys", apiKeyRoutes);
+app.use("/api/external", externalApiKeyRoutes);
 
 const swaggerOptions = {
     explorer: true,
