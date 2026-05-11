@@ -51,7 +51,7 @@ describe("applyTenantScopingToArgs", () => {
       model: "request",
       operation: "findMany",
       args: { where: { active: true } },
-      ctx: { orgId: 42n, bypassTenant: false },
+      ctx: { organizationId: 42n, bypassTenant: false },
     });
     expect(out.where.organizationId).toBe(42n);
     expect(out.where.active).toBe(true);
@@ -62,7 +62,7 @@ describe("applyTenantScopingToArgs", () => {
       model: "user",
       operation: "findUnique",
       args: { where: { userId: 1 } },
-      ctx: { orgId: 7n, bypassTenant: false },
+      ctx: { organizationId: 7n, bypassTenant: false },
     });
     expect(out.where.organizationId).toBe(7n);
   });
@@ -72,7 +72,7 @@ describe("applyTenantScopingToArgs", () => {
       model: "request",
       operation: "create",
       args: { data: { notes: "test", userId: 5 } },
-      ctx: { orgId: 7n, bypassTenant: false },
+      ctx: { organizationId: 7n, bypassTenant: false },
     });
     expect(out.data.organizationId).toBe(7n);
     expect(out.data.notes).toBe("test");
@@ -84,7 +84,7 @@ describe("applyTenantScopingToArgs", () => {
       model: "receipt",
       operation: "createMany",
       args: { data: [{ amount: 100 }, { amount: 200 }] },
-      ctx: { orgId: 3n, bypassTenant: false },
+      ctx: { organizationId: 3n, bypassTenant: false },
     });
     expect(out.data[0].organizationId).toBe(3n);
     expect(out.data[1].organizationId).toBe(3n);
@@ -96,7 +96,7 @@ describe("applyTenantScopingToArgs", () => {
       model: "request",
       operation: "findMany",
       args: { where: { active: true } },
-      ctx: { orgId: 1n, bypassTenant: true },
+      ctx: { organizationId: 1n, bypassTenant: true },
     });
     expect(out.where.organizationId).toBeUndefined();
   });
@@ -106,7 +106,7 @@ describe("applyTenantScopingToArgs", () => {
       model: "permission",
       operation: "findMany",
       args: { where: { active: true } },
-      ctx: { orgId: 42n, bypassTenant: false },
+      ctx: { organizationId: 42n, bypassTenant: false },
     });
     expect(out.where.organizationId).toBeUndefined();
   });
@@ -116,7 +116,7 @@ describe("applyTenantScopingToArgs", () => {
       model: "country",
       operation: "findMany",
       args: {},
-      ctx: { orgId: 42n, bypassTenant: false },
+      ctx: { organizationId: 42n, bypassTenant: false },
     });
     expect(out.where).toBeUndefined();
   });
@@ -126,7 +126,7 @@ describe("applyTenantScopingToArgs", () => {
       model: "request",
       operation: "findMany",
       args: { where: { organizationId: 99n } },
-      ctx: { orgId: 42n, bypassTenant: false },
+      ctx: { organizationId: 42n, bypassTenant: false },
     });
     expect(out.where.organizationId).toBe(99n);
   });
@@ -136,7 +136,7 @@ describe("applyTenantScopingToArgs", () => {
       model: "request",
       operation: "update",
       args: { where: { requestId: 5 }, data: { notes: "ok" } },
-      ctx: { orgId: 42n, bypassTenant: false },
+      ctx: { organizationId: 42n, bypassTenant: false },
     });
     expect(out.where.organizationId).toBe(42n);
     expect(out.where.requestId).toBe(5);
@@ -147,7 +147,7 @@ describe("applyTenantScopingToArgs", () => {
       model: "request",
       operation: "delete",
       args: { where: { requestId: 5 } },
-      ctx: { orgId: 42n, bypassTenant: false },
+      ctx: { organizationId: 42n, bypassTenant: false },
     });
     expect(out.where.organizationId).toBe(42n);
   });
@@ -161,7 +161,7 @@ describe("applyTenantScopingToArgs", () => {
         create: { receiptTypeName: "Hotel" },
         update: { receiptTypeName: "Hospedaje" },
       },
-      ctx: { orgId: 8n, bypassTenant: false },
+      ctx: { organizationId: 8n, bypassTenant: false },
     });
     expect(out.where.organizationId).toBe(8n);
     expect(out.create.organizationId).toBe(8n);

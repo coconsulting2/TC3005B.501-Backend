@@ -6,9 +6,9 @@
  *      como GUC transaction-local para activar las políticas RLS de Postgres.
  *      Si el contexto es bypass (super-admin Ditta cross-org), también
  *      `set_config('app.bypass_tenant', 'on', true)`.
- *   2. Inyecta `where.organizationId = ctx.orgId` en find/count/aggregate/update/delete
+ *   2. Inyecta `where.organizationId = ctx.organizationId` en find/count/aggregate/update/delete
  *      de los modelos tenant-scoped (lista cerrada).
- *   3. Inyecta `data.organizationId = ctx.orgId` en create/upsert.
+ *   3. Inyecta `data.organizationId = ctx.organizationId` en create/upsert.
  *   4. Si no hay tenantContext activo, NO inyecta nada — el llamador es responsable
  *      (server-internal jobs, seeds, etc., deben usar withTenantContext explícito).
  *
@@ -65,7 +65,7 @@ export function applyTenantScopingToArgs({ model, operation, args, ctx }) {
   if (ctx.bypassTenant) return args;
   if (!TENANT_SCOPED_MODELS.has(model)) return args;
 
-  const orgId = ctx.orgId;
+  const orgId = ctx.organizationId;
 
   if (READ_OPS.has(operation)) {
     return injectWhere(args, "organizationId", orgId);

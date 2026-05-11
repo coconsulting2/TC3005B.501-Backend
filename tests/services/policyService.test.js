@@ -90,7 +90,7 @@ describe("policyService.updatePolicy", () => {
 
   test("setExpenseCaps replaces caps idempotently", async () => {
     txClient.travelPolicy.findUnique.mockResolvedValue({
-      policyId: 1, orgId: 1n, validFrom: new Date("2026-01-01"), validTo: null, active: true, expenseCaps: [], category: null,
+      policyId: 1, organizationId: 1n, validFrom: new Date("2026-01-01"), validTo: null, active: true, expenseCaps: [], category: null,
     });
     txClient.policyExpenseCap.deleteMany.mockResolvedValue({ count: 3 });
     txClient.policyExpenseCap.createMany.mockResolvedValue({ count: 2 });
@@ -104,7 +104,7 @@ describe("policyService.updatePolicy", () => {
   });
 
   test("rejects setExpenseCaps with invalid capUnit", async () => {
-    txClient.travelPolicy.findUnique.mockResolvedValue({ policyId: 1, orgId: 1n });
+    txClient.travelPolicy.findUnique.mockResolvedValue({ policyId: 1, organizationId: 1n });
     await expect(svc.setExpenseCaps(1, 1n, [{ receiptTypeId: 1, capAmount: 1, capUnit: "per_aeon" }]))
       .rejects.toMatchObject({ status: 400 });
   });
@@ -112,7 +112,7 @@ describe("policyService.updatePolicy", () => {
 
 describe("policyService.deactivatePolicy", () => {
   test("marks active=false", async () => {
-    txClient.travelPolicy.findUnique.mockResolvedValue({ policyId: 1, orgId: 1n, active: true, expenseCaps: [], category: null });
+    txClient.travelPolicy.findUnique.mockResolvedValue({ policyId: 1, organizationId: 1n, active: true, expenseCaps: [], category: null });
     mockPrisma.travelPolicy.update.mockResolvedValue({ policyId: 1, active: false });
     const result = await svc.deactivatePolicy(1, 1n);
     expect(result.active).toBe(false);
@@ -121,9 +121,9 @@ describe("policyService.deactivatePolicy", () => {
 
 describe("policyService.snapshotPolicyForRequest", () => {
   test("freezes the matching policy into Request.policyEvaluationSnapshot", async () => {
-    mockPrisma.request.findUnique.mockResolvedValue({ requestId: 7, user: { orgId: 1n } });
+    mockPrisma.request.findUnique.mockResolvedValue({ requestId: 7, user: { organizationId: 1n } });
     mockPrisma.travelPolicy.findMany.mockResolvedValue([{
-      policyId: 1, orgId: 1n, name: "P1",
+      policyId: 1, organizationId: 1n, name: "P1",
       categoryId: null, destinationScope: "any", costsCenter: null,
       dailyPerDiem: 1500, currency: "MXN",
       validFrom: new Date("2026-01-01"), validTo: null, active: true,
@@ -141,7 +141,7 @@ describe("policyService.snapshotPolicyForRequest", () => {
     });
   });
 
-  test("returns null snapshot when request has no orgId", async () => {
+  test("returns null snapshot when request has no organizationId", async () => {
     mockPrisma.request.findUnique.mockResolvedValue({ requestId: 7, user: null });
     const result = await svc.snapshotPolicyForRequest(null, 7, { destinationScope: "nacional" });
     expect(result.policyId).toBeNull();

@@ -25,7 +25,7 @@
 /**
  * @typedef {Object} TravelPolicyRow
  * @property {number} policyId
- * @property {bigint | number} orgId
+ * @property {bigint | number} organizationId
  * @property {string} name
  * @property {number | null} categoryId
  * @property {DestinationScope} destinationScope
@@ -292,7 +292,7 @@ export function summarizeRequestPolicyResult(receipts, caps, policy, opts = {}) 
  * Garantiza no retroactividad (RF-46): cambios futuros en la política no afectan solicitudes ya enviadas.
  * @param {TravelPolicyRow | null} policy
  * @param {ExpenseCapRow[]} caps
- * @param {{ orgId?: bigint | number, requestId?: number, evaluationDate?: Date }} requestCtx
+ * @param {{ organizationId?: bigint | number, requestId?: number, evaluationDate?: Date }} requestCtx
  * @returns {object | null}
  */
 export function buildPolicyEvaluationSnapshot(policy, caps, requestCtx = {}) {

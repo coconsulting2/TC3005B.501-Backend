@@ -9,7 +9,7 @@
 /**
  * @typedef {Object} WorkflowRuleRow
  * @property {bigint} id
- * @property {bigint} orgId
+ * @property {bigint} organizationId
  * @property {string} ruleType
  * @property {string} paramType
  * @property {import('@prisma/client/runtime/library').Decimal | null} threshold

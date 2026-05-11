@@ -6,7 +6,7 @@
  *   2. Si el usuario tiene permiso `organization:impersonate` y manda header
  *      `X-Organization-Id`, valida que la org exista y ACTIVE, luego override.
  *   3. Bloquea acceso si la org del usuario está SUSPENDED.
- *   4. Establece AsyncLocalStorage con { orgId, userId, isRoot, bypassTenant }
+ *   4. Establece AsyncLocalStorage con { organizationId, userId, isRoot, bypassTenant }
  *      que la Prisma extension consume para inyectar where/data + SET LOCAL en RLS.
  *
  * Importante: este middleware NO debe ejecutarse en rutas públicas (login, health,
@@ -16,7 +16,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 /**
  * @typedef {object} TenantContext
- * @property {bigint} orgId          - organizationId activo (post-impersonate).
+ * @property {bigint} organizationId          - organizationId activo (post-impersonate).
  * @property {bigint} jwtOrgId       - organizationId original del JWT.
  * @property {number} userId         - user_id del JWT.
  * @property {boolean} isRoot        - true si el JWT viene de la org ROOT (Ditta).
@@ -40,14 +40,14 @@ export function getTenantContext() {
  * seeds, scripts CLI, y para impersonación interna desde super-admin.
  *
  * @template T
- * @param {{orgId: bigint|number|string, userId?: number, isRoot?: boolean, bypassTenant?: boolean}} ctx
+ * @param {{organizationId: bigint|number|string, userId?: number, isRoot?: boolean, bypassTenant?: boolean}} ctx
  * @param {() => Promise<T>} fn
  * @returns {Promise<T>}
  */
 export function withTenantContext(ctx, fn) {
   const resolved = {
-    orgId: BigInt(ctx.orgId),
-    jwtOrgId: BigInt(ctx.orgId),
+    organizationId: BigInt(ctx.organizationId),
+    jwtOrgId: BigInt(ctx.organizationId),
     userId: ctx.userId ?? null,
     isRoot: Boolean(ctx.isRoot),
     bypassTenant: Boolean(ctx.bypassTenant),
@@ -68,7 +68,7 @@ export const tenantContextMiddleware = (req, res, next) => {
   const isRoot = req.user.organization_kind === "ROOT";
 
   if (jwtOrgId == null) {
-    // Si no hay orgId (tokens viejos durante grace period, mock users en tests,
+    // Si no hay organizationId (tokens viejos durante grace period, mock users en tests,
     // sesiones MOCK_AUTH), seguimos sin contexto. La defensa en profundidad
     // queda en RLS: sin `set_config('app.current_organization_id', ...)` las
     // queries a tablas tenant-scoped retornan 0 filas.
@@ -92,7 +92,7 @@ export const tenantContextMiddleware = (req, res, next) => {
   }
 
   const ctx = {
-    orgId: activeOrgId,
+    organizationId: activeOrgId,
     jwtOrgId,
     userId: Number(req.user.user_id),
     isRoot,

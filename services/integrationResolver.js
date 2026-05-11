@@ -8,27 +8,27 @@
  * el resto de PII (middleware/decryption.js). Aquí solo se descifra al leer.
  *
  * Caché: LRU in-memory con TTL 60s para evitar query por request. Invalidar
- * llamando `invalidateIntegrationCache(orgId, provider)` después de update.
+ * llamando `invalidateIntegrationCache(organizationId, provider)` después de update.
  */
 import prisma from "../database/config/prisma.js";
 import { withRls } from "../database/config/rlsConnection.js";
 import { decrypt } from "../middleware/decryption.js";
 
 const TTL_MS = 60_000;
-const cache = new Map(); // key: `${orgId}:${provider}` → { value, expiresAt }
+const cache = new Map(); // key: `${organizationId}:${provider}` → { value, expiresAt }
 
 /**
- * @param {bigint|number|string} orgId
+ * @param {bigint|number|string} organizationId
  * @param {'SMTP'|'WISE'|'SAT'|'BANXICO'|'VAPID'} provider
  * @returns {Promise<object>} Config descifrada (objeto JS).
  */
-export async function resolveIntegration(orgId, provider) {
-  const key = `${String(orgId)}:${provider}`;
+export async function resolveIntegration(organizationId, provider) {
+  const key = `${String(organizationId)}:${provider}`;
   const now = Date.now();
   const cached = cache.get(key);
   if (cached && cached.expiresAt > now) return cached.value;
 
-  const orgIdBig = BigInt(orgId);
+  const orgIdBig = BigInt(organizationId);
   // Bypass para leer la fila aunque el RLS context no esté seteado correctamente
   // (este resolver corre desde jobs internos, schedulers, etc.).
   const row = await withRls(orgIdBig, { bypass: true }, () =>
@@ -43,7 +43,7 @@ export async function resolveIntegration(orgId, provider) {
       const decryptedJson = decrypt(row.config);
       value = JSON.parse(decryptedJson);
     } catch (err) {
-      console.error(`integrationResolver: failed to decrypt ${provider} for org ${orgId}: ${err.message}`);
+      console.error(`integrationResolver: failed to decrypt ${provider} for org ${organizationId}: ${err.message}`);
       value = getFallbackConfig(provider);
     }
   } else {
@@ -54,8 +54,8 @@ export async function resolveIntegration(orgId, provider) {
   return value;
 }
 
-export function invalidateIntegrationCache(orgId, provider) {
-  cache.delete(`${String(orgId)}:${provider}`);
+export function invalidateIntegrationCache(organizationId, provider) {
+  cache.delete(`${String(organizationId)}:${provider}`);
 }
 
 /**
