@@ -77,6 +77,7 @@ const PERMISSION_GROUPS_DEFAULTS = [
       "permission:read", "permission:write", "permission_group:manage",
       "role:manage_permissions", "user:manage_permissions",
       "policy:read", "policy:manage",
+      "api_key:manage",
       "receipt_type:write",
       "alert_message:write",
       "accounting_catalog:read", "accounting_catalog:write",

@@ -34,6 +34,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   "policyException", "proveedor", "approvalSubstitute",
   "chartOfAccount", "accountingDocType", "accountingSociety",
   "organizationIntegration", "notificationTemplate",
+  "apiKey",
 ]);
 
 /** Operaciones de lectura: filtran por orgId en where. */
