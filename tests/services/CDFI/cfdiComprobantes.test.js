@@ -70,6 +70,7 @@ await jest.unstable_mockModule("../../../services/permissionService.js", () => (
     "expense:submit",
     "user:view_self",
   ]),
+  loadEffectivePermissionsForRole: jest.fn().mockResolvedValue([]),
 }));
 
 /** Política de carga de comprobantes (insertarCfdi) consulta estado de solicitud vía Prisma; se simula aquí. */
