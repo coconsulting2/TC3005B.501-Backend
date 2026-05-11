@@ -63,6 +63,7 @@ model User {
   policyExceptionsRequested   PolicyException[]        @relation("PolicyExceptionRequester")
   policyExceptionsDecided     PolicyException[]        @relation("PolicyExceptionDecider")
   reimbursementTimeLimitEdits ReimbursementTimeLimit[]
+  apiKeysCreated              ApiKey[]
 
   @@map("User")
 }
@@ -465,6 +466,44 @@ model ReimbursementTimeLimit {
   updatedBy     User?    @relation(fields: [updatedById], references: [userId])
 
   @@map("reimbursement_time_limit")
+}
+
+// =====================================================================
+// API keys por organización (panel admin para integraciones).
+// El secreto se devuelve una sola vez al crear; en BD solo vive el SHA-256.
+// =====================================================================
+
+/// Clave API por organización. `keyHash` es SHA-256 hex (64 chars) del secreto;
+/// `scope` es JSON libre con `permissions: string[]` para acotar el consumo.
+model ApiKey {
+  id        Int       @id @default(autoincrement())
+  orgId     BigInt    @map("org_id")
+  keyHash   String    @unique @map("key_hash") @db.VarChar(64)
+  scope     Json
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdBy Int       @map("created_by")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  creator User        @relation(fields: [createdBy], references: [userId], onDelete: Restrict, onUpdate: Cascade)
+  logs    ApiKeyLog[]
+
+  @@index([orgId])
+  @@map("api_keys")
+}
+
+/// Auditoría de consumo por clave API (endpoint, código HTTP, instante).
+model ApiKeyLog {
+  id           BigInt   @id @default(autoincrement())
+  keyId        Int      @map("key_id")
+  endpoint     String   @db.Text
+  responseCode Int      @map("response_code")
+  timestamp    DateTime @default(now())
+
+  apiKey ApiKey @relation(fields: [keyId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([keyId, timestamp(sort: Desc)])
+  @@map("api_key_logs")
 }
 
 /// Reglas de workflow por organización (M2-004). Evaluación al alta de solicitud nueva.

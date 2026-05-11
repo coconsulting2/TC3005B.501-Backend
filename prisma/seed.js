@@ -65,6 +65,9 @@ const PERMISSION_CATALOG = [
   { code: "policy:read",                 resource: "policy",  action: "read",                 description: "Read travel policies, expense caps and reimbursement time limits" },
   { code: "policy:manage",               resource: "policy",  action: "manage",               description: "Create/update/delete travel policies, employee categories and reimbursement time limits" },
   { code: "expense:authorize_exception", resource: "expense", action: "authorize_exception", description: "Approve or reject policy exceptions on receipts" },
+
+  // API keys por organización (panel admin para integraciones)
+  { code: "api_key:manage", resource: "api_key", action: "manage", description: "Create, list, revoke organization API keys and inspect their audit log" },
 ];
 
 const PERMISSION_GROUPS = [
@@ -124,6 +127,7 @@ const PERMISSION_GROUPS = [
       "permission:read", "permission:write", "permission_group:manage",
       "role:manage_permissions", "user:manage_permissions",
       "policy:read", "policy:manage",
+      "api_key:manage",
       "user:view_self",
     ],
   },
