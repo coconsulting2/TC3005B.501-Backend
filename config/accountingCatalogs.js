@@ -74,3 +74,24 @@ export const formatPstngDate = (d) => {
     const yyyy = d.getFullYear();
     return `${dd}/${mm}/${yyyy}`;
 };
+
+/**
+ * Defaults exportados como dataset para sembrarlos como filas per-org en las
+ * tablas chart_of_accounts / accounting_doc_types / accounting_societies.
+ * Las constantes arriba se mantienen como fallback en código legacy.
+ */
+export const ACCOUNTING_CATALOG_DEFAULTS = {
+    chartOfAccounts: Object.entries(GL_ACCOUNT_DESCRIPTIONS).map(([code, name]) => ({
+        code,
+        name,
+        type: code === "1003" ? "Iva" : code === "1000" ? "Anticipo" : "Gasto",
+    })),
+    docTypes: Object.entries(DOC_TYPES).map(([key, code]) => ({
+        code,
+        name: key.replace(/_/g, " "),
+    })),
+    societies: Object.entries(SOCIEDADES).map(([code, info]) => ({
+        code,
+        name: info.descripcion,
+    })),
+};

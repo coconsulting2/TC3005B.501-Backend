@@ -7,7 +7,7 @@ import { resolveN1N2Approvers } from "./approverResolver.js";
 /**
  * @param {import('@prisma/client').Prisma.TransactionClient} tx
  * @param {Object} opts
- * @param {bigint | number | null | undefined} opts.orgId
+ * @param {bigint | number | null | undefined} opts.organizationId
  * @param {number | null | undefined} opts.departmentId
  * @param {number | string | undefined} opts.requestedFee
  * @param {number[]} opts.destinationCountryIds
@@ -18,7 +18,7 @@ import { resolveN1N2Approvers } from "./approverResolver.js";
  */
 export async function buildRequestWorkflowSnapshots(tx, opts) {
   const {
-    orgId,
+    organizationId,
     departmentId,
     requestedFee,
     destinationCountryIds,
@@ -27,14 +27,14 @@ export async function buildRequestWorkflowSnapshots(tx, opts) {
     currency = "MXN",
   } = opts;
 
-  if (orgId === null || orgId === undefined) {
+  if (organizationId === null || organizationId === undefined) {
     return { pre: null, post: null };
   }
 
-  const oid = typeof orgId === "bigint" ? orgId : BigInt(orgId);
+  const oid = typeof organizationId === "bigint" ? organizationId : BigInt(organizationId);
 
   const rules = await tx.workflowRule.findMany({
-    where: { orgId: oid, active: true },
+    where: { organizationId: oid, active: true },
   });
 
   const approvers = await resolveN1N2Approvers(tx, oid, departmentId);

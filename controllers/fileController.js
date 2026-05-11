@@ -144,13 +144,13 @@ export const uploadFile = async (req, res) => {
       return res.status(400).json({ error: "File is required." });
     }
 
-    const orgId = req.body.orgId || req.user?.orgId || "defaultOrg";
+    const organizationId = req.body.organizationId || req.user?.organizationId || "defaultOrg";
     const viajeId = req.body.viajeId || "defaultViaje";
     const receiptId = req.body.receiptId;
 
     const { key, bucket } = await upload({
       body: req.file.buffer,
-      orgId,
+      organizationId,
       viajeId,
       fileName: req.file.originalname,
       contentType: req.file.mimetype,

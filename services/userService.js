@@ -64,8 +64,20 @@ export async function authenticateUser(username, password, req) {
       throw new Error("User acccount is inactive");
     }
 
+    // organization_id: del User. organization_kind: ROOT (Ditta) | CLIENT.
+    // Bloquea login si la org está SUSPENDED (RNF-08 / multi-tenant).
+    if (user.organization_status === "SUSPENDED") {
+      throw new Error("Organización suspendida; contacta a tu administrador.");
+    }
+
     const token = jwt.sign(
-      { user_id: user.user_id, role: user.role_name, ip: req.ip },
+      {
+        user_id: user.user_id,
+        organization_id: user.organization_id != null ? String(user.organization_id) : null,
+        organization_kind: user.organization_kind || "CLIENT",
+        role: user.role_name,
+        ip: req.ip,
+      },
       process.env.JWT_SECRET,
       { expiresIn: "1h" }
     );
@@ -75,6 +87,8 @@ export async function authenticateUser(username, password, req) {
       role: user.role_name,
       username: user.user_name,
       user_id: user.user_id,
+      organization_id: user.organization_id != null ? String(user.organization_id) : null,
+      organization_kind: user.organization_kind || "CLIENT",
       department_id: user.department_id
     };
   } catch (error) {

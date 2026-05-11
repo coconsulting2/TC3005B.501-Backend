@@ -14,7 +14,7 @@ const TERMINAL_STATUS_IDS = [8, 9, 10]; // Finalizado, Cancelado, Rechazado
 
 /**
  * Returns the default time-limit row shape when a row does not exist for an org.
- * Does NOT include orgId because BigInt is not JSON-serializable by default
+ * Does NOT include organizationId because BigInt is not JSON-serializable by default
  * and the controller does not need it back.
  * @returns {{ daysAfterTrip: number, graceDays: number, blockOnExpiry: boolean, active: boolean }}
  */
@@ -30,11 +30,11 @@ function defaultLimit() {
 /**
  * Reads the time-limit configuration for an organization.
  * Returns defaults (14d / 0 grace / blockOnExpiry=true) when no row exists.
- * @param {bigint | number} orgId
+ * @param {bigint | number} organizationId
  * @returns {Promise<{ daysAfterTrip: number, graceDays: number, blockOnExpiry: boolean, active: boolean }>}
  */
-export async function getOrgTimeLimit(orgId) {
-  const row = await prisma.reimbursementTimeLimit.findUnique({ where: { orgId } });
+export async function getOrgTimeLimit(organizationId) {
+  const row = await prisma.reimbursementTimeLimit.findUnique({ where: { organizationId } });
   if (!row) return defaultLimit();
   return {
     daysAfterTrip: row.daysAfterTrip,
@@ -46,11 +46,11 @@ export async function getOrgTimeLimit(orgId) {
 
 /**
  * Upserts the time-limit configuration. Idempotent.
- * @param {bigint | number} orgId
+ * @param {bigint | number} organizationId
  * @param {{ daysAfterTrip?: number, graceDays?: number, blockOnExpiry?: boolean, active?: boolean }} payload
  * @param {number | null} [updatedById]
  */
-export async function setOrgTimeLimit(orgId, payload, updatedById = null) {
+export async function setOrgTimeLimit(organizationId, payload, updatedById = null) {
   const data = {
     daysAfterTrip: payload.daysAfterTrip ?? DEFAULT_DAYS_AFTER_TRIP,
     graceDays: payload.graceDays ?? DEFAULT_GRACE_DAYS,
@@ -59,20 +59,20 @@ export async function setOrgTimeLimit(orgId, payload, updatedById = null) {
     updatedById,
   };
   return prisma.reimbursementTimeLimit.upsert({
-    where: { orgId },
+    where: { organizationId },
     update: data,
-    create: { orgId, ...data },
+    create: { organizationId, ...data },
   });
 }
 
 /**
  * Returns the deadline (Date) computed from a tripEndDate using the org config.
  * @param {Date | string} tripEndDate
- * @param {bigint | number} orgId
+ * @param {bigint | number} organizationId
  * @returns {Promise<{ deadline: Date, gracePeriodEnd: Date, daysAfterTrip: number, graceDays: number }>}
  */
-export async function computeDeadline(tripEndDate, orgId) {
-  const limit = await getOrgTimeLimit(orgId);
+export async function computeDeadline(tripEndDate, organizationId) {
+  const limit = await getOrgTimeLimit(organizationId);
   const base = tripEndDate instanceof Date ? new Date(tripEndDate) : new Date(tripEndDate);
 
   const deadline = new Date(base);
@@ -96,11 +96,11 @@ export async function computeDeadline(tripEndDate, orgId) {
 export async function isWithinDeadline(requestId) {
   const req = await prisma.request.findUnique({
     where: { requestId: Number(requestId) },
-    select: { requestId: true, tripEndDate: true, user: { select: { orgId: true } } },
+    select: { requestId: true, tripEndDate: true, user: { select: { organizationId: true } } },
   });
-  if (!req || !req.tripEndDate || !req.user || !req.user.orgId) return true;
+  if (!req || !req.tripEndDate || !req.user || !req.user.organizationId) return true;
 
-  const { gracePeriodEnd } = await computeDeadline(req.tripEndDate, req.user.orgId);
+  const { gracePeriodEnd } = await computeDeadline(req.tripEndDate, req.user.organizationId);
   return new Date() <= gracePeriodEnd;
 }
 
@@ -114,14 +114,14 @@ export async function isWithinDeadline(requestId) {
 export async function assertCanSubmitReceipts(requestId) {
   const req = await prisma.request.findUnique({
     where: { requestId: Number(requestId) },
-    select: { requestId: true, tripEndDate: true, user: { select: { orgId: true } } },
+    select: { requestId: true, tripEndDate: true, user: { select: { organizationId: true } } },
   });
-  if (!req || !req.tripEndDate || !req.user || !req.user.orgId) return;
+  if (!req || !req.tripEndDate || !req.user || !req.user.organizationId) return;
 
-  const limit = await getOrgTimeLimit(req.user.orgId);
+  const limit = await getOrgTimeLimit(req.user.organizationId);
   if (!limit.blockOnExpiry) return;
 
-  const { gracePeriodEnd, daysAfterTrip } = await computeDeadline(req.tripEndDate, req.user.orgId);
+  const { gracePeriodEnd, daysAfterTrip } = await computeDeadline(req.tripEndDate, req.user.organizationId);
   if (new Date() > gracePeriodEnd) {
     const err = new Error(
       `Plazo de reembolso vencido (${daysAfterTrip} días desde fin de viaje). ` +
@@ -150,17 +150,17 @@ export async function lockExpiredRequests() {
       tripEndDate: true,
       requestStatusId: true,
       userId: true,
-      user: { select: { orgId: true, userId: true } },
+      user: { select: { organizationId: true, userId: true } },
     },
   });
 
   let locked = 0;
   for (const req of candidates) {
-    if (!req.user || !req.user.orgId || !req.tripEndDate) continue;
-    const limit = await getOrgTimeLimit(req.user.orgId);
+    if (!req.user || !req.user.organizationId || !req.tripEndDate) continue;
+    const limit = await getOrgTimeLimit(req.user.organizationId);
     if (!limit.blockOnExpiry) continue;
 
-    const { gracePeriodEnd, daysAfterTrip } = await computeDeadline(req.tripEndDate, req.user.orgId);
+    const { gracePeriodEnd, daysAfterTrip } = await computeDeadline(req.tripEndDate, req.user.organizationId);
     if (new Date() <= gracePeriodEnd) continue;
 
     await prisma.$transaction(async (tx) => {

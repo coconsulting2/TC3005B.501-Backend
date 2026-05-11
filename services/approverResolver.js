@@ -9,21 +9,21 @@ const N2_NAME = "N2";
 
 /**
  * @param {import('@prisma/client').PrismaClient | import('@prisma/client').Prisma.TransactionClient} db
- * @param {bigint | null | undefined} orgId
+ * @param {bigint | null | undefined} organizationId
  * @param {number | null | undefined} departmentId
  * @returns {Promise<{ n1UserId: number | null, n2UserId: number | null }>}
  */
-export async function resolveN1N2Approvers(db, orgId, departmentId) {
-  if (orgId === null || orgId === undefined) {
+export async function resolveN1N2Approvers(db, organizationId, departmentId) {
+  if (organizationId === null || organizationId === undefined) {
     return { n1UserId: null, n2UserId: null };
   }
 
-  const org = BigInt(orgId);
+  const org = BigInt(organizationId);
   const dept = departmentId != null ? Number(departmentId) : null;
 
   const findOne = async (roleName, preferDept) => {
     const base = {
-      orgId: org,
+      organizationId: org,
       active: true,
       role: { roleName },
     };
@@ -52,9 +52,9 @@ export async function resolveN1N2Approvers(db, orgId, departmentId) {
 
 /**
  * Resolución usando cliente global (tests / utilidades).
- * @param {bigint | null | undefined} orgId
+ * @param {bigint | null | undefined} organizationId
  * @param {number | null | undefined} departmentId
  */
-export async function resolveN1N2ApproversGlobal(orgId, departmentId) {
-  return resolveN1N2Approvers(prisma, orgId, departmentId);
+export async function resolveN1N2ApproversGlobal(organizationId, departmentId) {
+  return resolveN1N2Approvers(prisma, organizationId, departmentId);
 }

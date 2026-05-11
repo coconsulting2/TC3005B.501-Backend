@@ -55,9 +55,9 @@ describe("setOrgTimeLimit", () => {
     mockPrisma.reimbursementTimeLimit.upsert.mockResolvedValue({ limitId: 1 });
     await svc.setOrgTimeLimit(1n, { daysAfterTrip: 30, graceDays: 5, blockOnExpiry: false }, 99);
     expect(mockPrisma.reimbursementTimeLimit.upsert).toHaveBeenCalledWith(expect.objectContaining({
-      where: { orgId: 1n },
+      where: { organizationId: 1n },
       update: expect.objectContaining({ daysAfterTrip: 30, graceDays: 5, blockOnExpiry: false, updatedById: 99 }),
-      create: expect.objectContaining({ orgId: 1n, daysAfterTrip: 30, graceDays: 5, blockOnExpiry: false, updatedById: 99 }),
+      create: expect.objectContaining({ organizationId: 1n, daysAfterTrip: 30, graceDays: 5, blockOnExpiry: false, updatedById: 99 }),
     }));
   });
 
@@ -98,14 +98,14 @@ describe("computeDeadline", () => {
 
 describe("isWithinDeadline", () => {
   test("returns true when no tripEndDate is set", async () => {
-    mockPrisma.request.findUnique.mockResolvedValue({ requestId: 1, tripEndDate: null, user: { orgId: 1n } });
+    mockPrisma.request.findUnique.mockResolvedValue({ requestId: 1, tripEndDate: null, user: { organizationId: 1n } });
     expect(await svc.isWithinDeadline(1)).toBe(true);
   });
 
   test("returns true when current date is before deadline", async () => {
     const today = new Date();
     const recentEnd = new Date(today.getTime() - 5 * 86400000); // -5d
-    mockPrisma.request.findUnique.mockResolvedValue({ requestId: 1, tripEndDate: recentEnd, user: { orgId: 1n } });
+    mockPrisma.request.findUnique.mockResolvedValue({ requestId: 1, tripEndDate: recentEnd, user: { organizationId: 1n } });
     mockPrisma.reimbursementTimeLimit.findUnique.mockResolvedValue({
       daysAfterTrip: 14, graceDays: 0, blockOnExpiry: true, active: true,
     });
@@ -114,7 +114,7 @@ describe("isWithinDeadline", () => {
 
   test("returns false when past deadline", async () => {
     const oldEnd = new Date("2025-01-01");
-    mockPrisma.request.findUnique.mockResolvedValue({ requestId: 1, tripEndDate: oldEnd, user: { orgId: 1n } });
+    mockPrisma.request.findUnique.mockResolvedValue({ requestId: 1, tripEndDate: oldEnd, user: { organizationId: 1n } });
     mockPrisma.reimbursementTimeLimit.findUnique.mockResolvedValue({
       daysAfterTrip: 14, graceDays: 0, blockOnExpiry: true, active: true,
     });
@@ -125,7 +125,7 @@ describe("isWithinDeadline", () => {
 describe("assertCanSubmitReceipts", () => {
   test("throws 403 when out-of-window and blockOnExpiry=true", async () => {
     mockPrisma.request.findUnique.mockResolvedValue({
-      requestId: 1, tripEndDate: new Date("2025-01-01"), user: { orgId: 1n },
+      requestId: 1, tripEndDate: new Date("2025-01-01"), user: { organizationId: 1n },
     });
     mockPrisma.reimbursementTimeLimit.findUnique.mockResolvedValue({
       daysAfterTrip: 14, graceDays: 0, blockOnExpiry: true, active: true,
@@ -135,7 +135,7 @@ describe("assertCanSubmitReceipts", () => {
 
   test("does NOT throw when blockOnExpiry=false", async () => {
     mockPrisma.request.findUnique.mockResolvedValue({
-      requestId: 1, tripEndDate: new Date("2025-01-01"), user: { orgId: 1n },
+      requestId: 1, tripEndDate: new Date("2025-01-01"), user: { organizationId: 1n },
     });
     mockPrisma.reimbursementTimeLimit.findUnique.mockResolvedValue({
       daysAfterTrip: 14, graceDays: 0, blockOnExpiry: false, active: true,
@@ -144,7 +144,7 @@ describe("assertCanSubmitReceipts", () => {
   });
 
   test("does NOT throw when tripEndDate is null", async () => {
-    mockPrisma.request.findUnique.mockResolvedValue({ requestId: 1, tripEndDate: null, user: { orgId: 1n } });
+    mockPrisma.request.findUnique.mockResolvedValue({ requestId: 1, tripEndDate: null, user: { organizationId: 1n } });
     await expect(svc.assertCanSubmitReceipts(1)).resolves.toBeUndefined();
   });
 });
@@ -153,8 +153,8 @@ describe("lockExpiredRequests", () => {
   test("locks only requests past their deadline and not already terminal", async () => {
     const oldEnd = new Date("2025-01-01");
     mockPrisma.request.findMany.mockResolvedValue([
-      { requestId: 1, tripEndDate: oldEnd, requestStatusId: 6, userId: 9, user: { orgId: 1n, userId: 9 } },
-      { requestId: 2, tripEndDate: new Date(), requestStatusId: 6, userId: 9, user: { orgId: 1n, userId: 9 } }, // not expired
+      { requestId: 1, tripEndDate: oldEnd, requestStatusId: 6, userId: 9, user: { organizationId: 1n, userId: 9 } },
+      { requestId: 2, tripEndDate: new Date(), requestStatusId: 6, userId: 9, user: { organizationId: 1n, userId: 9 } }, // not expired
     ]);
     mockPrisma.reimbursementTimeLimit.findUnique.mockResolvedValue({
       daysAfterTrip: 14, graceDays: 0, blockOnExpiry: true, active: true,
@@ -171,7 +171,7 @@ describe("lockExpiredRequests", () => {
 
   test("skips org with blockOnExpiry=false", async () => {
     mockPrisma.request.findMany.mockResolvedValue([
-      { requestId: 1, tripEndDate: new Date("2025-01-01"), requestStatusId: 6, userId: 9, user: { orgId: 1n, userId: 9 } },
+      { requestId: 1, tripEndDate: new Date("2025-01-01"), requestStatusId: 6, userId: 9, user: { organizationId: 1n, userId: 9 } },
     ]);
     mockPrisma.reimbursementTimeLimit.findUnique.mockResolvedValue({
       daysAfterTrip: 14, graceDays: 0, blockOnExpiry: false, active: true,

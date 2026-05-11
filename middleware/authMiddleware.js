@@ -24,10 +24,18 @@ const MOCK_AUTH_ENABLED = IS_DEV && process.env.MOCK_AUTH === "true";
 
 const MOCK_USER = Object.freeze({
   user_id: 1,
-  role: "Solicitante",
+  organization_id: "1",
+  organization_kind: "ROOT",
+  role: "Admin Ditta",
   ip: "127.0.0.1",
   isMock: true,
 });
+
+// Grace period para JWTs viejos firmados antes del rollout multi-tenant (RFC plan §9 punto 2).
+// Tras este momento (24h post-deploy), tokens sin `organization_id` se rechazan.
+const TOKEN_GRACE_PERIOD_END = process.env.TOKEN_GRACE_PERIOD_END
+  ? Date.parse(process.env.TOKEN_GRACE_PERIOD_END)
+  : Date.now() + 24 * 60 * 60 * 1000;
 
 /**
  * Extracts the Bearer token from the Authorization header
@@ -101,6 +109,14 @@ export const authenticateToken = async (req, res, next) => {
       process.env.JWT_SKIP_IP_CHECK === "true";
     if (!skipIpCheck && decoded.ip !== requestIp) {
       throw new TokenMismatchError();
+    }
+
+    // Multi-tenant: organization_id es obligatorio post grace period.
+    // Durante el grace period, tokens sin organization_id pasan; la defensa
+    // real queda en RLS de Postgres (sin SET LOCAL del GUC, las queries a
+    // tablas tenant-scoped retornan 0 filas).
+    if (decoded.organization_id == null && Date.now() > TOKEN_GRACE_PERIOD_END) {
+      throw new InvalidTokenError();
     }
 
     req.user = decoded;
