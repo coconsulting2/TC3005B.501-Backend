@@ -20,6 +20,9 @@ import app from "../../../app.js";
 import { startSATMockServer, stopSATMockServer } from "./server/mock-server.js";
 import { createTestJWT, LOCALHOST, ROLES } from "../../utils/createTestAuthToken.js";
 
+// Multi-tenant: org de testing (Ditta como ROOT id=1).
+const TEST_ORG_ID = 1n;
+
 const INVOICE_FIXTURES = await loadInvoiceFixtures();
 const HEADERS = {
     "Content-Type": "application/json",
@@ -63,6 +66,7 @@ const startMockServer = async () => { // TODO: logs server logs to a file
 async function seedReceiptWithCfdi(invoice) {
     const receipt = await prisma.receipt.create({
         data: {
+            organizationId: TEST_ORG_ID,
             amount: invoice.amount,
             validation: "Pendiente",
         },
@@ -70,6 +74,7 @@ async function seedReceiptWithCfdi(invoice) {
 
     await prisma.cfdiComprobante.create({
         data: {
+            organizationId: TEST_ORG_ID,
             receiptId: receipt.receiptId,
             // Timbre
             uuid: invoice.uuid,
@@ -129,10 +134,17 @@ async function seedReceiptWithCfdi(invoice) {
  * @param {number} userId - user_id embedded in the test JWT (default 1).
  */
 async function seedAuthForAccountsPayable(userId = 1) {
+    // Multi-tenant: org base (Ditta como ROOT id=1).
+    await prisma.organization.upsert({
+        where: { id: TEST_ORG_ID },
+        update: { kind: "ROOT", status: "ACTIVE" },
+        create: { id: TEST_ORG_ID, nombre: "Ditta", kind: "ROOT", status: "ACTIVE" },
+    });
+
     const role = await prisma.role.upsert({
-        where: { roleName: "Cuentas por pagar" },
+        where: { organizationId_roleName: { organizationId: TEST_ORG_ID, roleName: "Cuentas por pagar" } },
         update: {},
-        create: { roleName: "Cuentas por pagar" },
+        create: { organizationId: TEST_ORG_ID, roleName: "Cuentas por pagar" },
     });
 
     // Receipt.validate is the permission /validate-receipt is gated on.
@@ -158,6 +170,7 @@ async function seedAuthForAccountsPayable(userId = 1) {
         update: { roleId: role.roleId },
         create: {
             userId,
+            organizationId: TEST_ORG_ID,
             roleId: role.roleId,
             userName: `test-user-${userId}`,
             password: "test",
