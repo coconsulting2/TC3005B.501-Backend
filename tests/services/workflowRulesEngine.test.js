@@ -10,7 +10,7 @@ import {
 function ir(id, threshold, approvalLevel, skipIfBelow = null) {
   return {
     id: BigInt(id),
-    orgId: BigInt(1),
+    organizationId: BigInt(1),
     ruleType: "pre",
     paramType: "importe",
     threshold,

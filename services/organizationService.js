@@ -110,19 +110,19 @@ export async function listOrganizations(opts = {}) {
 }
 
 export async function getOrganization(id, { bypass = false } = {}) {
-  const orgId = BigInt(id);
-  return withRls(orgId, { bypass }, async () => {
-    const org = await prisma.organization.findUnique({ where: { id: orgId } });
+  const organizationId = BigInt(id);
+  return withRls(organizationId, { bypass }, async () => {
+    const org = await prisma.organization.findUnique({ where: { id: organizationId } });
     return org ? serializeOrganization(org) : null;
   });
 }
 
-export async function getOrganizationMe(orgId) {
-  return getOrganization(orgId, { bypass: false });
+export async function getOrganizationMe(organizationId) {
+  return getOrganization(organizationId, { bypass: false });
 }
 
 export async function updateOrganization(id, patch, { bypass = false } = {}) {
-  const orgId = BigInt(id);
+  const organizationId = BigInt(id);
   const allowed = ["nombre", "logoUrl", "timezone", "baseCurrency", "razonSocial", "rfc"];
   const data = {};
   for (const k of allowed) {
@@ -133,17 +133,17 @@ export async function updateOrganization(id, patch, { bypass = false } = {}) {
     err.status = 400;
     throw err;
   }
-  return withRls(orgId, { bypass }, async () => {
-    const updated = await prisma.organization.update({ where: { id: orgId }, data });
+  return withRls(organizationId, { bypass }, async () => {
+    const updated = await prisma.organization.update({ where: { id: organizationId }, data });
     return serializeOrganization(updated);
   });
 }
 
 export async function activateOrganization(id) {
-  const orgId = BigInt(id);
+  const organizationId = BigInt(id);
   return withRls(1n, { bypass: true }, async () => {
     const updated = await prisma.organization.update({
-      where: { id: orgId },
+      where: { id: organizationId },
       data: { status: "ACTIVE" },
     });
     return serializeOrganization(updated);
@@ -151,15 +151,15 @@ export async function activateOrganization(id) {
 }
 
 export async function suspendOrganization(id) {
-  const orgId = BigInt(id);
-  if (orgId === 1n) {
+  const organizationId = BigInt(id);
+  if (organizationId === 1n) {
     const err = new Error("La organización ROOT no puede ser suspendida");
     err.status = 400;
     throw err;
   }
   return withRls(1n, { bypass: true }, async () => {
     const updated = await prisma.organization.update({
-      where: { id: orgId },
+      where: { id: organizationId },
       data: { status: "SUSPENDED" },
     });
     return serializeOrganization(updated);

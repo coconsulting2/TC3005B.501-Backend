@@ -10,7 +10,7 @@ import {
 function policy(overrides = {}) {
   return {
     policyId: 1,
-    orgId: 1,
+    organizationId: 1,
     name: "Test policy",
     categoryId: null,
     destinationScope: "any",

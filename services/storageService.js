@@ -1,7 +1,7 @@
 /**
  * @module storageService
  * @description AWS S3 storage for trip files: upload with SSE-S3 (AES-256), pre-signed GET URLs (15 min), and delete.
- * Object keys: `{orgId}/{viajeId}/[{receiptId}/]{uuid}/{filename}` cuando `receiptId` se envía en el body del upload.
+ * Object keys: `{organizationId}/{viajeId}/[{receiptId}/]{uuid}/{filename}` cuando `receiptId` se envía en el body del upload.
  */
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -52,14 +52,14 @@ function getBucketName() {
 
 /**
  * Builds a safe S3 key: org/viaje/uuid/filename (no path traversal).
- * @param {string|number} orgId
+ * @param {string|number} organizationId
  * @param {string|number} viajeId
  * @param {string} fileName
  * @param {string|number|null} [receiptId]
  * @returns {string}
  */
-function buildObjectKey(orgId, viajeId, fileName, receiptId) {
-  const safeOrg = String(orgId).replace(/[^a-zA-Z0-9-_]/g, "");
+function buildObjectKey(organizationId, viajeId, fileName, receiptId) {
+  const safeOrg = String(organizationId).replace(/[^a-zA-Z0-9-_]/g, "");
   const safeViaje = String(viajeId).replace(/[^a-zA-Z0-9-_]/g, "");
   const base = path.basename(String(fileName) || "file").replace(/[^a-zA-Z0-9._-]/g, "_");
   const id = randomUUID();
@@ -76,17 +76,17 @@ function buildObjectKey(orgId, viajeId, fileName, receiptId) {
  * Uploads a file to S3 with server-side encryption (SSE-S3, AES-256).
  * @param {object} params
  * @param {Buffer|Uint8Array|string} params.body - File contents
- * @param {string|number} params.orgId - Organization identifier
+ * @param {string|number} params.organizationId - Organization identifier
  * @param {string|number} params.viajeId - Trip identifier
  * @param {string} params.fileName - Original file name (basename is used)
  * @param {string} [params.contentType] - MIME type; defaults to application/octet-stream
  * @param {string|number} [params.receiptId] - Opcional: segmento de clave S3 alineado con comprobantes
  * @returns {Promise<{ key: string, bucket: string }>}
  */
-async function upload({ body, orgId, viajeId, fileName, contentType, receiptId }) {
+async function upload({ body, organizationId, viajeId, fileName, contentType, receiptId }) {
   const client = createS3Client();
   const bucket = getBucketName();
-  const key = buildObjectKey(orgId, viajeId, fileName, receiptId);
+  const key = buildObjectKey(organizationId, viajeId, fileName, receiptId);
   await client.send(
     new PutObjectCommand({
       Bucket: bucket,

@@ -7,13 +7,13 @@ import * as svc from "../services/employeeCategoryService.js";
 
 async function resolveOrgId(req) {
   const userId = Number(req.user.user_id);
-  const user = await prisma.user.findUnique({ where: { userId }, select: { orgId: true } });
-  if (!user || user.orgId === null) {
+  const user = await prisma.user.findUnique({ where: { userId }, select: { organizationId: true } });
+  if (!user || user.organizationId === null) {
     const err = new Error("Usuario sin organización asignada.");
     err.status = 403;
     throw err;
   }
-  return user.orgId;
+  return user.organizationId;
 }
 
 function handleError(res, error, label) {
@@ -28,8 +28,8 @@ function handleError(res, error, label) {
  */
 export const list = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
-    const rows = await svc.listCategories(orgId, { activeOnly: req.query.activeOnly !== "false" });
+    const organizationId = await resolveOrgId(req);
+    const rows = await svc.listCategories(organizationId, { activeOnly: req.query.activeOnly !== "false" });
     return res.status(200).json({ categories: rows });
   } catch (e) { return handleError(res, e, "category.list"); }
 };
@@ -40,8 +40,8 @@ export const list = async (req, res) => {
  */
 export const create = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
-    const created = await svc.createCategory(orgId, req.body);
+    const organizationId = await resolveOrgId(req);
+    const created = await svc.createCategory(organizationId, req.body);
     return res.status(201).json(created);
   } catch (e) { return handleError(res, e, "category.create"); }
 };
@@ -52,8 +52,8 @@ export const create = async (req, res) => {
  */
 export const update = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
-    const updated = await svc.updateCategory(Number(req.params.id), orgId, req.body);
+    const organizationId = await resolveOrgId(req);
+    const updated = await svc.updateCategory(Number(req.params.id), organizationId, req.body);
     return res.status(200).json(updated);
   } catch (e) { return handleError(res, e, "category.update"); }
 };
@@ -64,8 +64,8 @@ export const update = async (req, res) => {
  */
 export const deactivate = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
-    await svc.deactivateCategory(Number(req.params.id), orgId);
+    const organizationId = await resolveOrgId(req);
+    await svc.deactivateCategory(Number(req.params.id), organizationId);
     return res.status(204).send();
   } catch (e) { return handleError(res, e, "category.deactivate"); }
 };

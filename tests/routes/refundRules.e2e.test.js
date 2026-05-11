@@ -70,9 +70,9 @@ async function seedUsers() {
   })) {
     await prisma.user.upsert({
       where: { userId },
-      update: { orgId: ORG_ID, roleId: roleIdByName[roleName] },
+      update: { organizationId: ORG_ID, roleId: roleIdByName[roleName] },
       create: {
-        userId, roleId: roleIdByName[roleName], orgId: ORG_ID,
+        userId, roleId: roleIdByName[roleName], organizationId: ORG_ID,
         userName: `e2e_${roleName.replace(/\s/g, "_")}_${userId}`,
         password: "x".repeat(60),
         workstation: "test", email: `e2e_${userId}@test.local`,

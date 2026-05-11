@@ -40,7 +40,7 @@ describe("tenantContextMiddleware", () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  test("setea req.tenant con orgId del JWT", () => {
+  test("setea req.tenant con organizationId del JWT", () => {
     const req = {
       user: { user_id: 5, organization_id: "42", organization_kind: "CLIENT" },
       headers: {},
@@ -49,13 +49,13 @@ describe("tenantContextMiddleware", () => {
     const next = jest.fn(() => {
       // Dentro de next, el AsyncLocalStorage debe estar activo.
       const ctx = getTenantContext();
-      expect(ctx?.orgId).toBe(42n);
+      expect(ctx?.organizationId).toBe(42n);
       expect(ctx?.userId).toBe(5);
       expect(ctx?.isRoot).toBe(false);
       expect(ctx?.bypassTenant).toBe(false);
     });
     tenantContextMiddleware(req, res, next);
-    expect(req.tenant.orgId).toBe(42n);
+    expect(req.tenant.organizationId).toBe(42n);
     expect(req.tenant.jwtOrgId).toBe(42n);
     expect(next).toHaveBeenCalled();
   });
@@ -68,7 +68,7 @@ describe("tenantContextMiddleware", () => {
     const res = makeRes();
     const next = jest.fn(() => {
       const ctx = getTenantContext();
-      expect(ctx?.orgId).toBe(5n);
+      expect(ctx?.organizationId).toBe(5n);
       expect(ctx?.jwtOrgId).toBe(1n);
       expect(ctx?.isRoot).toBe(true);
       expect(ctx?.bypassTenant).toBe(true);
@@ -86,11 +86,11 @@ describe("tenantContextMiddleware", () => {
     const next = jest.fn(() => {
       const ctx = getTenantContext();
       // Sigue siendo 5 (su org), no 999.
-      expect(ctx?.orgId).toBe(5n);
+      expect(ctx?.organizationId).toBe(5n);
       expect(ctx?.bypassTenant).toBe(false);
     });
     tenantContextMiddleware(req, res, next);
-    expect(req.tenant.orgId).toBe(5n);
+    expect(req.tenant.organizationId).toBe(5n);
   });
 });
 
@@ -98,9 +98,9 @@ describe("withTenantContext", () => {
   test("ejecuta fn dentro del contexto y lo libera al salir", async () => {
     expect(getTenantContext()).toBeNull();
 
-    const result = await withTenantContext({ orgId: 7n, userId: 99, isRoot: false }, async () => {
+    const result = await withTenantContext({ organizationId: 7n, userId: 99, isRoot: false }, async () => {
       const ctx = getTenantContext();
-      expect(ctx?.orgId).toBe(7n);
+      expect(ctx?.organizationId).toBe(7n);
       return "ok";
     });
 
