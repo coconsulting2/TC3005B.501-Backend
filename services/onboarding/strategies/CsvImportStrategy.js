@@ -14,6 +14,9 @@
 import { BaseImportStrategy } from "./BaseImportStrategy.js";
 
 export class CsvImportStrategy extends BaseImportStrategy {
+  static MAX_CSV_BYTES = 5 * 1024 * 1024; // 5MB
+  static MAX_CSV_LINE_LENGTH = 10000;
+
   get mimeTypes() {
     return ["text/csv", "text/plain", "application/vnd.ms-excel"];
   }
@@ -27,8 +30,19 @@ export class CsvImportStrategy extends BaseImportStrategy {
    * @returns {Promise<{ rows: import('./BaseImportStrategy.js').ImportUserDTO[], embeddedRoleMappings: Record<string, string> }>}
    */
   async parse(buffer) {
+    if (!Buffer.isBuffer(buffer)) {
+      throw new Error("Archivo CSV inválido.");
+    }
+    if (buffer.length > CsvImportStrategy.MAX_CSV_BYTES) {
+      throw new Error("El archivo CSV excede el tamaño máximo permitido.");
+    }
+
     const text = buffer.toString("utf-8").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
     const lines = text.split("\n").filter((l) => l.trim().length > 0);
+
+    if (lines.some((l) => l.length > CsvImportStrategy.MAX_CSV_LINE_LENGTH)) {
+      throw new Error("El CSV contiene líneas demasiado largas.");
+    }
 
     if (lines.length < 2) {
       throw new Error("El CSV debe tener al menos una fila de encabezado y una de datos.");
@@ -93,14 +107,19 @@ export class CsvImportStrategy extends BaseImportStrategy {
    * @returns {string[]}
    */
   #splitCsvLine(line, sep) {
+    const safeLine = typeof line === "string" ? line : String(line ?? "");
+    if (safeLine.length > CsvImportStrategy.MAX_CSV_LINE_LENGTH) {
+      throw new Error("Línea CSV excede la longitud máxima permitida.");
+    }
+
     const result = [];
     let current = "";
     let inQuotes = false;
 
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
+    for (let i = 0; i < safeLine.length; i++) {
+      const ch = safeLine[i];
       if (ch === '"') {
-        if (inQuotes && line[i + 1] === '"') {
+        if (inQuotes && safeLine[i + 1] === '"') {
           current += '"';
           i++;
         } else {
