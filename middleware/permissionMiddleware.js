@@ -14,6 +14,8 @@
 import { authenticateToken } from "./authMiddleware.js";
 import { InsufficientPermissionsError } from "./authErrors.js";
 import { loadEffectivePermissions } from "../services/permissionService.js";
+import { tenantContextMiddleware } from "./tenantContext.js";
+import { applyRlsForRequest } from "../database/config/rlsConnection.js";
 
 /**
  * Loads the effective permission set for the authenticated user into
@@ -89,6 +91,8 @@ export const authorizeAnyPermission = (...required) => {
  */
 export const requirePermission = (...perms) => [
   authenticateToken,
+  tenantContextMiddleware,
+  applyRlsForRequest,
   loadPermissions,
   authorizePermission(...perms),
 ];
@@ -101,6 +105,8 @@ export const requirePermission = (...perms) => [
  */
 export const requireAnyPermission = (...perms) => [
   authenticateToken,
+  tenantContextMiddleware,
+  applyRlsForRequest,
   loadPermissions,
   authorizeAnyPermission(...perms),
 ];

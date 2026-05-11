@@ -23,6 +23,7 @@ import inboxRoutes from "./routes/inboxRoutes.js";
 import approvalSubstituteRoutes from "./routes/approvalSubstituteRoutes.js";
 import apiKeyRoutes from "./routes/apiKeyRoutes.js";
 import externalApiKeyRoutes from "./routes/externalApiKeyRoutes.js";
+import organizationRoutes from "./routes/organizationRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
@@ -101,6 +102,8 @@ app.use("/api/refunds", refundRoutes);
 // API keys por organización (panel admin + endpoints externos para integraciones)
 app.use("/api/keys", apiKeyRoutes);
 app.use("/api/external", externalApiKeyRoutes);
+// Multi-tenant: gestión de organizaciones (Ditta only para crear/listar; admins de org leen/editan la propia).
+app.use("/api/organizations", organizationRoutes);
 
 const swaggerOptions = {
     explorer: true,
