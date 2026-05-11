@@ -48,8 +48,11 @@ export async function clearRlsSetting() {
  */
 export const applyRlsForRequest = async (req, res, next) => {
   if (!req.tenant) return next();
+  // tenantContextMiddleware expone organizationId (no orgId).
+  const orgId = req.tenant.organizationId ?? req.tenant.orgId;
+  if (orgId == null) return next();
   try {
-    await applyRlsSetting(req.tenant.orgId, { bypass: req.tenant.bypassTenant });
+    await applyRlsSetting(orgId, { bypass: req.tenant.bypassTenant });
     next();
   } catch (err) {
     next(err);

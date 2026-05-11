@@ -1,0 +1,72 @@
+{
+  "_meta": {
+    "description": "Usuarios de demo para pruebas de onboarding. Usar con POST /api/onboarding/import/preview.",
+    "targetOrg": "TechCorp (o cualquier org CLIENT activa)",
+    "version": "1.0"
+  },
+  "users": [
+    {
+      "userName": "ana.solano",
+      "email": "ana.solano@techcorp.mx",
+      "password": "Demo1234!",
+      "roleName": "Solicitante",
+      "department": "Finanzas",
+      "firstName": "Ana",
+      "lastName": "Solano"
+    },
+    {
+      "userName": "pedro.ramos",
+      "email": "pedro.ramos@techcorp.mx",
+      "password": "Demo1234!",
+      "roleName": "N1",
+      "department": "Operaciones",
+      "firstName": "Pedro",
+      "lastName": "Ramos"
+    },
+    {
+      "userName": "laura.vega",
+      "email": "laura.vega@techcorp.mx",
+      "password": "Demo1234!",
+      "roleName": "N2",
+      "department": "Dirección",
+      "firstName": "Laura",
+      "lastName": "Vega"
+    },
+    {
+      "userName": "carlos.ibarra",
+      "email": "carlos.ibarra@techcorp.mx",
+      "password": "Demo1234!",
+      "roleName": "Cuentas por pagar",
+      "department": "Contabilidad",
+      "firstName": "Carlos",
+      "lastName": "Ibarra"
+    },
+    {
+      "userName": "sofia.mendez",
+      "email": "sofia.mendez@techcorp.mx",
+      "password": "Demo1234!",
+      "roleName": "Agencia de viajes",
+      "department": "Logística",
+      "firstName": "Sofía",
+      "lastName": "Méndez"
+    },
+    {
+      "userName": "miguel.torres",
+      "email": "miguel.torres@techcorp.mx",
+      "password": "Demo1234!",
+      "roleName": "Solicitante",
+      "department": "Ventas",
+      "firstName": "Miguel",
+      "lastName": "Torres"
+    },
+    {
+      "userName": "diana.fuentes",
+      "email": "diana.fuentes@techcorp.mx",
+      "password": "Demo1234!",
+      "roleName": "Observador",
+      "department": "RRHH",
+      "firstName": "Diana",
+      "lastName": "Fuentes"
+    }
+  ]
+}

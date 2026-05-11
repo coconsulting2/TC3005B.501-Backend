@@ -45,6 +45,8 @@ export const login = async (req, res) => {
     const { username, password } = req.body;
     const result = await userService.authenticateUser(username, password, req);
     const permissions = await loadEffectivePermissions(result.user_id);
+    const deptCookie =
+      result.department_id != null ? String(result.department_id) : "";
     res
       .cookie("token", result.token, {
         httpOnly: true,
@@ -70,7 +72,7 @@ export const login = async (req, res) => {
         secure: true,
         maxAge: 1000 * 60 * 60,
       })
-      .cookie("department_id", result.department_id.toString(), {
+      .cookie("department_id", deptCookie, {
         sameSite: "Strict",
         httpOnly: true,
         secure: true,
