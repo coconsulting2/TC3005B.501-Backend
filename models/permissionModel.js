@@ -4,39 +4,15 @@
  * All Prisma queries live here so services stay free of ORM specifics.
  */
 import prisma from "../database/config/prisma.js";
+import { getTenantContext } from "../middleware/tenantContext.js";
 
-/**
- * Fetches a user with all their role permissions, role groups (and their items),
- * direct user permissions, and direct user groups (and their items). Used by
- * the permission service to compute the effective permission set.
- *
- * @param {number} userId - Target user id
- * @returns {Promise<Object|null>} Nested user record or null
- */
-export const findUserWithPermissions = (userId) =>
-  prisma.user.findUnique({
-    where: { userId },
+const USER_WITH_PERMISSIONS_INCLUDE = {
+  role: {
     include: {
-      role: {
-        include: {
-          rolePermissions: {
-            include: { permission: true },
-          },
-          rolePermissionGroups: {
-            include: {
-              group: {
-                include: {
-                  items: { include: { permission: true } },
-                },
-              },
-            },
-          },
-        },
-      },
-      userPermissions: {
+      rolePermissions: {
         include: { permission: true },
       },
-      userPermissionGroups: {
+      rolePermissionGroups: {
         include: {
           group: {
             include: {
@@ -46,7 +22,86 @@ export const findUserWithPermissions = (userId) =>
         },
       },
     },
+  },
+  userPermissions: {
+    include: { permission: true },
+  },
+  userPermissionGroups: {
+    include: {
+      group: {
+        include: {
+          items: { include: { permission: true } },
+        },
+      },
+    },
+  },
+};
+
+/**
+ * Fetches a user with all their role permissions, role groups (and their items),
+ * direct user permissions, and direct user groups (and their items). Used by
+ * the permission service to compute the effective permission set.
+ *
+ * En rutas sin tenant (p. ej. POST /login justo tras autenticar), RLS bloquearía
+ * la fila User; usamos transacción con bypass local solo en ese caso.
+ *
+ * @param {number} userId - Target user id
+ * @returns {Promise<Object|null>} Nested user record or null
+ */
+export async function findUserWithPermissions(userId) {
+  const q = (client) =>
+    client.user.findUnique({
+      where: { userId },
+      include: USER_WITH_PERMISSIONS_INCLUDE,
+    });
+
+  if (getTenantContext()) {
+    return q(prisma);
+  }
+
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('app.bypass_tenant', 'on', true)`;
+    return q(tx);
   });
+}
+
+const ROLE_WITH_PERMISSIONS_INCLUDE = {
+  rolePermissions: {
+    include: { permission: true },
+  },
+  rolePermissionGroups: {
+    include: {
+      group: {
+        include: {
+          items: { include: { permission: true } },
+        },
+      },
+    },
+  },
+};
+
+/**
+ * Carga un rol con permisos directos y los de sus grupos (misma forma que en User.role).
+ *
+ * @param {number} roleId - Rol destino
+ * @returns {Promise<Object|null>} Rol anidado o null
+ */
+export async function findRoleWithPermissions(roleId) {
+  const q = (client) =>
+    client.role.findUnique({
+      where: { roleId },
+      include: ROLE_WITH_PERMISSIONS_INCLUDE,
+    });
+
+  if (getTenantContext()) {
+    return q(prisma);
+  }
+
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT set_config('app.bypass_tenant', 'on', true)`;
+    return q(tx);
+  });
+}
 
 /**
  * Lists permissions, optionally filtered by active flag.
