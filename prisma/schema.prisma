@@ -99,6 +99,27 @@ model Role {
   @@map("Role")
 }
 
+model Permission {
+  permissionId    Int              @id @default(autoincrement()) @map("permission_id")
+  permKey         String           @unique @map("perm_key") @db.VarChar(100)
+  description     String?          @db.VarChar(255)
+  rolePermissions RolePermission[]
+
+  @@map("Permission")
+}
+
+model RolePermission {
+  rolePermissionId Int        @id @default(autoincrement()) @map("role_permission_id")
+  roleId           Int        @map("role_id")
+  permissionId     Int        @map("permission_id")
+  expiresAt        DateTime?  @map("expires_at")
+  role             Role       @relation(fields: [roleId], references: [roleId])
+  permission       Permission @relation(fields: [permissionId], references: [permissionId])
+
+  @@unique([roleId, permissionId])
+  @@map("Role_Permission")
+}
+
 model Department {
   departmentId   Int          @id @default(autoincrement()) @map("department_id")
   organizationId BigInt       @map("organization_id")
@@ -230,6 +251,8 @@ model Request {
   creationDate             DateTime             @default(now()) @map("creation_date")
   lastModDate              DateTime             @default(now()) @updatedAt @map("last_mod_date")
   active                   Boolean              @default(true)
+  isExported               Boolean              @default(false) @map("is_exported")
+  exportedAt               DateTime?            @map("exported_at")
   organization             Organization         @relation(fields: [organizationId], references: [id])
   user                     User?                @relation(fields: [userId], references: [userId])
   requestStatus            RequestStatus        @relation(fields: [requestStatusId], references: [requestStatusId])
