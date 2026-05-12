@@ -7,6 +7,7 @@ import { cancelTravelRequestValidation, createExpenseValidationBatch, sendReceip
 import { decrypt } from "../middleware/decryption.js";
 import { Mail } from "../services/email/mail.cjs";
 import mailData from "../services/email/mailData.js";
+import { checkFeeVsViaticosPolicy } from "../services/viaticasPolicyService.js";
 
 /**
  * Retrieves an applicant by their user ID.
@@ -149,6 +150,11 @@ export const createTravelRequest = async (req, res) => {
   const applicantId = Number(req.params.user_id);
   const travelDetails = req.body;
   try {
+    await checkFeeVsViaticosPolicy(
+      applicantId,
+      travelDetails.requested_fee ?? 0,
+      travelDetails.hotel_needed ?? false,
+    );
     const travelRequest = await Applicant.createTravelRequest(
       applicantId,
       travelDetails,
@@ -161,6 +167,7 @@ export const createTravelRequest = async (req, res) => {
     }
     res.status(201).json(travelRequest);
   } catch (error) {
+    if (error.status === 422) return res.status(422).json({ error: error.message });
     console.error("Error in createTravelRequest controller:", error);
     res.status(500).json({ error: "Internal server error" });
   }
