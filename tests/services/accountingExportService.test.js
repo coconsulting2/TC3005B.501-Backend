@@ -15,6 +15,7 @@ await jest.unstable_mockModule("../../models/accountingExportModel.js", () => ({
     default: {
         getRequestForExport: jest.fn(),
         getFinalizedRequestsInRange: jest.fn(),
+        markRequestsAsExported: jest.fn().mockResolvedValue(undefined),
     },
 }));
 
@@ -256,6 +257,59 @@ describe("AccountingExportService.getPolizasInRange", () => {
             new Date("2026-12-31")
         );
         expect(polizas).toEqual([]);
+    });
+
+    test("marca los requests como exportados tras generar polizas", async () => {
+        AccountingExport.getFinalizedRequestsInRange.mockResolvedValue([
+            makeRequest({ requestId: 222, imposedFee: 0 }),
+            makeRequest({ requestId: 223, imposedFee: 0 }),
+        ]);
+        await AccountingExportService.getPolizasInRange(
+            new Date("2026-01-01"),
+            new Date("2026-12-31")
+        );
+        expect(AccountingExport.markRequestsAsExported).toHaveBeenCalledWith([222, 223]);
+    });
+
+    test("rango vacio NO llama a markRequestsAsExported", async () => {
+        AccountingExport.getFinalizedRequestsInRange.mockResolvedValue([]);
+        await AccountingExportService.getPolizasInRange(
+            new Date("2026-01-01"),
+            new Date("2026-12-31")
+        );
+        expect(AccountingExport.markRequestsAsExported).not.toHaveBeenCalled();
+    });
+
+    test("force=true se pasa al modelo", async () => {
+        AccountingExport.getFinalizedRequestsInRange.mockResolvedValue([]);
+        await AccountingExportService.getPolizasInRange(
+            new Date("2026-01-01"),
+            new Date("2026-12-31"),
+            { force: true }
+        );
+        expect(AccountingExport.getFinalizedRequestsInRange).toHaveBeenCalledWith(
+            expect.any(Date),
+            expect.any(Date),
+            true
+        );
+    });
+});
+
+describe("AccountingExportService.getPolizasForRequest — marca como exportado", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    test("marca el request como exportado tras generar polizas", async () => {
+        AccountingExport.getRequestForExport.mockResolvedValue(makeRequest());
+        await AccountingExportService.getPolizasForRequest(222);
+        expect(AccountingExport.markRequestsAsExported).toHaveBeenCalledWith([222]);
+    });
+
+    test("NO marca como exportado si el request no existe", async () => {
+        AccountingExport.getRequestForExport.mockResolvedValue(null);
+        await expect(AccountingExportService.getPolizasForRequest(9999)).rejects.toMatchObject({ status: 404 });
+        expect(AccountingExport.markRequestsAsExported).not.toHaveBeenCalled();
     });
 });
 
