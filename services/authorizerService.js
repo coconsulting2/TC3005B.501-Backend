@@ -9,6 +9,8 @@ import {
   statusAfterN2Approval,
 } from "./workflowRulesEngine.js";
 import * as policyExceptionService from "./policyExceptionService.js";
+import anticipoPolizaLifecycleService from "./anticipoPolizaLifecycleService.js";
+import employeeHierarchyService from "./employeeHierarchyService.js";
 
 /**
  * @param {object | null} snapshot
@@ -49,6 +51,58 @@ function labelForStatusId(statusId) {
   if (statusId === 4) return "Cotización del Viaje";
   if (statusId === 10) return "Rechazado";
   return "Actualizado";
+}
+
+function useHierarchyApprovalMode() {
+  return String(process.env.WORKFLOW_APPROVAL_MODE || "").toLowerCase() === "hierarchy";
+}
+
+/**
+ * En modo jerárquico, obtiene el aprobador esperado para el estado actual:
+ * - status 2 (N1 lógico): jefe directo
+ * - status 3 (N2 lógico): jefe del jefe
+ * @param {object} ctx
+ * @returns {Promise<number|null>}
+ */
+async function expectedApproverByHierarchy(ctx) {
+  if (!ctx?.userId) return null;
+  const chain = await employeeHierarchyService.getApprovalChain(Number(ctx.userId), 4);
+  if (ctx.requestStatusId === 2) return chain[0] ?? null;
+  if (ctx.requestStatusId === 3) return chain[1] ?? null;
+  return null;
+}
+
+/**
+ * Coexistencia: intenta validar por jerarquía si está activo; si no, usa snapshot N1/N2.
+ * @param {object} ctx
+ * @param {number} tier
+ * @param {number} userId
+ * @param {string|null} roleName
+ * @returns {Promise<boolean>}
+ */
+async function canActOnTier(ctx, tier, userId, roleName) {
+  if (useHierarchyApprovalMode()) {
+    const expected = await expectedApproverByHierarchy(ctx);
+    if (expected != null) return Number(expected) === Number(userId);
+  }
+  return authorizerMatchesTier(ctx?.workflowPreSnapshot, tier, userId, roleName);
+}
+
+/**
+ * Póliza AV al aprobar la solicitud (requested_fee). No bloquea el flujo si falla persistencia.
+ * @param {number} requestId
+ * @param {number} newStatusId
+ */
+async function emitAnticipoPolizaIfApproved(requestId, newStatusId) {
+  if (Number(newStatusId) !== 4) return;
+  try {
+    await anticipoPolizaLifecycleService.onTravelRequestFullyApproved(requestId);
+  } catch (err) {
+    console.error(
+      "emitAnticipoPolizaIfApproved:",
+      err?.message || err,
+    );
+  }
 }
 
 /**
@@ -139,8 +193,9 @@ const authorizeRequest = async (request_id, user_id) => {
   const maxAmount = await Authorizer.getUserMaxApprovalAmount(user_id);
 
   if (ctx.requestStatusId === 2) {
+    const canAct = await canActOnTier(ctx, 1, user_id, roleName);
     if (
-      !authorizerMatchesTier(snap, 1, user_id, roleName) ||
+      !canAct ||
       !levels.includes(1)
     ) {
       throw {
@@ -179,6 +234,7 @@ const authorizeRequest = async (request_id, user_id) => {
       SolicitudHistorialAccion.APROBADO,
       null,
     );
+    await emitAnticipoPolizaIfApproved(request_id, new_status_id);
     return {
       new_status: labelForStatusId(new_status_id),
       outcome: "APROBADO",
@@ -186,8 +242,9 @@ const authorizeRequest = async (request_id, user_id) => {
   }
 
   if (ctx.requestStatusId === 3) {
+    const canAct = await canActOnTier(ctx, 2, user_id, roleName);
     if (
-      !authorizerMatchesTier(snap, 2, user_id, roleName) ||
+      !canAct ||
       !levels.includes(2)
     ) {
       throw {
@@ -213,6 +270,7 @@ const authorizeRequest = async (request_id, user_id) => {
       SolicitudHistorialAccion.APROBADO,
       null,
     );
+    await emitAnticipoPolizaIfApproved(request_id, new_status_id);
     return {
       new_status: labelForStatusId(new_status_id),
       outcome: "APROBADO",
@@ -258,7 +316,24 @@ const declineRequest = async (request_id, user_id, comentario) => {
     };
   }
 
-  ensureTierForDecline(ctx, user_id, roleName);
+  if (useHierarchyApprovalMode()) {
+    const tier = ctx.requestStatusId === 2 ? 1 : ctx.requestStatusId === 3 ? 2 : null;
+    if (!tier) {
+      throw {
+        status: 400,
+        message: "Request is not awaiting N1/N2 authorization at this status",
+      };
+    }
+    const canAct = await canActOnTier(ctx, tier, user_id, roleName);
+    if (!canAct) {
+      throw {
+        status: 400,
+        message: "User role not authorized to decline request at this stage",
+      };
+    }
+  } else {
+    ensureTierForDecline(ctx, user_id, roleName);
+  }
 
   await Authorizer.applyWorkflowAction(
     request_id,

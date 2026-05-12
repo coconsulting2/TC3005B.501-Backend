@@ -37,4 +37,13 @@ router.route("/update-user/:user_id")
 router.route("/delete-user/:user_id")
     .put(generalRateLimiter, ...requirePermission("user:edit"), adminController.deactivateUser);
 
+router.route("/employees/sync")
+    .post(generalRateLimiter, ...requirePermission("user:edit"), adminController.syncEmployee);
+
+router.route("/employees")
+    .get(generalRateLimiter, ...requirePermission("user:list"), adminController.getEmployees);
+
+router.route("/users/:user_id/employee-link")
+    .put(generalRateLimiter, ...requirePermission("user:edit"), adminController.linkUserEmployee);
+
 export default router;

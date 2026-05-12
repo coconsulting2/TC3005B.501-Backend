@@ -33,6 +33,21 @@ const mockPolicyExceptionService = {
 };
 await jest.unstable_mockModule("../../services/policyExceptionService.js", () => mockPolicyExceptionService);
 
+const mockAnticipoLifecycle = {
+  onTravelRequestFullyApproved: jest.fn().mockResolvedValue(undefined),
+};
+
+await jest.unstable_mockModule("../../services/anticipoPolizaLifecycleService.js", () => ({
+  default: mockAnticipoLifecycle,
+}));
+
+const mockHierarchyService = {
+  getApprovalChain: jest.fn().mockResolvedValue([]),
+};
+await jest.unstable_mockModule("../../services/employeeHierarchyService.js", () => ({
+  default: mockHierarchyService,
+}));
+
 const { default: authorizerService } = await import(
   "../../services/authorizerService.js"
 );
@@ -41,6 +56,9 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockModel.applyWorkflowAction.mockResolvedValue(undefined);
   mockPolicyExceptionService.listPendingForRequest.mockResolvedValue([]);
+  mockAnticipoLifecycle.onTravelRequestFullyApproved.mockResolvedValue(undefined);
+  mockHierarchyService.getApprovalChain.mockResolvedValue([]);
+  delete process.env.WORKFLOW_APPROVAL_MODE;
 });
 
 describe("declineRequest", () => {
@@ -111,6 +129,7 @@ describe("authorizeRequest — escalamiento por monto", () => {
       ACC.APROBADO,
       null,
     );
+    expect(mockAnticipoLifecycle.onTravelRequestFullyApproved).not.toHaveBeenCalled();
   });
 });
 
@@ -146,6 +165,7 @@ describe("authorizeRequest — M2-006 PolicyException PENDING", () => {
 
     const result = await authorizerService.authorizeRequest(5, 10);
     expect(result.outcome).toBe("APROBADO");
+    expect(mockAnticipoLifecycle.onTravelRequestFullyApproved).toHaveBeenCalledWith(5);
   });
 
   test("decideException delega a policyExceptionService", async () => {
@@ -153,5 +173,41 @@ describe("authorizeRequest — M2-006 PolicyException PENDING", () => {
     const result = await authorizerService.decideException(7, "APPROVED", 10, "ok");
     expect(result.exceptionId).toBe(7);
     expect(mockPolicyExceptionService.decideException).toHaveBeenCalledWith(7, "APPROVED", 10, "ok");
+  });
+});
+
+describe("authorizeRequest — coexistencia con modo jerárquico", () => {
+  test("en modo hierarchy, permite aprobación de N1 lógico (jefe directo) aunque rol no sea N1", async () => {
+    process.env.WORKFLOW_APPROVAL_MODE = "hierarchy";
+    mockHierarchyService.getApprovalChain.mockResolvedValue([10, 20]);
+    mockModel.getRequestAuthorizationContext.mockResolvedValue({
+      requestStatusId: 2,
+      workflowPreSnapshot: { levels: [1, 2], n1UserId: 99 },
+      requestedFee: 1000,
+      userId: 77,
+    });
+    mockModel.getUserRoleName.mockResolvedValue("CPP");
+    mockModel.getUserMaxApprovalAmount.mockResolvedValue(50_000);
+
+    const result = await authorizerService.authorizeRequest(5, 10);
+    expect(result.outcome).toBe("APROBADO");
+    expect(mockHierarchyService.getApprovalChain).toHaveBeenCalledWith(77, 4);
+  });
+
+  test("en modo hierarchy, rechaza si intenta aprobar alguien fuera de cadena", async () => {
+    process.env.WORKFLOW_APPROVAL_MODE = "hierarchy";
+    mockHierarchyService.getApprovalChain.mockResolvedValue([10, 20]);
+    mockModel.getRequestAuthorizationContext.mockResolvedValue({
+      requestStatusId: 2,
+      workflowPreSnapshot: { levels: [1], n1UserId: 10 },
+      requestedFee: 1000,
+      userId: 77,
+    });
+    mockModel.getUserRoleName.mockResolvedValue("N1");
+    mockModel.getUserMaxApprovalAmount.mockResolvedValue(50_000);
+
+    await expect(authorizerService.authorizeRequest(5, 99)).rejects.toMatchObject({
+      status: 400,
+    });
   });
 });

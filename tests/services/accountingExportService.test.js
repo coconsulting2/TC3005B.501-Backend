@@ -19,8 +19,26 @@ await jest.unstable_mockModule("../../models/accountingExportModel.js", () => ({
     },
 }));
 
+await jest.unstable_mockModule("../../database/config/prisma.js", () => ({
+    default: {
+        $transaction: jest.fn(async (cb) =>
+            cb({
+                accountingPoliza: { createMany: jest.fn().mockResolvedValue(undefined) },
+                request: { updateMany: jest.fn().mockResolvedValue(undefined) },
+            })
+        ),
+        accountingPoliza: {
+            createMany: jest.fn().mockResolvedValue(undefined),
+        },
+    },
+}));
+
 const { default: AccountingExport } = await import("../../models/accountingExportModel.js");
-const { default: AccountingExportService } = await import("../../services/accountingExportService.js");
+const { default: prisma } = await import("../../database/config/prisma.js");
+const {
+    default: AccountingExportService,
+    buildAnticipoPolizaForAdvance,
+} = await import("../../services/accountingExportService.js");
 
 // ──────────────────────────────────────────────────────────
 // Helpers de fixtures (shape Prisma incluyendo relaciones)
@@ -46,6 +64,7 @@ const makeReceipt = (overrides = {}) => ({
 const makeRequest = (overrides = {}) => ({
     requestId: 222,
     userId: 5,
+    organizationId: 1n,
     imposedFee: 1000,
     requestStatusId: 8,
     user: { userId: 5, department: { costsCenter: "102" } },
@@ -54,9 +73,25 @@ const makeRequest = (overrides = {}) => ({
 });
 
 const sumDebe = (poliza) =>
-    poliza.detalles.filter((d) => d.SHKZG === "S").reduce((s, d) => s + d.AMT_DOCCUR, 0);
+    poliza.detalle.filter((d) => d.SHKZG === "S").reduce((s, d) => s + d.AMT_DOCCUR, 0);
 const sumHaber = (poliza) =>
-    poliza.detalles.filter((d) => d.SHKZG === "H").reduce((s, d) => s + d.AMT_DOCCUR, 0);
+    poliza.detalle.filter((d) => d.SHKZG === "H").reduce((s, d) => s + d.AMT_DOCCUR, 0);
+
+describe("buildAnticipoPolizaForAdvance", () => {
+    test("devuelve null si el monto es <= 0", () => {
+        expect(buildAnticipoPolizaForAdvance({ requestId: 1, userId: 5 }, 0)).toBeNull();
+        expect(buildAnticipoPolizaForAdvance({ requestId: 1, userId: 5 }, -1)).toBeNull();
+    });
+
+    test("arma AV con el importe indicado", () => {
+        const p = buildAnticipoPolizaForAdvance({ requestId: 9, userId: 2 }, 1234.5);
+        expect(p).not.toBeNull();
+        expect(p.header.DOC_TYPE).toBe("AV");
+        expect(p.header.ID_VIAJE).toBe("9");
+        expect(p.detalle[0].AMT_DOCCUR).toBe(1234.5);
+        expect(p.detalle[1].AMT_DOCCUR).toBe(1234.5);
+    });
+});
 
 // ──────────────────────────────────────────────────────────
 // Tests
@@ -79,11 +114,11 @@ describe("AccountingExportService.getPolizasForRequest", () => {
         expect(av.header.DOC_TYPE).toBe("AV");
         expect(av.header.ID_VIAJE).toBe("222");
         expect(av.header.HEADER_TXT).toBe("Anticipo Viaje # 222");
-        expect(av.detalles).toHaveLength(2);
-        expect(av.detalles[0]).toMatchObject({
+        expect(av.detalle).toHaveLength(2);
+        expect(av.detalle[0]).toMatchObject({
             ITEMNO_ACC: 1, SHKZG: "S", GL_ACCOUNT: "1000", VENDOR_NO: "20000000005",
         });
-        expect(av.detalles[1]).toMatchObject({
+        expect(av.detalle[1]).toMatchObject({
             ITEMNO_ACC: 2, SHKZG: "H", GL_ACCOUNT: "1001",
         });
         expect(sumDebe(av)).toBe(1000);
@@ -92,7 +127,7 @@ describe("AccountingExportService.getPolizasForRequest", () => {
         // GV (con anticipo -> haber a 1000)
         expect(gv.header.DOC_TYPE).toBe("GV");
         expect(gv.header.HEADER_TXT).toBe("Comprobacion Viaje # 222");
-        const haber = gv.detalles.at(-1);
+        const haber = gv.detalle.at(-1);
         expect(haber.GL_ACCOUNT).toBe("1000");
         expect(haber.SHKZG).toBe("H");
         expect(sumDebe(gv)).toBe(sumHaber(gv));
@@ -109,7 +144,7 @@ describe("AccountingExportService.getPolizasForRequest", () => {
         const [gv] = polizas;
         expect(gv.header.DOC_TYPE).toBe("GV");
         expect(gv.header.HEADER_TXT).toBe("Gasto sin Anticipo # 223");
-        const haber = gv.detalles.at(-1);
+        const haber = gv.detalle.at(-1);
         expect(haber.GL_ACCOUNT).toBe("1001");
     });
 
@@ -119,7 +154,7 @@ describe("AccountingExportService.getPolizasForRequest", () => {
         );
         const polizas = await AccountingExportService.getPolizasForRequest(222);
         expect(polizas).toHaveLength(1);
-        expect(polizas[0].detalles.at(-1).GL_ACCOUNT).toBe("1001");
+        expect(polizas[0].detalle.at(-1).GL_ACCOUNT).toBe("1001");
     });
 
     test("receipt con iva=0 omite la linea 1003", async () => {
@@ -134,7 +169,7 @@ describe("AccountingExportService.getPolizasForRequest", () => {
             })
         );
         const [gv] = await AccountingExportService.getPolizasForRequest(222);
-        const cuentas = gv.detalles.map((d) => d.GL_ACCOUNT);
+        const cuentas = gv.detalle.map((d) => d.GL_ACCOUNT);
         expect(cuentas).not.toContain("1003");
     });
 
@@ -150,8 +185,8 @@ describe("AccountingExportService.getPolizasForRequest", () => {
         );
         const [gv] = await AccountingExportService.getPolizasForRequest(222);
         // 2 receipts * (Debe 1002 + Debe 1003) + 1 Haber = 5 items
-        expect(gv.detalles).toHaveLength(5);
-        expect(gv.detalles.map((d) => d.ITEMNO_ACC)).toEqual([1, 2, 3, 4, 5]);
+        expect(gv.detalle).toHaveLength(5);
+        expect(gv.detalle.map((d) => d.ITEMNO_ACC)).toEqual([1, 2, 3, 4, 5]);
         expect(sumDebe(gv)).toBeCloseTo(348, 4);
         expect(sumHaber(gv)).toBeCloseTo(348, 4);
     });
@@ -172,6 +207,23 @@ describe("AccountingExportService.getPolizasForRequest", () => {
         expect(gv.header.EXCH_RATE).toBe(19);
     });
 
+    test("COSTCENTER prioriza ceco de Empleado vinculado", async () => {
+        AccountingExport.getRequestForExport.mockResolvedValue(
+            makeRequest({
+                imposedFee: 0,
+                user: {
+                    userId: 5,
+                    department: { costsCenter: "203" },
+                    empleado: { proveedor: "20000009999", ceco: "999" },
+                },
+            })
+        );
+        const [gv] = await AccountingExportService.getPolizasForRequest(222);
+        const debeGasto = gv.detalle.find((d) => d.SHKZG === "S" && d.COSTCENTER);
+        expect(debeGasto?.COSTCENTER).toBe("999");
+        expect(gv.detalle.at(-1).VENDOR_NO).toBe("20000009999");
+    });
+
     test("COSTCENTER viene de user.department.costsCenter", async () => {
         AccountingExport.getRequestForExport.mockResolvedValue(
             makeRequest({
@@ -180,7 +232,7 @@ describe("AccountingExportService.getPolizasForRequest", () => {
             })
         );
         const [gv] = await AccountingExportService.getPolizasForRequest(222);
-        const debeGasto = gv.detalles.find((d) => d.GL_ACCOUNT === "1002");
+        const debeGasto = gv.detalle.find((d) => d.GL_ACCOUNT === "1002");
         expect(debeGasto.COSTCENTER).toBe("203");
     });
 
@@ -223,11 +275,41 @@ describe("AccountingExportService.getPolizasForRequest", () => {
             })
         );
         const [gv] = await AccountingExportService.getPolizasForRequest(222);
-        for (const d of gv.detalles) {
+        for (const d of gv.detalle) {
             expect(Number.isFinite(d.AMT_DOCCUR)).toBe(true);
             const decimals = (String(d.AMT_DOCCUR).split(".")[1] || "").length;
             expect(decimals).toBeLessThanOrEqual(4);
         }
+    });
+
+    test("lanza ValidationError si falta COSTCENTER en cuenta de gasto", async () => {
+        AccountingExport.getRequestForExport.mockResolvedValue(
+            makeRequest({
+                imposedFee: 0,
+                user: { userId: 5, department: { costsCenter: "" } },
+            })
+        );
+        await expect(AccountingExportService.getPolizasForRequest(222)).rejects.toMatchObject({
+            status: 400,
+            message: expect.stringContaining("COSTCENTER is required"),
+        });
+    });
+
+    test("lanza ValidationError cuando la poliza queda descuadrada", async () => {
+        AccountingExport.getRequestForExport.mockResolvedValue(
+            makeRequest({
+                imposedFee: 0,
+                receipts: [
+                    makeReceipt({
+                        cfdiComprobante: { subtotal: 100, iva: 16, total: 150, moneda: "MXN", tipoCambio: 1 },
+                    }),
+                ],
+            })
+        );
+        await expect(AccountingExportService.getPolizasForRequest(222)).rejects.toMatchObject({
+            status: 400,
+            message: expect.stringContaining("unbalanced"),
+        });
     });
 });
 
@@ -268,16 +350,16 @@ describe("AccountingExportService.getPolizasInRange", () => {
             new Date("2026-01-01"),
             new Date("2026-12-31")
         );
-        expect(AccountingExport.markRequestsAsExported).toHaveBeenCalledWith([222, 223]);
+        expect(prisma.$transaction).toHaveBeenCalled();
     });
 
-    test("rango vacio NO llama a markRequestsAsExported", async () => {
+    test("rango vacio NO persiste ni actualiza export", async () => {
         AccountingExport.getFinalizedRequestsInRange.mockResolvedValue([]);
         await AccountingExportService.getPolizasInRange(
             new Date("2026-01-01"),
             new Date("2026-12-31")
         );
-        expect(AccountingExport.markRequestsAsExported).not.toHaveBeenCalled();
+        expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
     test("force=true se pasa al modelo", async () => {
@@ -300,16 +382,16 @@ describe("AccountingExportService.getPolizasForRequest — marca como exportado"
         jest.clearAllMocks();
     });
 
-    test("marca el request como exportado tras generar polizas", async () => {
+    test("persiste export vía transacción tras generar polizas", async () => {
         AccountingExport.getRequestForExport.mockResolvedValue(makeRequest());
         await AccountingExportService.getPolizasForRequest(222);
-        expect(AccountingExport.markRequestsAsExported).toHaveBeenCalledWith([222]);
+        expect(prisma.$transaction).toHaveBeenCalled();
     });
 
-    test("NO marca como exportado si el request no existe", async () => {
+    test("NO persiste si el request no existe", async () => {
         AccountingExport.getRequestForExport.mockResolvedValue(null);
         await expect(AccountingExportService.getPolizasForRequest(9999)).rejects.toMatchObject({ status: 404 });
-        expect(AccountingExport.markRequestsAsExported).not.toHaveBeenCalled();
+        expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 });
 

@@ -19,6 +19,11 @@
  * @property {string}  [department] - nombre de departamento (opcional)
  * @property {string}  [firstName]
  * @property {string}  [lastName]
+ * @property {string}  [noEmpleado]        - clave empleado externa (SAP/RH)
+ * @property {string}  [managerNoEmpleado] - jefe inmediato (adjacency list)
+ * @property {string}  [sapCeco]
+ * @property {string}  [sapProveedor]
+ * @property {"A"|"I"|string} [sapStatus]
  * @property {number}  [_row]       - número de fila en el archivo origen (1-indexed)
  */
 export class BaseImportStrategy {

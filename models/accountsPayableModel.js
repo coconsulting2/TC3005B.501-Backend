@@ -102,7 +102,7 @@ const AccountsPayable = {
   /**
    * Recibo con CFDI para validacion CPP (aprobacion / rechazo).
    * @param {number} receiptId
-   * @returns {Promise<{ receipt_id: number, validation: string, cfdiComprobante: Object|null }|undefined>}
+   * @returns {Promise<{ receipt_id: number, request_id: number, validation: string, cfdiComprobante: Object|null }|undefined>}
    */
   async findReceiptForValidation(receiptId) {
     const receipt = await prisma.receipt.findUnique({
