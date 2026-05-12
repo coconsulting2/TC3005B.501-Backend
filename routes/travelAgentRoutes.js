@@ -18,4 +18,8 @@ router.use((req, res, next) => {
 router.route("/attend-travel-request/:request_id")
     .put(generalRateLimiter, ...requirePermission("travel_agent:attend"), validateId, validateInputs, travelAgentController.attendTravelRequest);
 
+// TF-010 — persistir oferta de vuelo seleccionada
+router.route("/travel-request/:request_id/selected-flight")
+    .put(generalRateLimiter, ...requirePermission("travel_agent:attend"), validateId, validateInputs, travelAgentController.saveSelectedFlightOffer);
+
 export default router;

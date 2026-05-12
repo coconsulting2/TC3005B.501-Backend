@@ -3,8 +3,9 @@
  * @description Handles HTTP requests for CFDI comprobantes (M1-003).
  * @author Hector Lugo
  */
-import { insertarCfdi } from "../services/comprobantesService.js";
+import { insertarCfdi, insertarComprobanteInternacional } from "../services/comprobantesService.js";
 import ComprobantesModel from "../models/comprobantesModel.js";
+import { parseCFDI, CfdiParseError, buildComprobanteRegistroBodyFromXml } from "../services/cfdiParserService.js";
 
 const SAT_STATUS_MAP = Object.freeze({
   vigente: "vigente",
@@ -14,6 +15,46 @@ const SAT_STATUS_MAP = Object.freeze({
 const normalizeSatStatus = (satEstado) => {
   const key = String(satEstado || "").trim().toLowerCase();
   return SAT_STATUS_MAP[key] || "no_encontrado";
+};
+
+/**
+ * POST /api/comprobantes/parse-xml
+ * Devuelve RFC emisor, UUID, total y fecha para autollenar formularios (sin persistir).
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {void}
+ */
+export const parseXmlComprobante = async (req, res) => {
+  try {
+    if (!req.file?.buffer) {
+      return res.status(400).json({ error: "Archivo XML requerido" });
+    }
+    const xml = req.file.buffer.toString("utf-8");
+    const data = parseCFDI(xml);
+    const fechaLocal = new Date(data.fecha);
+    const pad = (n) => String(n).padStart(2, "0");
+    const local = `${fechaLocal.getFullYear()}-${pad(fechaLocal.getMonth() + 1)}-${pad(fechaLocal.getDate())}T${pad(fechaLocal.getHours())}:${pad(fechaLocal.getMinutes())}`;
+    let registro_sugerido = null;
+    try {
+      registro_sugerido = buildComprobanteRegistroBodyFromXml(xml);
+    } catch {
+      registro_sugerido = null;
+    }
+    return res.status(200).json({
+      rfc_emisor: data.rfcEmisor,
+      fecha_emision: local,
+      monto_total: data.total,
+      uuid: data.uuid,
+      registro_sugerido,
+    });
+  } catch (error) {
+    if (error instanceof CfdiParseError) {
+      return res.status(422).json({ error: error.message, code: error.code });
+    }
+    console.error("parseXmlComprobante:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
 };
 
 /**
@@ -28,6 +69,12 @@ const normalizeSatStatus = (satEstado) => {
 export const crearComprobante = async (req, res) => {
   const receiptId = Number(req.params.receipt_id);
   try {
+    const rawIntl = req.body?.is_international;
+    const isIntl = rawIntl === true || rawIntl === "true";
+    if (isIntl) {
+      const cfdi = await insertarComprobanteInternacional(receiptId, req.body);
+      return res.status(201).json(cfdi);
+    }
     const cfdi = await insertarCfdi(receiptId, req.body);
     return res.status(201).json(cfdi);
   } catch (error) {
@@ -65,4 +112,4 @@ export const getValidacionSat = async (req, res) => {
   }
 };
 
-export default { crearComprobante, getValidacionSat };
+export default { crearComprobante, getValidacionSat, parseXmlComprobante };

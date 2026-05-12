@@ -1,14 +1,28 @@
 /**
  * @file routes/comprobantesRoutes.js
- * @description Routes for CFDI comprobantes (M1-003).
+ * @description Routes for CFDI comprobantes (M1-003) + vista previa XML (TF-010).
  * @author Hector Lugo
  */
 import express from "express";
 const router = express.Router();
-import { crearComprobante, getValidacionSat } from "../controllers/comprobantesController.js";
-import { validateId, validateCfdi, validateInputs } from "../middleware/validation.js";
+import {
+  crearComprobante,
+  getValidacionSat,
+  parseXmlComprobante,
+} from "../controllers/comprobantesController.js";
+import { validateId, chooseComprobanteValidation, validateInputs } from "../middleware/validation.js";
 import { requirePermission } from "../middleware/permissionMiddleware.js";
 import { generalRateLimiter } from "../middleware/rateLimiters.js";
+import { upload, handleMulterError } from "../middleware/fileUpload.js";
+
+// POST /api/comprobantes/parse-xml — vista previa RFC/UUID/monto (sin persistir)
+router.post(
+  "/parse-xml",
+  generalRateLimiter,
+  ...requirePermission("receipt:upload"),
+  upload.single("xml"),
+  parseXmlComprobante
+);
 
 // POST /api/comprobantes/:receipt_id
 // Permission: receipt:upload (granted to Solicitante, N1, N2)
@@ -17,8 +31,7 @@ router.route("/:receipt_id")
     generalRateLimiter,
     ...requirePermission("receipt:upload"),
     validateId,
-    validateCfdi,
-    validateInputs,
+    chooseComprobanteValidation,
     crearComprobante
   );
 
@@ -32,5 +45,7 @@ router.route("/:id/validacion-sat")
     validateInputs,
     getValidacionSat,
   );
+
+router.use(handleMulterError);
 
 export default router;
