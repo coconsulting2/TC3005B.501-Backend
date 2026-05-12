@@ -9,6 +9,7 @@ process.env.NODE_ENV ??= "test";
 
 class NotFoundErrorStub extends Error { constructor(m) { super(m); this.status = 404; } }
 class ConflictErrorStub extends Error { constructor(m) { super(m); this.status = 409; } }
+class ValidationErrorStub extends Error { constructor(m) { super(m); this.status = 400; } }
 
 const serviceMocks = {
     getPolizasForRequest: jest.fn(),
@@ -16,6 +17,7 @@ const serviceMocks = {
     polizasToXml: jest.fn(() => "<Polizas/>"),
     NotFoundError: NotFoundErrorStub,
     ConflictError: ConflictErrorStub,
+    ValidationError: ValidationErrorStub,
 };
 
 await jest.unstable_mockModule("../../services/accountingExportService.js", () => ({
@@ -39,19 +41,20 @@ beforeEach(() => {
     jest.clearAllMocks();
     serviceMocks.NotFoundError = NotFoundErrorStub;
     serviceMocks.ConflictError = ConflictErrorStub;
+    serviceMocks.ValidationError = ValidationErrorStub;
     serviceMocks.polizasToXml.mockReturnValue("<Polizas/>");
 });
 
 describe("exportByRequest", () => {
     test("200 JSON por default", async () => {
-        serviceMocks.getPolizasForRequest.mockResolvedValue([{ header: {}, detalles: [] }]);
+        serviceMocks.getPolizasForRequest.mockResolvedValue([{ header: {}, detalle: [] }]);
         const req = { params: { request_id: "222" }, query: {}, headers: {} };
         const res = mockRes();
 
         await AccountingExportController.exportByRequest(req, res);
 
         expect(res.status).toHaveBeenCalledWith(200);
-        expect(res.json).toHaveBeenCalledWith({ polizas: [{ header: {}, detalles: [] }] });
+        expect(res.json).toHaveBeenCalledWith({ polizas: [{ header: {}, detalle: [], detalles: [] }] });
         expect(res.type).not.toHaveBeenCalled();
     });
 
@@ -96,6 +99,17 @@ describe("exportByRequest", () => {
 
         expect(res.status).toHaveBeenCalledWith(409);
         expect(res.json).toHaveBeenCalledWith({ error: "not finalized" });
+    });
+
+    test("400 cuando el service tira ValidationError", async () => {
+        serviceMocks.getPolizasForRequest.mockRejectedValue(new ValidationErrorStub("Poliza unbalanced"));
+        const req = { params: { request_id: "1" }, query: {}, headers: {} };
+        const res = mockRes();
+
+        await AccountingExportController.exportByRequest(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({ error: "Poliza unbalanced" });
     });
 
     test("500 cuando el service tira error generico", async () => {
@@ -145,12 +159,21 @@ describe("exportByRange", () => {
     });
 
     test("200 XML con format=xml", async () => {
-        serviceMocks.getPolizasInRange.mockResolvedValue([{ header: {}, detalles: [] }]);
+        serviceMocks.getPolizasInRange.mockResolvedValue([{ header: {}, detalle: [] }]);
         const req = { query: { from: "2026-01-01", to: "2026-12-31", format: "xml" }, headers: {} };
         const res = mockRes();
         await AccountingExportController.exportByRange(req, res);
         expect(res.type).toHaveBeenCalledWith("application/xml");
         expect(res.send).toHaveBeenCalledWith("<Polizas/>");
+    });
+
+    test("400 si service retorna ValidationError en rango", async () => {
+        serviceMocks.getPolizasInRange.mockRejectedValue(new ValidationErrorStub("COSTCENTER missing"));
+        const req = { query: { from: "2026-01-01", to: "2026-12-31" }, headers: {} };
+        const res = mockRes();
+        await AccountingExportController.exportByRange(req, res);
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({ error: "COSTCENTER missing" });
     });
 
     test("convierte 'to' al final del dia antes de consultar", async () => {
