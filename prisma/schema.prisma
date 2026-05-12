@@ -99,27 +99,6 @@ model Role {
   @@map("Role")
 }
 
-model Permission {
-  permissionId    Int              @id @default(autoincrement()) @map("permission_id")
-  permKey         String           @unique @map("perm_key") @db.VarChar(100)
-  description     String?          @db.VarChar(255)
-  rolePermissions RolePermission[]
-
-  @@map("Permission")
-}
-
-model RolePermission {
-  rolePermissionId Int        @id @default(autoincrement()) @map("role_permission_id")
-  roleId           Int        @map("role_id")
-  permissionId     Int        @map("permission_id")
-  expiresAt        DateTime?  @map("expires_at")
-  role             Role       @relation(fields: [roleId], references: [roleId])
-  permission       Permission @relation(fields: [permissionId], references: [permissionId])
-
-  @@unique([roleId, permissionId])
-  @@map("Role_Permission")
-}
-
 model Department {
   departmentId   Int          @id @default(autoincrement()) @map("department_id")
   organizationId BigInt       @map("organization_id")
