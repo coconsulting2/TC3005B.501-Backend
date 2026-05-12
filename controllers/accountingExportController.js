@@ -93,7 +93,55 @@ const exportByRange = async (req, res) => {
     }
 };
 
+/**
+ * GET /api/export/contable?date_from=YYYY-MM-DD[&date_to=YYYY-MM-DD][&status=Sincronizado][&format=xml|json]
+ *
+ * Exporta polizas contables de Requests finalizados en un rango.
+ * - Devuelve solo registros no exportados (isExported=false) por default.
+ * - Si status=Sincronizado, incluye tambien los ya exportados (force=true).
+ * - Tras generar las polizas, marca los requests como isExported=true (Sincronizado).
+ *
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
+const exportContable = async (req, res) => {
+    const { date_from, date_to, status } = req.query;
+    const format = resolveFormat(req);
+
+    if (!date_from) {
+        return res.status(400).json({ error: "Query param 'date_from' (YYYY-MM-DD) is required" });
+    }
+
+    const fromDate = new Date(String(date_from));
+    if (Number.isNaN(fromDate.getTime())) {
+        return res.status(400).json({ error: "'date_from' must be a valid date (YYYY-MM-DD)" });
+    }
+
+    const toDate = date_to ? new Date(String(date_to)) : new Date();
+    if (Number.isNaN(toDate.getTime())) {
+        return res.status(400).json({ error: "'date_to' must be a valid date (YYYY-MM-DD)" });
+    }
+
+    if (fromDate > toDate) {
+        return res.status(400).json({ error: "'date_from' must be on or before 'date_to'" });
+    }
+
+    // status=Sincronizado => re-exportar registros ya sincronizados (force mode)
+    const force = String(status || "").toLowerCase() === "sincronizado";
+
+    toDate.setHours(23, 59, 59, 999);
+
+    try {
+        const polizas = await AccountingExportService.getPolizasInRange(fromDate, toDate, { force });
+        return sendPolizas(res, polizas, format);
+    } catch (error) {
+        console.error("Error in exportContable controller:", error);
+        return res.status(500).json({ error: "Internal server error" });
+    }
+};
+
 export default {
     exportByRequest,
     exportByRange,
+    exportContable,
 };
