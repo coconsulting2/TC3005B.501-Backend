@@ -1,6 +1,6 @@
 {
   "name": "tc3005b-501-backend",
-  "version": "0.1.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "API and Database for the conection and the functioning of the trip management system portal developed in course TC3005B by group 501.",
   "main": "index.js",
@@ -18,18 +18,20 @@
     "build:ts": "bunx tsc -p tsconfig.build.json",
     "typecheck:new": "bunx tsc -p tsconfig.src-ts.json --noEmit",
     "build": "node scripts/verify-build.mjs",
-    "test": "NODE_OPTIONS='--experimental-vm-modules' bunx jest --coverage --testPathIgnorePatterns='/node_modules|\\.e2e\\.test\\.'",
-    "test:watch": "NODE_OPTIONS='--experimental-vm-modules' bunx jest --watch --testPathIgnorePatterns='/node_modules|\\.e2e\\.test\\.'",
-    "docker:test": "docker compose -f docker-compose.dev.yml exec -T -e NODE_OPTIONS=--experimental-vm-modules backend bunx jest --coverage --testPathIgnorePatterns='/node_modules|\\.e2e\\.test\\.'",
-    "docker:test:watch": "docker compose -f docker-compose.dev.yml exec -e NODE_OPTIONS=--experimental-vm-modules backend bunx jest --watch --testPathIgnorePatterns='/node_modules|\\.e2e\\.test\\.'",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage \"--testPathIgnorePatterns=\\.e2e\\.test\\.\"",
+    "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch \"--testPathIgnorePatterns=\\.e2e\\.test\\.\"",
+    "docker:test": "docker compose -f docker-compose.dev.yml exec -T -e NODE_OPTIONS=--experimental-vm-modules backend bunx jest --coverage \"--testPathIgnorePatterns=\\.e2e\\.test\\.\"",
+    "docker:test:watch": "docker compose -f docker-compose.dev.yml exec -e NODE_OPTIONS=--experimental-vm-modules backend bunx jest --watch \"--testPathIgnorePatterns=\\.e2e\\.test\\.\"",
     "docker:prisma": "docker compose -f docker-compose.dev.yml exec -T backend bunx prisma",
-    "test:e2e": "NODE_OPTIONS='--experimental-vm-modules' bunx jest tests --verbose --detectOpenHandles --testTimeout=60000 --testMatch='**/*.e2e.test*.{js,ts}'",
-    "test:e2e:watch": "NODE_OPTIONS='--experimental-vm-modules' bunx jest tests --watch --verbose --detectOpenHandles --testTimeout=60000 --testMatch='**/*.e2e.test*.{js,ts}'",
-    "test:all": "NODE_OPTIONS='--experimental-vm-modules' bunx jest tests --verbose --detectOpenHandles --testTimeout=60000",
-    "docker:dev": "docker compose -f docker-compose.dev.yml up --watch",
-    "docker:dev:build": "docker compose -f docker-compose.dev.yml up --build --watch",
+    "test:e2e": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js tests --runInBand --verbose --detectOpenHandles --testTimeout=60000 --testMatch=**/*.e2e.test*.{js,ts}",
+    "test:e2e:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js tests --watch --verbose --detectOpenHandles --testTimeout=60000 --testMatch=**/*.e2e.test*.{js,ts}",
+    "test:all": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js tests --verbose --detectOpenHandles --testTimeout=60000",
+    "docker:dev": "docker compose -f docker-compose.dev.yml up",
+    "docker:dev:build": "docker compose -f docker-compose.dev.yml up --build",
     "docker:dev:down": "docker compose -f docker-compose.dev.yml down",
     "docker:dev:clean": "docker compose -f docker-compose.dev.yml down -v",
+    "docker:data:reset": "docker compose -f docker-compose.dev.yml exec -T backend sh -c 'bunx prisma db push --force-reset && node prisma/seed.js dev'",
+    "docker:permissions:sync": "docker compose -f docker-compose.dev.yml exec -T backend node prisma/seed.js",
     "seed": "node prisma/seed-orgs.js"
   },
   "repository": {
@@ -56,16 +58,19 @@
     "csv-parse": "^5.6.0",
     "dotenv": "^16.4.7",
     "express": "^4.18.2",
-    "express-rate-limit": "^7.5.0",
+    "express-rate-limit": "^8.3.2",
     "express-validator": "^7.2.1",
     "fast-xml-parser": "^5.5.11",
+    "js-yaml": "^4.1.1",
     "jsonwebtoken": "^9.0.2",
     "mongo-sanitize": "^1.1.0",
     "mongodb": "^5.0.0",
     "multer": "^2.0.1",
-    "node-cache": "^5.1.2",
+    "node-cron": "^4.2.1",
     "nodemailer": "^7.0.3",
-    "soap": "^1.8.0"
+    "soap": "^1.8.0",
+    "swagger-ui-express": "^5.0.1",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
@@ -89,8 +94,7 @@
     "coverageDirectory": "coverage",
     "collectCoverageFrom": [
       "middleware/authMiddleware.js",
-      "middleware/authErrors.js",
-      "middleware/permissionMiddleware.js"
+      "middleware/authErrors.js"
     ],
     "testPathIgnorePatterns": [
       "/node_modules/"
