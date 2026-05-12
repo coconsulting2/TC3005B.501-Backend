@@ -269,6 +269,146 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /api/accounts-payable/polizas:
+    get:
+      tags: [ExportContable]
+      summary: Listar pólizas contables persistidas
+      description: |
+        Devuelve metadatos de pólizas generadas o exportadas (tabla `accounting_poliza`).
+        Filtra por `request_id` y/o rango de fechas de creación. Requiere permiso `accounting:export`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: request_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        "200":
+          description: Lista de pólizas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  polizas:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AccountingPolizaListItem"
+        "400":
+          description: Parámetros de consulta inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token ausente o inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+        "403":
+          description: Rol no permitido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthErrorResponse"
+
+  /api/accounts-payable/polizas/{request_id}/generar:
+    post:
+      tags: [ExportContable]
+      summary: Generar y persistir pólizas (sin marcar solicitud exportada)
+      description: |
+        Construye AV/GV para la solicitud finalizada, valida balance y longitudes, persiste filas en `accounting_poliza`
+        con `request_marked_exported=false`. No cambia `Request.is_exported` (diferencia respecto a `accounting-export`).
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "201":
+          description: Pólizas generadas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolizasResponse"
+        "400":
+          description: Validación contable o SAP
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Solicitud no encontrada
+        "409":
+          description: Solicitud no finalizada
+        "401":
+          description: Token ausente o inválido
+        "403":
+          description: Rol no permitido
+
+  /api/accounts-payable/polizas/{poliza_id}/export:
+    get:
+      tags: [ExportContable]
+      summary: Exportar una póliza persistida por id
+      description: |
+        Devuelve el JSON (o XML con `?format=xml`) de una fila `accounting_poliza` del tenant actual.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: poliza_id
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 10
+            maxLength: 40
+        - name: format
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [json, xml]
+      responses:
+        "200":
+          description: Payload de póliza
+          content:
+            application/json:
+              schema:
+                type: object
+            application/xml:
+              schema:
+                type: string
+        "404":
+          description: Póliza no encontrada
+
   /api/accounts-payable/accounting-export:
     get:
       tags: [ExportContable]
@@ -370,6 +510,12 @@ paths:
             application/xml:
               schema:
                 type: string
+        "400":
+          description: Póliza inválida para SAP (ej. cuenta de gasto sin CeCo o desbalance Debe/Haber)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           description: Token ausente o invalido
           content:
@@ -408,6 +554,8 @@ paths:
       description: |
         Equivalente funcional a `can_approve`. Usa `requested_fee` y `Role.max_approval_amount`;
         si el monto supera el tope del aprobador y existe nivel N2, escala automáticamente (estado ESCALADO en historial).
+        Coexistencia fase 2: si `WORKFLOW_APPROVAL_MODE=hierarchy`, el aprobador esperado
+        se resuelve por cadena de mando (`manager_user_id`) manteniendo el mismo flujo de estados.
       security:
         - BearerAuth: []
       parameters:
@@ -835,14 +983,85 @@ components:
       type: object
       properties:
         header:
-          type: object
-          additionalProperties: true
-        detalles:
+          $ref: "#/components/schemas/PolizaHeader"
+        detalle:
           type: array
           items:
-            type: object
-            additionalProperties: true
-      required: [header, detalles]
+            $ref: "#/components/schemas/PolizaLine"
+        detalles:
+          description: Alias temporal de compatibilidad. Usar `detalle`.
+          type: array
+          deprecated: true
+          items:
+            $ref: "#/components/schemas/PolizaLine"
+      required: [header, detalle]
+
+    PolizaHeader:
+      type: object
+      properties:
+        ID_VIAJE:
+          type: string
+          maxLength: 10
+        DOC_TYPE:
+          type: string
+          enum: [AV, GV]
+        HEADER_TXT:
+          type: string
+          maxLength: 25
+        COMP_CODE:
+          type: string
+          maxLength: 4
+        PSTNG_DATE:
+          type: string
+          format: date
+        CURRENCY:
+          type: string
+          maxLength: 5
+        EXCH_RATE:
+          type: number
+      required: [ID_VIAJE, DOC_TYPE, HEADER_TXT, COMP_CODE, PSTNG_DATE, CURRENCY, EXCH_RATE]
+
+    PolizaLine:
+      type: object
+      properties:
+        ITEMNO_ACC:
+          type: integer
+          minimum: 1
+        SHKZG:
+          type: string
+          enum: [S, H]
+        GL_ACCOUNT:
+          type: string
+          maxLength: 10
+        COSTCENTER:
+          type: string
+          maxLength: 10
+        VENDOR_NO:
+          type: string
+          maxLength: 11
+        ITEM_TEXT:
+          type: string
+          maxLength: 50
+        AMT_DOCCUR:
+          type: number
+      required: [ITEMNO_ACC, SHKZG, GL_ACCOUNT, ITEM_TEXT, AMT_DOCCUR]
+
+    AccountingPolizaListItem:
+      type: object
+      properties:
+        id:
+          type: string
+        requestId:
+          type: integer
+        polizaIndex:
+          type: integer
+        docType:
+          type: string
+        requestMarkedExported:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
 
     PolizasResponse:
       type: object

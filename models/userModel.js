@@ -27,6 +27,7 @@ const User = {
       email: user.email,
       phone_number: user.phoneNumber,
       workstation: user.workstation,
+      no_empleado: user.noEmpleado,
       department_name: user.department?.departmentName,
       costs_center: user.department?.costsCenter,
       creation_date: user.creationDate,
@@ -177,7 +178,7 @@ const User = {
       await tx.$executeRaw`SELECT set_config('app.bypass_tenant', 'on', true)`;
       return tx.user.findUnique({
         where: { userName: username },
-        include: { role: true, organization: true },
+        include: { role: true, organization: true, empleado: true },
       });
     });
 
@@ -193,6 +194,10 @@ const User = {
       organization_id: user.organizationId,
       organization_kind: user.organization?.kind,
       organization_status: user.organization?.status,
+      no_empleado: user.noEmpleado,
+      empleado_ceco: user.empleado?.ceco ?? null,
+      empleado_proveedor: user.empleado?.proveedor ?? null,
+      empleado_jefe_inmediato: user.empleado?.jefeInmediato ?? null,
     };
   },
 

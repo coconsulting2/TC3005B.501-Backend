@@ -3,6 +3,7 @@
  * @description Data access layer for admin-related queries using Prisma.
  */
 import prisma from "../database/config/prisma.js";
+import { getTenantContext } from "../middleware/tenantContext.js";
 
 const Admin = {
   /**
@@ -11,12 +12,19 @@ const Admin = {
    * @returns {Promise<Array<Object>>} List of active users.
    */
   async getUserList() {
+    const ctx = getTenantContext();
+    const where = { active: true };
+    if (ctx?.organizationId !== undefined && ctx?.organizationId !== null) {
+      where.organizationId = ctx.organizationId;
+    }
+
     const users = await prisma.user.findMany({
-      where: { active: true },
-      orderBy: { departmentId: "asc" },
+      where,
+      orderBy: [{ organizationId: "asc" }, { departmentId: "asc" }],
       include: {
         role: true,
         department: true,
+        organization: { select: { id: true, nombre: true } },
       },
     });
 
@@ -29,6 +37,11 @@ const Admin = {
       department_name: u.department?.departmentName,
       department_id: u.department?.departmentId,
       phone_number: u.phoneNumber,
+      organization_id:
+        u.organizationId !== undefined && u.organizationId !== null
+          ? u.organizationId.toString()
+          : null,
+      organization_name: u.organization?.nombre ?? "",
     }));
   },
 
@@ -181,6 +194,22 @@ const Admin = {
       data: { active: false },
     });
     return true;
+  },
+
+  /**
+   * Usuario por id acotado a organización.
+   * @param {number} userId
+   * @param {bigint|number|string} organizationId
+   * @returns {Promise<Object|null>}
+   */
+  async findUserByIdInOrg(userId, organizationId) {
+    return prisma.user.findFirst({
+      where: {
+        userId: Number(userId),
+        organizationId: BigInt(organizationId),
+      },
+      select: { userId: true, organizationId: true, noEmpleado: true },
+    });
   },
 };
 

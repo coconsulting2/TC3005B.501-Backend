@@ -35,6 +35,15 @@ await jest.unstable_mockModule("../../../models/accountsPayableModel.js", () => 
   },
 }));
 
+await jest.unstable_mockModule("../../../services/accountsPayableService.js", () => ({
+  default: {
+    validateReceiptsAndUpdateStatus: jest.fn().mockResolvedValue({
+      updatedStatus: null,
+      message: "Receipts still pending.",
+    }),
+  },
+}));
+
 await jest.unstable_mockModule("../../../services/satConsultaService.js", () => ({
   consultarCfdiWithRetries: jest.fn(),
   acuseToCfdiRow: (a) => ({
@@ -83,6 +92,7 @@ await jest.unstable_mockModule("../../../models/applicantModel.js", () => ({
 const { default: ComprobantesModel } = await import("../../../models/comprobantesModel.js");
 const { default: Applicant } = await import("../../../models/applicantModel.js");
 const { default: AccountsPayable } = await import("../../../models/accountsPayableModel.js");
+const { default: AccountsPayableService } = await import("../../../services/accountsPayableService.js");
 const { consultarCfdiWithRetries } = await import("../../../services/satConsultaService.js");
 const { default: app } = await import("../../../app.js");
 
@@ -425,6 +435,11 @@ describe("PUT /api/accounts-payable/validate-receipt/:receipt_id (SAT)", () => {
     AccountsPayable.findReceiptForValidation.mockReset();
     AccountsPayable.validateReceipt.mockReset();
     AccountsPayable.validateReceipt.mockResolvedValue(true);
+    AccountsPayableService.validateReceiptsAndUpdateStatus.mockClear();
+    AccountsPayableService.validateReceiptsAndUpdateStatus.mockResolvedValue({
+      updatedStatus: null,
+      message: "Receipts still pending.",
+    });
     ComprobantesModel.updateSatAcuseByReceiptId.mockClear();
     consultarCfdiWithRetries.mockReset();
     consultarCfdiWithRetries.mockResolvedValue(vigenteSatAp());
@@ -483,6 +498,7 @@ describe("PUT /api/accounts-payable/validate-receipt/:receipt_id (SAT)", () => {
   test("200 al aprobar con Vigente y actualiza acuse", async () => {
     AccountsPayable.findReceiptForValidation.mockResolvedValue({
       receipt_id: 12,
+      request_id: 501,
       validation: "Pendiente",
       cfdiComprobante: mockCfdiApprove,
     });
@@ -493,6 +509,7 @@ describe("PUT /api/accounts-payable/validate-receipt/:receipt_id (SAT)", () => {
     expect(res.status).toBe(200);
     expect(ComprobantesModel.updateSatAcuseByReceiptId).toHaveBeenCalled();
     expect(AccountsPayable.validateReceipt).toHaveBeenCalledWith(12, 2);
+    expect(AccountsPayableService.validateReceiptsAndUpdateStatus).toHaveBeenCalledWith(501);
   });
 
   test("rechazar no llama al SAT", async () => {

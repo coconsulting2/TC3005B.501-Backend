@@ -32,7 +32,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   "permissionGroup", "userPermission", "userPermissionGroup",
   "employeeCategory", "travelPolicy", "reimbursementTimeLimit", "workflowRule",
   "policyException", "proveedor", "approvalSubstitute",
-  "chartOfAccount", "accountingDocType", "accountingSociety",
+  "chartOfAccount", "accountingDocType", "accountingSociety", "accountingPoliza",
   "organizationIntegration", "notificationTemplate",
   "apiKey",
 ]);
@@ -70,6 +70,9 @@ export function applyTenantScopingToArgs({ model, operation, args, ctx }) {
 
   if (READ_OPS.has(operation)) {
     return injectWhere(args, "organizationId", orgId);
+  }
+  if (!WRITE_OPS.has(operation)) {
+    return args;
   }
   if (operation === "create") {
     return ensureCreateOrgId(args, orgId);

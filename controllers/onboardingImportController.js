@@ -16,9 +16,10 @@ import {
  * Body: multipart/form-data
  *   file: <archivo JSON o CSV>
  *
- * Query param opcional:
- *   orgId: ID de la org destino. Si no se manda, usa la org del JWT (req.tenant.organizationId).
- *          Solo DittaSuperAdmin puede especificar orgId diferente al suyo.
+ * Query params opcionales:
+ *   create_new_org=1 — vista previa para importar creando una org CLIENT nueva desde el bloque
+ *     `organization` del JSON (solo ROOT + permiso organization:create). El token queda ligado
+ *     a la org del JWT (Ditta), no a la org impersonada.
  */
 export async function postPreviewImport(req, res) {
   try {
@@ -26,14 +27,22 @@ export async function postPreviewImport(req, res) {
       return res.status(400).json({ error: "Se requiere un archivo (field: file)." });
     }
 
-    const orgId = resolveTargetOrgId(req);
+    const rawFlag = req.query?.create_new_org ?? req.query?.createNewOrg;
+    const createNewOrganization =
+      rawFlag === "1" || String(rawFlag ?? "").toLowerCase() === "true";
+    const actorHasOrganizationCreate = Boolean(
+      req.user?.permissionSet?.has("organization:create")
+    );
+
+    const orgId = resolveTargetOrgIdForOnboardingImport(req, { createNewOrganization });
     const actingUserId = resolveActingUserId(req);
     const result = await previewImport(
       req.file.buffer,
       req.file.mimetype,
       req.file.originalname,
       orgId,
-      actingUserId
+      actingUserId,
+      { createNewOrganization, actorHasOrganizationCreate }
     );
 
     return res.status(200).json(result);
@@ -51,7 +60,8 @@ export async function postPreviewImport(req, res) {
  *   roleOverrides?,       // userName → rol de la org (sobrescribe el del archivo)
  *   permissionExtras?,    // userName → códigos de permiso adicionales (UserPermission)
  *   passwordGlobal?,
- *   passwordOverrides?    // userName → password individual
+ *   passwordOverrides?,    // userName → password individual
+ *   createNewOrganization?: boolean  // debe coincidir con la vista previa; crea org CLIENT + usuarios
  * }
  */
 export async function postApplyImport(req, res) {
@@ -63,12 +73,18 @@ export async function postApplyImport(req, res) {
       permissionExtras,
       passwordGlobal,
       passwordOverrides,
+      createNewOrganization: createNewOrganizationRaw,
     } = req.body ?? {};
     if (!previewToken) {
       return res.status(400).json({ error: "Se requiere el campo previewToken." });
     }
 
-    const orgId = resolveTargetOrgId(req);
+    const createNewOrganization = Boolean(createNewOrganizationRaw);
+    if (createNewOrganization && !req.user?.permissionSet?.has("organization:create")) {
+      return res.status(403).json({ error: "No tienes permiso para crear una organización nueva." });
+    }
+
+    const orgId = resolveTargetOrgIdForOnboardingImport(req, { createNewOrganization });
     const actingUserId = resolveActingUserId(req);
 
     const mappings =
@@ -105,7 +121,8 @@ export async function postApplyImport(req, res) {
       mappings,
       extras,
       passwordOptions,
-      overrides
+      overrides,
+      { createNewOrganization }
     );
 
     return res.status(201).json(result);
@@ -115,21 +132,25 @@ export async function postApplyImport(req, res) {
 }
 
 /**
- * Determina el organizationId destino.
- * DittaSuperAdmin puede pasar ?orgId=X o header X-Organization-Id.
- * El resto usa su propio org del contexto de tenant.
+ * Determina el organizationId destino del import.
+ * Si `createNewOrganization`, el token debe ligarse a la org del JWT (ROOT), no a la impersonada.
  *
  * @param {import('express').Request} req
+ * @param {{ createNewOrganization?: boolean }} [opts]
  * @returns {bigint}
  */
-function resolveTargetOrgId(req) {
-  if (req.tenant?.organizationId) {
-    return req.tenant.organizationId;
+function resolveTargetOrgIdForOnboardingImport(req, opts = {}) {
+  const createNewOrganization = Boolean(opts.createNewOrganization);
+  if (!req.tenant?.organizationId) {
+    if (req.user?.organization_id) {
+      return BigInt(req.user.organization_id);
+    }
+    throw new Error("No se pudo determinar la organización destino.");
   }
-  if (req.user?.organization_id) {
-    return BigInt(req.user.organization_id);
+  if (createNewOrganization && req.tenant.isRoot && req.tenant.jwtOrgId !== undefined && req.tenant.jwtOrgId !== null) {
+    return req.tenant.jwtOrgId;
   }
-  throw new Error("No se pudo determinar la organización destino.");
+  return req.tenant.organizationId;
 }
 
 /**

@@ -178,6 +178,11 @@ const DEFAULT_ROLES = [
   { roleName: "Observador",        maxApprovalAmount: null },
 ];
 
+/** Nombres de rol que existirán tras `bootstrapOrganizationCatalogs` en una org CLIENT. */
+export function getDefaultClientRoleNamesForOnboardingImport() {
+  return DEFAULT_ROLES.map((r) => r.roleName);
+}
+
 const ROLE_GROUP_ASSIGNMENTS_DEFAULT = {
   "Solicitante":         ["TravelRequestAuthor"],
   "N1":                  ["TravelRequestApprover"],

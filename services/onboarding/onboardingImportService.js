@@ -27,6 +27,8 @@ import { validateImportRows, isValidImportPassword } from "./onboardingImportVal
 import { resolveImportRole, resolveManualRoleMapping } from "./importRoleResolution.js";
 import { loadEffectivePermissionsForRole } from "../permissionService.js";
 import { buildPermissionsCatalogGrouped } from "./permissionCatalog.js";
+import { getDefaultClientRoleNamesForOnboardingImport } from "../../prisma/seedHelpers/bootstrapOrganization.js";
+import { createClientOrganizationOnly } from "../organizationService.js";
 
 const SALT_ROUNDS = 10;
 
@@ -130,6 +132,27 @@ function resolvePlainPassword(userName, perUser, globalTrim) {
   return null;
 }
 
+function buildEmpleadoNombre(row) {
+  const fn = String(row.firstName ?? "").trim();
+  const ln = String(row.lastName ?? "").trim();
+  const full = `${fn} ${ln}`.trim();
+  return full || String(row.userName ?? "").trim();
+}
+
+function fallbackProveedorFromUserId(userId) {
+  const base = 20000000000n + BigInt(Number(userId));
+  return base.toString().padStart(11, "0").slice(-11);
+}
+
+/**
+ * @param {{ nombre: string, rfc?: string|null }} spec
+ */
+function validateImportOrganizationSpec(spec) {
+  if (spec.rfc && !/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i.test(spec.rfc)) {
+    throw new Error("El RFC del bloque \"organization\" del JSON no cumple el formato SAT.");
+  }
+}
+
 /**
  * Fase 1: parsea el archivo, valida DTOs, cruza userNames/emails contra la BD.
  *
@@ -138,9 +161,20 @@ function resolvePlainPassword(userName, perUser, globalTrim) {
  * @param {string} originalname
  * @param {bigint|number|string} organizationId
  * @param {bigint|number|string} actingUserId
+ * @param {{ createNewOrganization?: boolean, actorHasOrganizationCreate?: boolean }} [options]
  * @returns {Promise<object>}
  */
-export async function previewImport(buffer, mimetype, originalname, organizationId, actingUserId) {
+export async function previewImport(
+  buffer,
+  mimetype,
+  originalname,
+  organizationId,
+  actingUserId,
+  options = {}
+) {
+  const createNewOrganization = Boolean(options.createNewOrganization);
+  const actorHasOrganizationCreate = Boolean(options.actorHasOrganizationCreate);
+
   const orgIdBig = BigInt(organizationId);
   if (actingUserId === undefined || actingUserId === null) {
     throw new Error("Falta actingUserId para emitir el token de previsualización.");
@@ -148,13 +182,38 @@ export async function previewImport(buffer, mimetype, originalname, organization
   const actingUserIdBig = BigInt(actingUserId);
 
   const strategy = resolveImportStrategy(mimetype, originalname);
-  const { rows, embeddedRoleMappings } = await strategy.parse(buffer);
+  const parsed = await strategy.parse(buffer);
+  const rows = parsed.rows;
+  const embeddedRoleMappings = parsed.embeddedRoleMappings ?? {};
+  const organizationSpec = parsed.organizationSpec ?? null;
 
-  const orgRoles = await prisma.role.findMany({
-    where: { organizationId: orgIdBig },
-    select: { roleName: true, roleId: true },
-  });
-  const validRoleNames = orgRoles.map((r) => r.roleName);
+  /** @type {{ roleName: string, roleId: number }[]} */
+  let orgRoles;
+  /** @type {string[]} */
+  let validRoleNames;
+
+  if (createNewOrganization) {
+    if (strategy.label !== "JSON") {
+      throw new Error("La creación de una organización nueva solo está disponible con archivos JSON.");
+    }
+    if (!actorHasOrganizationCreate) {
+      throw new Error("No tienes permiso para crear una organización nueva (organization:create).");
+    }
+    if (!organizationSpec?.nombre?.trim()) {
+      throw new Error(
+        "Para crear una organización nueva, el JSON debe incluir un objeto \"organization\" con al menos \"nombre\"."
+      );
+    }
+    validateImportOrganizationSpec(organizationSpec);
+    validRoleNames = getDefaultClientRoleNamesForOnboardingImport();
+    orgRoles = validRoleNames.map((roleName, i) => ({ roleName, roleId: -(i + 1) }));
+  } else {
+    orgRoles = await prisma.role.findMany({
+      where: { organizationId: orgIdBig },
+      select: { roleName: true, roleId: true },
+    });
+    validRoleNames = orgRoles.map((r) => r.roleName);
+  }
 
   const processedRows = rows.map((r) => {
     const rawRole = String(r.roleName ?? "").trim();
@@ -212,6 +271,8 @@ export async function previewImport(buffer, mimetype, originalname, organization
     orgRoles,
     validRoleNames,
     expiresAt: Date.now() + PREVIEW_TTL_MS,
+    createNewOrganization,
+    newOrgSpec: createNewOrganization ? organizationSpec : undefined,
   });
 
   // GC oportunista de tokens vencidos.
@@ -224,6 +285,10 @@ export async function previewImport(buffer, mimetype, originalname, organization
   const permByRoleId = new Map();
   await Promise.all(
     orgRoles.map(async (r) => {
+      if (r.roleId < 0) {
+        permByRoleId.set(r.roleId, []);
+        return;
+      }
       const codes = await loadEffectivePermissionsForRole(r.roleId);
       permByRoleId.set(r.roleId, codes);
     })
@@ -256,6 +321,17 @@ export async function previewImport(buffer, mimetype, originalname, organization
 
   const fileHadAnyPassword = processedRows.some((r) => r.hasFilePassword);
 
+  const organizationFromFile =
+    organizationSpec && strategy.label === "JSON"
+      ? {
+          nombre: organizationSpec.nombre,
+          rfc: organizationSpec.rfc,
+          razonSocial: organizationSpec.razonSocial,
+          timezone: organizationSpec.timezone,
+          baseCurrency: organizationSpec.baseCurrency,
+        }
+      : undefined;
+
   return {
     previewToken,
     strategy: strategy.label,
@@ -278,6 +354,12 @@ export async function previewImport(buffer, mimetype, originalname, organization
     rolesCatalog,
     errors,
     conflicts,
+    organizationFromFile,
+    newOrganizationApplyAvailable:
+      strategy.label === "JSON" &&
+      Boolean(organizationSpec?.nombre?.trim()) &&
+      actorHasOrganizationCreate,
+    previewCreateNewOrganization: createNewOrganization,
   };
 }
 
@@ -291,6 +373,7 @@ export async function previewImport(buffer, mimetype, originalname, organization
  * @param {Record<string, string[]>} [permissionExtrasByUser] - userName → códigos de permiso adicionales (directos, no incluidos en el rol)
  * @param {{ globalPassword?: string, perUser?: Record<string, string> }} [passwordOptions] - contraseñas (obligatorias por archivo o global)
  * @param {Record<string, string>} [roleOverridesByUser] - userName → rol elegido en UI; tiene PRIORIDAD sobre mappedRoleName y sobre roleMappings
+ * @param {{ createNewOrganization?: boolean }} [applyOptions]
  */
 export async function applyImport(
   previewToken,
@@ -299,7 +382,8 @@ export async function applyImport(
   roleMappings = {},
   permissionExtrasByUser = {},
   passwordOptions = {},
-  roleOverridesByUser = {}
+  roleOverridesByUser = {},
+  applyOptions = {}
 ) {
   const entry = previewCache.get(previewToken);
   if (!entry) {
@@ -314,6 +398,13 @@ export async function applyImport(
   }
   if (actingUserId === undefined || actingUserId === null || !sameBigInt(entry.actingUserId, actingUserId)) {
     throw new Error("El token fue emitido para otro usuario; vuelve a subir el archivo.");
+  }
+
+  const applyCreateNew = Boolean(applyOptions?.createNewOrganization);
+  if (applyCreateNew !== Boolean(entry.createNewOrganization)) {
+    throw new Error(
+      "La opción «crear organización nueva» no coincide con la vista previa. Vuelve a generar la vista previa."
+    );
   }
 
   // Consumir el token solo después de validar el contexto.
@@ -332,9 +423,27 @@ export async function applyImport(
 
   validatePasswordApplyOptions(perUserPwd, globalPwdTrim);
 
-  const orgIdBig = BigInt(organizationId);
-  const roleMap = new Map(entry.orgRoles.map((r) => [r.roleName.toLowerCase(), r.roleId]));
-  const validRoleNames = entry.validRoleNames;
+  let orgIdBig = BigInt(organizationId);
+  /** @type {Map<string, number>} */
+  let roleMap;
+  /** @type {string[]} */
+  let validRoleNames = entry.validRoleNames;
+
+  if (entry.createNewOrganization) {
+    if (!entry.newOrgSpec) {
+      throw new Error("Vista previa incompleta: falta la definición de la organización nueva.");
+    }
+    const { organization } = await createClientOrganizationOnly(entry.newOrgSpec);
+    orgIdBig = BigInt(organization.id);
+    const orgRolesFresh = await prisma.role.findMany({
+      where: { organizationId: orgIdBig },
+      select: { roleName: true, roleId: true },
+    });
+    roleMap = new Map(orgRolesFresh.map((r) => [r.roleName.toLowerCase(), r.roleId]));
+    validRoleNames = orgRolesFresh.map((r) => r.roleName);
+  } else {
+    roleMap = new Map(entry.orgRoles.map((r) => [r.roleName.toLowerCase(), r.roleId]));
+  }
 
   const overridesByUser =
     roleOverridesByUser &&
@@ -374,6 +483,7 @@ export async function applyImport(
   }
 
   const created = [];
+  const managerLinks = [];
   let skipped = 0;
   /** @type {Array<{ userName: string, reason: string }>} */
   const failures = [];
@@ -453,6 +563,60 @@ export async function applyImport(
       throw e;
     }
 
+    // Si el archivo trae no_empleado (layout SAP), sincronizamos catálogo Empleado
+    // y vinculamos el User recién creado.
+    if (row.noEmpleado) {
+      const noEmpleado = String(row.noEmpleado).slice(0, 10);
+      const proveedor = String(row.sapProveedor || fallbackProveedorFromUserId(user.userId)).slice(0, 11);
+      const ceco = String(row.sapCeco || row.department || "000").slice(0, 10);
+      const status = String(row.sapStatus || "A").toUpperCase() === "I" ? "I" : "A";
+      const nombre = buildEmpleadoNombre(row).slice(0, 100);
+      const actor = `import_${String(actingUserId)}`.slice(0, 30);
+
+      await prisma.empleado.upsert({
+        where: {
+          organizationId_noEmpleado: {
+            organizationId: orgIdBig,
+            noEmpleado,
+          },
+        },
+        create: {
+          organizationId: orgIdBig,
+          noEmpleado,
+          nombre,
+          email: row.email ? String(row.email).slice(0, 100) : null,
+          jefeInmediato: row.managerNoEmpleado ? String(row.managerNoEmpleado).slice(0, 10) : null,
+          proveedor,
+          ceco,
+          status,
+          fechaAlta: new Date(),
+          usuarioUltimaModificacion: actor,
+        },
+        update: {
+          nombre,
+          email: row.email ? String(row.email).slice(0, 100) : null,
+          jefeInmediato: row.managerNoEmpleado ? String(row.managerNoEmpleado).slice(0, 10) : null,
+          proveedor,
+          ceco,
+          status,
+          usuarioUltimaModificacion: actor,
+        },
+      });
+
+      await prisma.user.update({
+        where: { userId: user.userId },
+        data: { noEmpleado },
+      });
+
+      if (row.managerNoEmpleado) {
+        managerLinks.push({
+          userId: user.userId,
+          managerNoEmpleado: String(row.managerNoEmpleado).slice(0, 10),
+        });
+      }
+      user.noEmpleado = noEmpleado;
+    }
+
     created.push(user);
 
     const extraCodes = permissionExtrasByUser[row.userName];
@@ -486,11 +650,43 @@ export async function applyImport(
     }
   }
 
+  // Segunda pasada: resolver managerUserId por no_empleado para soportar adjacency list SAP.
+  if (managerLinks.length > 0) {
+    const managerNoEmpleadoSet = [...new Set(managerLinks.map((m) => m.managerNoEmpleado))];
+    const managerUsers = await prisma.user.findMany({
+      where: {
+        organizationId: orgIdBig,
+        noEmpleado: { in: managerNoEmpleadoSet },
+      },
+      select: { userId: true, noEmpleado: true },
+    });
+    const managerByNoEmpleado = new Map(
+      managerUsers.map((u) => [String(u.noEmpleado), Number(u.userId)])
+    );
+
+    for (const link of managerLinks) {
+      const managerUserId = managerByNoEmpleado.get(link.managerNoEmpleado);
+      if (!managerUserId || Number(managerUserId) === Number(link.userId)) continue;
+      await prisma.user.update({
+        where: { userId: Number(link.userId) },
+        data: { managerUserId: Number(managerUserId) },
+      });
+    }
+  }
+
+  const createdOrganization = entry.createNewOrganization
+    ? {
+        id: orgIdBig.toString(),
+        nombre: String(entry.newOrgSpec?.nombre ?? ""),
+      }
+    : undefined;
+
   return {
     created: created.length,
     skipped,
     createdUsers: created,
     appliedBy: actingUserId,
     failures,
+    createdOrganization,
   };
 }

@@ -1,8 +1,15 @@
 {
   "_meta": {
     "description": "Equipo CocoFuego — fixture de prueba para onboarding import.",
-    "targetOrg": "CocoFuego (crear como org CLIENT activa en el panel de organizaciones)",
-    "version": "1.0"
+    "targetOrg": "Opción A: importar en org existente. Opción B: marcar «Crear organización nueva» con este JSON (incluye bloque organization).",
+    "version": "1.1"
+  },
+  "organization": {
+    "nombre": "CocoFuego",
+    "rfc": null,
+    "razonSocial": "CocoFuego Demo S.A. de C.V.",
+    "timezone": "America/Mexico_City",
+    "baseCurrency": "MXN"
   },
   "users": [
     {

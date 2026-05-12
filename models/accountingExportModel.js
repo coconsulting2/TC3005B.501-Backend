@@ -8,7 +8,13 @@ import prisma from "../database/config/prisma.js";
 
 /** Campos de inclusion reutilizados en todas las consultas de exportacion. */
 const EXPORT_INCLUDE = {
-    user: { include: { department: true } },
+    user: { include: { department: true, empleado: true } },
+    organization: {
+        include: {
+            chartOfAccounts: { where: { active: true } },
+            accountingSocieties: true,
+        },
+    },
     requestStatus: true,
     receipts: {
         where: { validation: "Aprobado" },

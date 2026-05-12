@@ -33,7 +33,11 @@ const sendPolizas = (res, polizas, format) => {
         res.type("application/xml");
         return res.status(200).send(AccountingExportService.polizasToXml(polizas));
     }
-    return res.status(200).json({ polizas });
+    const compatible = polizas.map((p) => ({
+        ...p,
+        detalles: p.detalle || p.detalles || [],
+    }));
+    return res.status(200).json({ polizas: compatible });
 };
 
 /**
@@ -50,6 +54,9 @@ const exportByRequest = async (req, res) => {
         const polizas = await AccountingExportService.getPolizasForRequest(requestId);
         return sendPolizas(res, polizas, format);
     } catch (error) {
+        if (error instanceof AccountingExportService.ValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
         if (error instanceof AccountingExportService.NotFoundError) {
             return res.status(404).json({ error: error.message });
         }
@@ -88,6 +95,9 @@ const exportByRange = async (req, res) => {
         const polizas = await AccountingExportService.getPolizasInRange(fromDate, toDate);
         return sendPolizas(res, polizas, format);
     } catch (error) {
+        if (error instanceof AccountingExportService.ValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
         console.error("Error in exportByRange controller:", error);
         return res.status(500).json({ error: "Internal server error" });
     }
@@ -135,6 +145,9 @@ const exportContable = async (req, res) => {
         const polizas = await AccountingExportService.getPolizasInRange(fromDate, toDate, { force });
         return sendPolizas(res, polizas, format);
     } catch (error) {
+        if (error instanceof AccountingExportService.ValidationError) {
+            return res.status(400).json({ error: error.message });
+        }
         console.error("Error in exportContable controller:", error);
         return res.status(500).json({ error: "Internal server error" });
     }

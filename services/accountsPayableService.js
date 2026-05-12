@@ -4,6 +4,7 @@
  * including receipt validation and automatic request-status transitions.
  */
 import AccountsPayable from "../models/accountsPayableModel.js";
+import anticipoPolizaLifecycleService from "./anticipoPolizaLifecycleService.js";
 
 const AccountsPayableService = {
     /**
@@ -30,6 +31,11 @@ const AccountsPayableService = {
         const allApproved = statuses.every(s => s === "Aprobado");
         if (allApproved) {
             await AccountsPayable.updateRequestStatus(requestId, 8); // Finalizado
+            try {
+                await anticipoPolizaLifecycleService.onExpensesVerified(requestId);
+            } catch (err) {
+                console.error("onExpensesVerified:", err?.message || err);
+            }
             return {
                 updatedStatus: 8,
                 message: "All receipts approved. Request finalized."

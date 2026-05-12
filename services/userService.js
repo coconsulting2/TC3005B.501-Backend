@@ -27,6 +27,7 @@ export async function getUserById(userId) {
       email: decryptedEmail,
       phone_number: decryptedPhone,
       workstation: userData.workstation,
+      no_empleado: userData.no_empleado ?? null,
       department_name: userData.department_name,
       costs_center: userData.costs_center,
       creation_date: userData.creation_date,
@@ -76,6 +77,7 @@ export async function authenticateUser(username, password, req) {
         organization_id: user.organization_id != null ? String(user.organization_id) : null,
         organization_kind: user.organization_kind || "CLIENT",
         role: user.role_name,
+        no_empleado: user.no_empleado ?? null,
         ip: req.ip,
       },
       process.env.JWT_SECRET,
@@ -89,7 +91,11 @@ export async function authenticateUser(username, password, req) {
       user_id: user.user_id,
       organization_id: user.organization_id != null ? String(user.organization_id) : null,
       organization_kind: user.organization_kind || "CLIENT",
-      department_id: user.department_id
+      department_id: user.department_id,
+      no_empleado: user.no_empleado ?? null,
+      empleado_ceco: user.empleado_ceco ?? null,
+      empleado_proveedor: user.empleado_proveedor ?? null,
+      empleado_jefe_inmediato: user.empleado_jefe_inmediato ?? null,
     };
   } catch (error) {
     throw new Error(`Authentication failed: ${error.message}`);

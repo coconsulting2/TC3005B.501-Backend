@@ -67,6 +67,7 @@ model Organization {
   reimbursementTimeLimits ReimbursementTimeLimit[]
   workflowRules           WorkflowRule[]
   proveedores             Proveedor[]
+  empleados               Empleado[]
   approvalSubstitutes     ApprovalSubstitute[]
   chartOfAccounts         ChartOfAccount[]
   accountingDocTypes      AccountingDocType[]
@@ -74,6 +75,8 @@ model Organization {
   integrations            OrganizationIntegration[]
   notificationTemplates   NotificationTemplate[]
   apiKeys                 ApiKey[]
+  anticipoPolizaSnapshots AnticipoPolizaSnapshot[]
+  accountingPolizas     AccountingPoliza[]
 
   @@map("organizaciones")
 }
@@ -113,6 +116,29 @@ model Department {
   @@map("Department")
 }
 
+/// Catálogo de empleados sincronizado desde RH/SAP (adjacency list por no_empleado).
+model Empleado {
+  empleadoId                Int          @id @default(autoincrement()) @map("empleado_id")
+  organizationId            BigInt       @map("organization_id")
+  noEmpleado                String       @map("no_empleado") @db.VarChar(10)
+  nombre                    String       @db.VarChar(100)
+  email                     String?      @db.VarChar(100)
+  jefeInmediato             String?      @map("jefe_inmediato") @db.VarChar(10)
+  proveedor                 String       @db.VarChar(11)
+  ceco                      String       @db.VarChar(10)
+  status                    String       @default("A") @db.VarChar(1)
+  fechaAlta                 DateTime     @map("fecha_alta") @db.Date
+  fechaUltimaModificacion   DateTime     @default(now()) @updatedAt @map("fecha_ultima_modificacion")
+  usuarioUltimaModificacion String       @map("usuario_ultima_modificacion") @db.VarChar(30)
+  organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users                     User[]
+
+  @@unique([organizationId, noEmpleado])
+  @@index([organizationId, status])
+  @@index([organizationId, jefeInmediato])
+  @@map("empleado")
+}
+
 /// Mensajes de alerta (templates per-org). is_system marca los defaults intocables.
 model AlertMessage {
   messageId      Int          @id @default(autoincrement()) @map("message_id")
@@ -130,6 +156,8 @@ model User {
   userId                       Int                      @id @default(autoincrement()) @map("user_id")
   roleId                       Int?                     @map("role_id")
   departmentId                 Int?                     @map("department_id")
+  managerUserId                Int?                     @map("manager_user_id")
+  noEmpleado                   String?                  @map("no_empleado") @db.VarChar(10)
   organizationId               BigInt                   @map("organization_id")
   userName                     String                   @unique @map("user_name") @db.VarChar(60)
   password                     String                   @db.VarChar(60)
@@ -143,6 +171,9 @@ model User {
   organization                 Organization             @relation(fields: [organizationId], references: [id])
   role                         Role?                    @relation(fields: [roleId], references: [roleId])
   department                   Department?              @relation(fields: [departmentId], references: [departmentId])
+  manager                      User?                    @relation("UserManager", fields: [managerUserId], references: [userId], onDelete: SetNull)
+  subordinates                 User[]                   @relation("UserManager")
+  empleado                     Empleado?                @relation(fields: [organizationId, noEmpleado], references: [organizationId, noEmpleado])
   requests                     Request[]
   solicitudHistorial           SolicitudHistorial[]
   userPermissions              UserPermission[]
@@ -158,6 +189,8 @@ model User {
   apiKeysCreated               ApiKey[]
 
   @@index([organizationId, active])
+  @@index([organizationId, managerUserId])
+  @@index([organizationId, noEmpleado])
   @@map("User")
 }
 
@@ -241,10 +274,29 @@ model Request {
   gastoTramos              GastoTramo[]
   solicitudHistorial       SolicitudHistorial[]
   policyExceptions         PolicyException[]
+  anticipoPolizaSnapshots  AnticipoPolizaSnapshot[]
+  accountingPolizas        AccountingPoliza[]
 
   @@index([requestStatusId, tripEndDate])
   @@index([organizationId, requestStatusId])
   @@map("Request")
+}
+
+/// Póliza de anticipo (AV) generada en hitos del ciclo de vida (aprobación de solicitud / comprobación de gastos).
+model AnticipoPolizaSnapshot {
+  id             Int          @id @default(autoincrement()) @map("id")
+  organizationId BigInt       @map("organization_id")
+  requestId      Int          @map("request_id")
+  /// ON_TRAVEL_APPROVED: monto requested_fee. ON_EXPENSES_VERIFIED: monto imposed_fee al finalizar.
+  phase          String       @db.VarChar(40)
+  payload        Json         @map("payload")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  request        Request      @relation(fields: [requestId], references: [requestId], onDelete: Cascade)
+
+  @@unique([requestId, phase], map: "anticipo_poliza_request_phase_unique")
+  @@index([organizationId, createdAt])
+  @@map("anticipo_poliza_snapshot")
 }
 
 enum SolicitudHistorialAccion {
@@ -352,6 +404,10 @@ model ReceiptType {
   organizationId    BigInt             @map("organization_id")
   receiptTypeName   String             @map("receipt_type_name") @db.VarChar(40)
   isSystem          Boolean            @default(false) @map("is_system")
+  /// cuenta mayor SAP para línea de gasto (Debe). Si null, usa catálogo org / default.
+  gastoGlAccountCode String?           @map("gasto_gl_account_code") @db.VarChar(10)
+  /// cuenta mayor SAP para IVA acreditable (Debe). Si null, usa catálogo org / default.
+  ivaGlAccountCode   String?           @map("iva_gl_account_code") @db.VarChar(10)
   organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   receipts          Receipt[]
   policyExpenseCaps PolicyExpenseCap[]
@@ -826,6 +882,24 @@ model AccountingSociety {
 
   @@unique([organizationId, code])
   @@map("accounting_societies")
+}
+
+/// Pólizas contables persistidas (AV/GV) tras generación o export; auditoría y GET por id.
+model AccountingPoliza {
+  id                      String       @id @default(cuid())
+  organizationId          BigInt       @map("organization_id")
+  requestId               Int          @map("request_id")
+  polizaIndex             Int          @map("poliza_index")
+  docType                 String       @map("doc_type") @db.VarChar(2)
+  payload                 Json
+  requestMarkedExported   Boolean      @default(false) @map("request_marked_exported")
+  createdAt               DateTime     @default(now()) @map("created_at")
+  organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  request                 Request      @relation(fields: [requestId], references: [requestId], onDelete: Cascade)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([requestId, polizaIndex])
+  @@map("accounting_poliza")
 }
 
 /// Credenciales de integración per-org (SMTP, Wise, SAT, Banxico, VAPID).
