@@ -30,6 +30,20 @@ const TravelAgent = {
     });
     return !!request;
   },
+
+  /**
+   * Persiste la oferta de vuelo seleccionada (JSON normalizado).
+   * @param {number|string} requestId
+   * @param {Object} offerPayload
+   * @returns {Promise<boolean>}
+   */
+  async saveSelectedFlightOffer(requestId, offerPayload) {
+    await prisma.request.update({
+      where: { requestId: Number(requestId) },
+      data: { selectedFlightOffer: offerPayload },
+    });
+    return true;
+  },
 };
 
 export default TravelAgent;

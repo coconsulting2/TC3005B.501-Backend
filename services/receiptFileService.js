@@ -96,6 +96,46 @@ export async function uploadReceiptFiles(receiptId, pdfFile, xmlFile) {
 }
 
 /**
+ * Sube imagen JPG/PNG como comprobante internacional (sin XML ni CFDI).
+ * Guarda el binario en GridFS y actualiza Receipt (pdf_* como archivo principal).
+ *
+ * @param {number} receiptId
+ * @param {Express.Multer.File} imageFile
+ * @returns {Promise<{ image: { fileId: string, fileName: string } }>}
+ */
+export async function uploadInternationalReceiptImage(receiptId, imageFile) {
+  const receiptRow = await prisma.receipt.findUnique({
+    where: { receiptId: Number(receiptId) },
+    select: { requestId: true },
+  });
+  if (!receiptRow?.requestId) {
+    const err = new Error("Receipt not found or has no associated request");
+    err.status = 404;
+    throw err;
+  }
+  await assertRequestAllowsReceiptUpload(receiptRow.requestId);
+
+  const imageResult = await uploadFile(
+    imageFile.buffer,
+    imageFile.originalname,
+    imageFile.mimetype,
+    { receiptId, fileType: "international_receipt" }
+  );
+
+  await prisma.receipt.update({
+    where: { receiptId: Number(receiptId) },
+    data: {
+      pdfFileId: imageResult.fileId,
+      pdfFileName: imageResult.fileName,
+      xmlFileId: null,
+      xmlFileName: null,
+    },
+  });
+
+  return { image: imageResult };
+}
+
+/**
  * Returns a readable download stream for a receipt file stored in GridFS.
  * @param {import('mongodb').ObjectId} fileId - MongoDB ObjectId of the file
  * @returns {Promise<import('stream').Readable>} GridFS download stream
