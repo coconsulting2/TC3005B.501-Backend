@@ -55,13 +55,13 @@ const USERS = [
   { user: "santino.im",            email: "santino.im@cocofuego.mx",            role: "N1",                  dept: "Operaciones",  first: "Santino",   last: "Im" },
   { user: "leonardo.rodriguez",    email: "leonardo.rodriguez@cocofuego.mx",    role: "N1",                  dept: "Finanzas",     first: "Leonardo",  last: "Rodríguez" },
   // Solicitantes
-  { user: "angel.montemayor",      email: "angel.montemayor@cocofuego.mx",      role: "Solicitante",         dept: "Ventas",       first: "Ángel",     last: "Montemayor" },
-  { user: "emiliano.delgadillo",   email: "emiliano.delgadillo@cocofuego.mx",   role: "Solicitante",         dept: "Marketing",    first: "Emiliano",  last: "Delgadillo" },
-  { user: "emiliano.deyta",        email: "emiliano.deyta@cocofuego.mx",        role: "Solicitante",         dept: "Desarrollo",   first: "Emiliano",  last: "Deyta" },
+  { user: "angel.montemayor",      email: "angel.montemayor@cocofuego.mx",      role: "Solicitante",         dept: "Operaciones", first: "Ángel",     last: "Montemayor" },
+  { user: "emiliano.delgadillo",   email: "emiliano.delgadillo@cocofuego.mx",   role: "Solicitante",         dept: "Operaciones", first: "Emiliano",  last: "Delgadillo" },
+  { user: "emiliano.deyta",        email: "emiliano.deyta@cocofuego.mx",        role: "Solicitante",         dept: "Operaciones", first: "Emiliano",  last: "Deyta" },
   // CxP
-  { user: "eder.cantero",          email: "eder.cantero@cocofuego.mx",          role: "Cuentas por pagar",   dept: "Contabilidad", first: "Eder",      last: "Cantero" },
+  { user: "eder.cantero",          email: "eder.cantero@cocofuego.mx",          role: "Cuentas por pagar",   dept: "Operaciones",  first: "Eder",      last: "Cantero" },
   // Agencia
-  { user: "erick.morales",         email: "erick.morales@cocofuego.mx",         role: "Agencia de viajes",   dept: "Logística",    first: "Erick",     last: "Morales" },
+  { user: "erick.morales",         email: "erick.morales@cocofuego.mx",         role: "Agencia de viajes",   dept: "Operaciones",  first: "Erick",     last: "Morales" },
 ];
 
 // Manager hierarchy: solicitante → N1
