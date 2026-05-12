@@ -76,7 +76,7 @@ model Organization {
   notificationTemplates   NotificationTemplate[]
   apiKeys                 ApiKey[]
   anticipoPolizaSnapshots AnticipoPolizaSnapshot[]
-  accountingPolizas     AccountingPoliza[]
+  accountingPolizas       AccountingPoliza[]
 
   @@map("organizaciones")
 }
@@ -248,26 +248,26 @@ model RequestStatus {
 }
 
 model Request {
-  requestId                Int                  @id @default(autoincrement()) @map("request_id")
-  userId                   Int?                 @map("user_id")
-  organizationId           BigInt               @map("organization_id")
-  requestStatusId          Int                  @default(1) @map("request_status_id")
-  notes                    String?              @db.Text
-  requestedFee             Float?               @map("requested_fee")
-  imposedFee               Float?               @map("imposed_fee")
-  requestDays              Float?               @map("request_days")
-  workflowPreSnapshot      Json?                @map("workflow_pre_snapshot")
-  workflowPostSnapshot     Json?                @map("workflow_post_snapshot")
-  tripEndDate              DateTime?            @map("trip_end_date") @db.Date
-  policyEvaluationSnapshot Json?                @map("policy_evaluation_snapshot")
-  creationDate             DateTime             @default(now()) @map("creation_date")
-  lastModDate              DateTime             @default(now()) @updatedAt @map("last_mod_date")
-  active                   Boolean              @default(true)
-  isExported               Boolean              @default(false) @map("is_exported")
-  exportedAt               DateTime?            @map("exported_at")
-  organization             Organization         @relation(fields: [organizationId], references: [id])
-  user                     User?                @relation(fields: [userId], references: [userId])
-  requestStatus            RequestStatus        @relation(fields: [requestStatusId], references: [requestStatusId])
+  requestId                Int                      @id @default(autoincrement()) @map("request_id")
+  userId                   Int?                     @map("user_id")
+  organizationId           BigInt                   @map("organization_id")
+  requestStatusId          Int                      @default(1) @map("request_status_id")
+  notes                    String?                  @db.Text
+  requestedFee             Float?                   @map("requested_fee")
+  imposedFee               Float?                   @map("imposed_fee")
+  requestDays              Float?                   @map("request_days")
+  workflowPreSnapshot      Json?                    @map("workflow_pre_snapshot")
+  workflowPostSnapshot     Json?                    @map("workflow_post_snapshot")
+  tripEndDate              DateTime?                @map("trip_end_date") @db.Date
+  policyEvaluationSnapshot Json?                    @map("policy_evaluation_snapshot")
+  creationDate             DateTime                 @default(now()) @map("creation_date")
+  lastModDate              DateTime                 @default(now()) @updatedAt @map("last_mod_date")
+  active                   Boolean                  @default(true)
+  isExported               Boolean                  @default(false) @map("is_exported")
+  exportedAt               DateTime?                @map("exported_at")
+  organization             Organization             @relation(fields: [organizationId], references: [id])
+  user                     User?                    @relation(fields: [userId], references: [userId])
+  requestStatus            RequestStatus            @relation(fields: [requestStatusId], references: [requestStatusId])
   alerts                   Alert[]
   routeRequests            RouteRequest[]
   receipts                 Receipt[]
@@ -400,17 +400,17 @@ model RouteRequest {
 
 /// Tipos de comprobante por organización. is_system marca los defaults (Boleto, Hotel, Comidas, Otros).
 model ReceiptType {
-  receiptTypeId     Int                @id @default(autoincrement()) @map("receipt_type_id")
-  organizationId    BigInt             @map("organization_id")
-  receiptTypeName   String             @map("receipt_type_name") @db.VarChar(40)
-  isSystem          Boolean            @default(false) @map("is_system")
+  receiptTypeId      Int                @id @default(autoincrement()) @map("receipt_type_id")
+  organizationId     BigInt             @map("organization_id")
+  receiptTypeName    String             @map("receipt_type_name") @db.VarChar(40)
+  isSystem           Boolean            @default(false) @map("is_system")
   /// cuenta mayor SAP para línea de gasto (Debe). Si null, usa catálogo org / default.
-  gastoGlAccountCode String?           @map("gasto_gl_account_code") @db.VarChar(10)
+  gastoGlAccountCode String?            @map("gasto_gl_account_code") @db.VarChar(10)
   /// cuenta mayor SAP para IVA acreditable (Debe). Si null, usa catálogo org / default.
-  ivaGlAccountCode   String?           @map("iva_gl_account_code") @db.VarChar(10)
-  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  receipts          Receipt[]
-  policyExpenseCaps PolicyExpenseCap[]
+  ivaGlAccountCode   String?            @map("iva_gl_account_code") @db.VarChar(10)
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  receipts           Receipt[]
+  policyExpenseCaps  PolicyExpenseCap[]
 
   @@unique([organizationId, receiptTypeName])
   @@index([organizationId])
@@ -886,16 +886,16 @@ model AccountingSociety {
 
 /// Pólizas contables persistidas (AV/GV) tras generación o export; auditoría y GET por id.
 model AccountingPoliza {
-  id                      String       @id @default(cuid())
-  organizationId          BigInt       @map("organization_id")
-  requestId               Int          @map("request_id")
-  polizaIndex             Int          @map("poliza_index")
-  docType                 String       @map("doc_type") @db.VarChar(2)
-  payload                 Json
-  requestMarkedExported   Boolean      @default(false) @map("request_marked_exported")
-  createdAt               DateTime     @default(now()) @map("created_at")
-  organization            Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  request                 Request      @relation(fields: [requestId], references: [requestId], onDelete: Cascade)
+  id                    String       @id @default(cuid())
+  organizationId        BigInt       @map("organization_id")
+  requestId             Int          @map("request_id")
+  polizaIndex           Int          @map("poliza_index")
+  docType               String       @map("doc_type") @db.VarChar(2)
+  payload               Json
+  requestMarkedExported Boolean      @default(false) @map("request_marked_exported")
+  createdAt             DateTime     @default(now()) @map("created_at")
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  request               Request      @relation(fields: [requestId], references: [requestId], onDelete: Cascade)
 
   @@index([organizationId, createdAt(sort: Desc)])
   @@index([requestId, polizaIndex])
