@@ -134,11 +134,13 @@ const validateReceipt = async (req, res) => {
         }
 
         if (approval === 1) {
-            const withinDeadline = await isWithinDeadline(receipt.request_id);
-            if (!withinDeadline) {
-                return res.status(409).json({
-                    error: "No se puede aprobar el comprobante: han pasado más de 14 días desde el fin del viaje.",
-                });
+            if (receipt.request_id) {
+                const withinDeadline = await isWithinDeadline(receipt.request_id);
+                if (!withinDeadline) {
+                    return res.status(409).json({
+                        error: "No se puede aprobar el comprobante: han pasado más de 14 días desde el fin del viaje.",
+                    });
+                }
             }
             if (!receipt.cfdiComprobante) {
                 return res.status(409).json({
