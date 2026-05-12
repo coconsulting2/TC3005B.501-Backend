@@ -67,9 +67,10 @@ export function validateImportRows(rows, validRoleNames) {
     }
 
     // password
-    if (!row.password) {
-      rowErrors.push({ row: rowNum, field: "password", message: "Campo requerido." });
-    } else if (!PASSWORD_RE.test(row.password)) {
+    // La contraseña del archivo es OPCIONAL: por seguridad, las contraseñas reales
+    // se definen al aplicar (passwordGlobal o passwordOverrides). Si vino en el
+    // archivo, validamos formato para avisar al admin antes de descartarla.
+    if (row.password && !PASSWORD_RE.test(row.password)) {
       rowErrors.push({
         row: rowNum,
         field: "password",

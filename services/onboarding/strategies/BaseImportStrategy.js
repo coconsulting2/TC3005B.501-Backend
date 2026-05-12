@@ -6,18 +6,20 @@
  * ImportUserDTO normalizado. La validación de negocio se hace en una capa superior.
  *
  * Contrato:
- *   parse(buffer: Buffer, options?: object) → Promise<ImportUserDTO[]>
+ *   parse(buffer: Buffer, options?: object)
+ *     → Promise<{ rows: ImportUserDTO[], embeddedRoleMappings: Record<string, string> }>
  *   get mimeTypes(): string[]   — tipos MIME que acepta esta estrategia.
  *   get label(): string         — nombre legible para logs/errores.
  *
  * @typedef {object} ImportUserDTO
  * @property {string}  userName     - identificador único de usuario (login)
  * @property {string}  email
- * @property {string}  password     - contraseña en texto plano (se hashea en el servicio)
- * @property {string}  roleName     - nombre del rol a asignar dentro de la org
+ * @property {string}  [password]   - contraseña en texto plano del archivo (opcional; en `apply` se descarta y se exige passwordGlobal/overrides)
+ * @property {string}  roleName     - nombre del rol o etiqueta externa a mapear
  * @property {string}  [department] - nombre de departamento (opcional)
  * @property {string}  [firstName]
  * @property {string}  [lastName]
+ * @property {number}  [_row]       - número de fila en el archivo origen (1-indexed)
  */
 export class BaseImportStrategy {
   /** @returns {string[]} */
@@ -33,7 +35,7 @@ export class BaseImportStrategy {
   /**
    * @param {Buffer} _buffer
    * @param {object} [_options]
-   * @returns {Promise<import('./BaseImportStrategy.js').ImportUserDTO[]>}
+   * @returns {Promise<{ rows: import('./BaseImportStrategy.js').ImportUserDTO[], embeddedRoleMappings: Record<string, string> }>}
    */
   // eslint-disable-next-line no-unused-vars
   async parse(_buffer, _options = {}) {
