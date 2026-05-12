@@ -26,6 +26,7 @@ import externalApiKeyRoutes from "./routes/externalApiKeyRoutes.js";
 import organizationRoutes from "./routes/organizationRoutes.js";
 import onboardingImportRoutes from "./routes/onboardingImportRoutes.js";
 import exportRoutes from "./routes/exportRoutes.js";
+import viaticasPolicyRoutes from "./routes/viaticasPolicyRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
@@ -110,6 +111,8 @@ app.use("/api/organizations", organizationRoutes);
 app.use("/api/onboarding/import", onboardingImportRoutes);
 // M1-010 — Exportación contable al ERP (polizas AV/GV).
 app.use("/api/export", exportRoutes);
+// TF-009 — Política de viáticos: topes de hotel y comida por organización.
+app.use("/api/viaticos-policy", viaticasPolicyRoutes);
 
 const swaggerOptions = {
     explorer: true,
