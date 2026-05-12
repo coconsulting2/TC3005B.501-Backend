@@ -379,13 +379,30 @@ const buildComprobacionPoliza = async (request, hasAnticipo) => {
 };
 
 /**
+ * Cuentas Debe que exigen CeCo: GL base del catálogo + overrides `gastoGlAccountCode` en receipts con CFDI.
+ * @param {object} request
+ * @param {object} gl
+ * @returns {Set<string>}
+ */
+const costCenterRequiredGlsForRequest = (request, gl) => {
+    const combined = new Set(costCenterRequiredAccountsFor(gl));
+    for (const r of request.receipts || []) {
+        if (!r?.cfdiComprobante) continue;
+        const raw = r.receiptType?.gastoGlAccountCode;
+        if (raw === undefined || raw === null || String(raw).trim() === "") continue;
+        combined.add(String(raw).trim().slice(0, 10));
+    }
+    return combined;
+};
+
+/**
  * @param {Object} request
  * @returns {Promise<Array<{ header: object, detalle: object[] }>>}
  */
 const buildPolizasFromRequest = async (request) => {
     const strict = isAccountingExportStrictLengths();
     const gl = resolveGlCatalog(request);
-    const costGls = costCenterRequiredAccountsFor(gl);
+    const costGls = costCenterRequiredGlsForRequest(request, gl);
     const polizas = [];
     const hasAnticipo = Number(request.imposedFee || 0) > 0;
 

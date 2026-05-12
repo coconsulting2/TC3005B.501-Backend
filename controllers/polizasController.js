@@ -18,13 +18,26 @@ const resolveFormat = (req) => {
 };
 
 /**
+ * Organización activa (impersonación ROOT + X-Organization-Id usa req.tenant).
+ * @param {import("express").Request} req
+ * @returns {bigint|number|string|null}
+ */
+const resolveActiveOrganizationId = (req) =>
+    req.tenant?.organizationId ?? req.user?.organization_id ?? null;
+
+/**
  * GET /api/accounts-payable/polizas
  * @param {import("express").Request} req
  * @param {import("express").Response} res
  */
 const listPolizas = async (req, res) => {
     try {
-        const orgId = req.user.organization_id;
+        const orgId = resolveActiveOrganizationId(req);
+        if (orgId == null) {
+            return res.status(400).json({
+                error: "No hay organización en contexto. Inicia sesión de nuevo o elige una organización (impersonación).",
+            });
+        }
         const requestId = req.query.request_id;
         const from = req.query.from ? new Date(String(req.query.from)) : null;
         const to = req.query.to ? new Date(String(req.query.to)) : null;
@@ -79,7 +92,13 @@ const generarPolizas = async (req, res) => {
  */
 const exportPolizaById = async (req, res) => {
     try {
-        const row = await AccountingPolizaModel.findPayloadById(req.user.organization_id, req.params.poliza_id);
+        const orgId = resolveActiveOrganizationId(req);
+        if (orgId == null) {
+            return res.status(400).json({
+                error: "No hay organización en contexto. Inicia sesión de nuevo o elige una organización (impersonación).",
+            });
+        }
+        const row = await AccountingPolizaModel.findPayloadById(orgId, req.params.poliza_id);
         if (!row?.payload) {
             return res.status(404).json({ error: "Poliza not found" });
         }

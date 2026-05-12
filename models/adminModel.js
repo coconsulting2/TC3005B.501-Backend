@@ -169,6 +169,7 @@ const Admin = {
       phone_number: "phoneNumber",
       wallet: "wallet",
       active: "active",
+      no_empleado: "noEmpleado",
     };
 
     const prismaData = {};

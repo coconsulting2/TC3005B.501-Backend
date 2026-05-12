@@ -9,6 +9,14 @@ import employeeSyncService from "../services/employeeSyncService.js";
 import EmployeeModel from "../models/employeeModel.js";
 
 /**
+ * Org activa (JWT o tenant tras impersonación).
+ * @param {import("express").Request} req
+ * @returns {bigint|number|string|null}
+ */
+const resolveActiveOrganizationId = (req) =>
+    req.tenant?.organizationId ?? req.user?.organization_id ?? null;
+
+/**
  * Retrieves the list of all active users with their roles and departments.
  * @param {import('express').Request} req - Express request
  * @param {import('express').Response} res - Express response
@@ -129,11 +137,11 @@ export const deactivateUser = async (req, res) => {
  */
 export const syncEmployee = async (req, res) => {
     try {
-        const organizationId = req.user?.organization_id;
+        const organizationId = resolveActiveOrganizationId(req);
         if (organizationId == null) {
             return res.status(401).json({
                 status: "error",
-                errores: ["organization_id no disponible en token"],
+                errores: ["organization_id no disponible en contexto (token o impersonación)"],
             });
         }
         const result = await employeeSyncService.syncEmployee(organizationId, req.body, req.user);
@@ -159,9 +167,11 @@ export const syncEmployee = async (req, res) => {
  */
 export const getEmployees = async (req, res) => {
     try {
-        const organizationId = req.user?.organization_id;
+        const organizationId = resolveActiveOrganizationId(req);
         if (organizationId == null) {
-            return res.status(401).json({ error: "organization_id no disponible en token" });
+            return res.status(401).json({
+                error: "organization_id no disponible en contexto (token o impersonación)",
+            });
         }
         const status = req.query?.status ? String(req.query.status).toUpperCase() : null;
         const rows = await EmployeeModel.listByOrganization(organizationId, { status });
@@ -193,9 +203,11 @@ export const getEmployees = async (req, res) => {
  */
 export const linkUserEmployee = async (req, res) => {
     try {
-        const organizationId = req.user?.organization_id;
+        const organizationId = resolveActiveOrganizationId(req);
         if (organizationId == null) {
-            return res.status(401).json({ error: "organization_id no disponible en token" });
+            return res.status(401).json({
+                error: "organization_id no disponible en contexto (token o impersonación)",
+            });
         }
         const userId = Number(req.params.user_id);
         if (!Number.isFinite(userId) || userId < 1) {
@@ -213,7 +225,7 @@ export const linkUserEmployee = async (req, res) => {
             }
         }
 
-        await Admin.updateUser(userId, { no_empleado: noEmpleado });
+        await Admin.updateUser(userId, { noEmpleado });
         return res.status(200).json({
             message: "User employee link updated",
             user_id: userId,

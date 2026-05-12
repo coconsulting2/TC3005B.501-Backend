@@ -33,6 +33,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   "employeeCategory", "travelPolicy", "reimbursementTimeLimit", "workflowRule",
   "policyException", "proveedor", "approvalSubstitute",
   "chartOfAccount", "accountingDocType", "accountingSociety", "accountingPoliza",
+  "empleado", "anticipoPolizaSnapshot",
   "organizationIntegration", "notificationTemplate",
   "apiKey",
 ]);
