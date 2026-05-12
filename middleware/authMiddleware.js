@@ -39,7 +39,7 @@ const TOKEN_GRACE_PERIOD_END = process.env.TOKEN_GRACE_PERIOD_END
 
 /**
  * JWT desde `Authorization: Bearer` o cookie httpOnly `token` (login).
- * Peticiones credencialed 4321→3000 envían la cookie aunque JS no pueda leerla.
+ * Peticiones con credenciales 4321→3000 envían la cookie aunque JS no pueda leerla.
  *
  * @param {import("express").Request} req - Express request
  * @returns {string|null} JWT crudo o null
