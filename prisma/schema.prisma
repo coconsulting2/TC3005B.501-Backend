@@ -869,14 +869,14 @@ model NotificationTemplate {
 
 /// Política de viáticos por organización: topes de hotel y comida (TF-009).
 model ViaticosPolicy {
-  id             Int          @id @default(autoincrement())
-  organizationId BigInt       @unique @map("org_id")
-  maxHotel       Decimal      @map("max_hotel") @db.Decimal(12, 2)
-  maxMeal        Decimal      @map("max_meal") @db.Decimal(12, 2)
-  currency       String       @default("MXN") @db.VarChar(3)
-  active         Boolean      @default(true)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id             Int      @id @default(autoincrement())
+  organizationId BigInt   @unique @map("org_id")
+  maxHotel       Decimal  @map("max_hotel") @db.Decimal(12, 2)
+  maxMeal        Decimal  @map("max_meal") @db.Decimal(12, 2)
+  currency       String   @default("MXN") @db.VarChar(3)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
