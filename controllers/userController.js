@@ -78,6 +78,12 @@ export const login = async (req, res) => {
         secure: true,
         maxAge: 1000 * 60 * 60,
       })
+      .cookie("no_empleado", result.no_empleado || "", {
+        sameSite: "Strict",
+        httpOnly: true,
+        secure: true,
+        maxAge: 1000 * 60 * 60,
+      })
       .json({ ...result, permissions });
   } catch {
     res.status(401).json({ error: "Invalid credentials" });
@@ -251,6 +257,7 @@ export const logout = (req, res) => {
     .clearCookie("username", cookieOptions)
     .clearCookie("id", cookieOptions)
     .clearCookie("department_id", cookieOptions)
+    .clearCookie("no_empleado", cookieOptions)
     .status(200)
     .json({ message: "Sesión cerrada correctamente" });
 };

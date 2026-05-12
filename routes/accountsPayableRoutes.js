@@ -1,14 +1,42 @@
 import express from "express";
 const router = express.Router();
-import { validateId, validateInputs } from "../middleware/validation.js";
+import { validateId, validateInputs, validatePolizaIdParam, validatePolizaListQuery, validatePolizaGenerarParam } from "../middleware/validation.js";
 import { requirePermission } from "../middleware/permissionMiddleware.js";
 import { generalRateLimiter } from "../middleware/rateLimiters.js";
 import AccountsPayableController from "../controllers/accountsPayableController.js";
 import AccountingExportController from "../controllers/accountingExportController.js";
+import PolizasController from "../controllers/polizasController.js";
 
 router.use((req, res, next) => {
     next();
 });
+
+router.route("/polizas/:poliza_id/export")
+    .get(
+        generalRateLimiter,
+        ...requirePermission("accounting:export"),
+        ...validatePolizaIdParam,
+        validateInputs,
+        PolizasController.exportPolizaById,
+    );
+
+router.route("/polizas")
+    .get(
+        generalRateLimiter,
+        ...requirePermission("accounting:export"),
+        ...validatePolizaListQuery,
+        validateInputs,
+        PolizasController.listPolizas,
+    );
+
+router.route("/polizas/:request_id/generar")
+    .post(
+        generalRateLimiter,
+        ...requirePermission("accounting:export"),
+        ...validatePolizaGenerarParam,
+        validateInputs,
+        PolizasController.generarPolizas,
+    );
 
 router.route("/attend-travel-request/:request_id")
     .put(generalRateLimiter, ...requirePermission("accounts_payable:attend"), validateId, validateInputs, AccountsPayableController.attendTravelRequest);

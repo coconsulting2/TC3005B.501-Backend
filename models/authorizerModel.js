@@ -70,6 +70,34 @@ const Authorizer = {
   },
 
   /**
+   * Obtiene jefe directo (adjacency list) del usuario.
+   * @param {number} userId
+   * @returns {Promise<number|null>}
+   */
+  async getManagerUserId(userId) {
+    const user = await prisma.user.findUnique({
+      where: { userId: Number(userId) },
+      select: { managerUserId: true },
+    });
+    if (!user) return null;
+    return user.managerUserId == null ? null : Number(user.managerUserId);
+  },
+
+  /**
+   * Obtiene subordinados directos de un usuario.
+   * @param {number} managerUserId
+   * @returns {Promise<number[]>}
+   */
+  async getDirectSubordinates(managerUserId) {
+    const rows = await prisma.user.findMany({
+      where: { managerUserId: Number(managerUserId), active: true },
+      select: { userId: true },
+      orderBy: { userId: "asc" },
+    });
+    return rows.map((r) => Number(r.userId));
+  },
+
+  /**
    * Estado y snapshot pre-viaje para autorización dinámica (M2-004).
    * @param {number} requestId
    */

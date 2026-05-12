@@ -81,11 +81,12 @@ export const formatPstngDate = (d) => {
  * Las constantes arriba se mantienen como fallback en código legacy.
  */
 export const ACCOUNTING_CATALOG_DEFAULTS = {
-    chartOfAccounts: Object.entries(GL_ACCOUNT_DESCRIPTIONS).map(([code, name]) => ({
-        code,
-        name,
-        type: code === "1003" ? "Iva" : code === "1000" ? "Anticipo" : "Gasto",
-    })),
+    chartOfAccounts: [
+        { code: "1000", name: GL_ACCOUNT_DESCRIPTIONS["1000"], type: "Anticipo" },
+        { code: "1001", name: GL_ACCOUNT_DESCRIPTIONS["1001"], type: "CxpEmpleado" },
+        { code: "1002", name: GL_ACCOUNT_DESCRIPTIONS["1002"], type: "GastoViaje" },
+        { code: "1003", name: GL_ACCOUNT_DESCRIPTIONS["1003"], type: "Iva" },
+    ],
     docTypes: Object.entries(DOC_TYPES).map(([key, code]) => ({
         code,
         name: key.replace(/_/g, " "),

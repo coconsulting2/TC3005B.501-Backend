@@ -5,6 +5,8 @@
 import * as adminService from "../services/adminService.js";
 import Admin from "../models/adminModel.js";
 import userModel from "../models/userModel.js";
+import employeeSyncService from "../services/employeeSyncService.js";
+import EmployeeModel from "../models/employeeModel.js";
 
 /**
  * Retrieves the list of all active users with their roles and departments.
@@ -25,6 +27,8 @@ export const getUserList = async (req, res) => {
             role_name: user.role_name,
             department_name: user.department_name,
             phone_number: user.phone_number,
+            organization_id: user.organization_id,
+            organization_name: user.organization_name,
         }));
         res.status(200).json(formattedUsers);
     } catch (error) {
@@ -117,10 +121,116 @@ export const deactivateUser = async (req, res) => {
     }
 };
 
+/**
+ * Sincroniza una transacción de empleado desde RH/SAP.
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ */
+export const syncEmployee = async (req, res) => {
+    try {
+        const organizationId = req.user?.organization_id;
+        if (organizationId == null) {
+            return res.status(401).json({
+                status: "error",
+                errores: ["organization_id no disponible en token"],
+            });
+        }
+        const result = await employeeSyncService.syncEmployee(organizationId, req.body, req.user);
+        return res.status(200).json(result);
+    } catch (error) {
+        const code = Number(error?.status) || 500;
+        return res.status(code).json({
+            idTransaction: req.body?.header?.idTransaction ?? null,
+            status: "error",
+            noEmpleado: req.body?.detalle?.noEmpleado ?? null,
+            accion_realizada: null,
+            errores: [error?.message || "Internal server error"],
+        });
+    }
+};
+
+/**
+ * Lista empleados del tenant actual.
+ * Query opcional: ?status=A|I
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ */
+export const getEmployees = async (req, res) => {
+    try {
+        const organizationId = req.user?.organization_id;
+        if (organizationId == null) {
+            return res.status(401).json({ error: "organization_id no disponible en token" });
+        }
+        const status = req.query?.status ? String(req.query.status).toUpperCase() : null;
+        const rows = await EmployeeModel.listByOrganization(organizationId, { status });
+        return res.status(200).json({
+            employees: rows.map((e) => ({
+                no_empleado: e.noEmpleado,
+                nombre: e.nombre,
+                email: e.email,
+                jefe_inmediato: e.jefeInmediato,
+                proveedor: e.proveedor,
+                ceco: e.ceco,
+                status: e.status,
+                fecha_alta: e.fechaAlta,
+                fecha_ultima_modificacion: e.fechaUltimaModificacion,
+                usuario_ultima_modificacion: e.usuarioUltimaModificacion,
+            })),
+        });
+    } catch (error) {
+        return res.status(500).json({ error: "Internal server error" });
+    }
+};
+
+/**
+ * Vincula/desvincula un usuario con no_empleado.
+ * Body: { no_empleado: string|null }
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ */
+export const linkUserEmployee = async (req, res) => {
+    try {
+        const organizationId = req.user?.organization_id;
+        if (organizationId == null) {
+            return res.status(401).json({ error: "organization_id no disponible en token" });
+        }
+        const userId = Number(req.params.user_id);
+        if (!Number.isFinite(userId) || userId < 1) {
+            return res.status(400).json({ error: "user_id inválido" });
+        }
+
+        const user = await Admin.findUserByIdInOrg(userId, organizationId);
+        if (!user) return res.status(404).json({ error: "User not found in organization" });
+
+        const noEmpleado = req.body?.no_empleado ?? null;
+        if (noEmpleado !== null) {
+            const empleado = await EmployeeModel.findByNoEmpleado(organizationId, noEmpleado);
+            if (!empleado) {
+                return res.status(404).json({ error: `Empleado ${noEmpleado} no existe en la organización` });
+            }
+        }
+
+        await Admin.updateUser(userId, { no_empleado: noEmpleado });
+        return res.status(200).json({
+            message: "User employee link updated",
+            user_id: userId,
+            no_empleado: noEmpleado,
+        });
+    } catch (error) {
+        return res.status(500).json({ error: "Internal server error" });
+    }
+};
+
 export default {
     getUserList,
     deactivateUser,
     createMultipleUsers,
     createUser,
-    updateUser
+    updateUser,
+    syncEmployee,
+    getEmployees,
+    linkUserEmployee,
 };

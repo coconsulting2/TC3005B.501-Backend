@@ -1,4 +1,4 @@
-import { body, param, validationResult } from "express-validator";
+import { body, param, query, validationResult } from "express-validator";
 
 /*
  * This will validate and sanitize the field of user id, given in any endpoint
@@ -573,6 +573,25 @@ export const validateCfdi = [
 /*
  * This reviews any errors received in previous validations
  */
+export const validatePolizaIdParam = [
+    param("poliza_id")
+        .isString()
+        .trim()
+        .isLength({ min: 10, max: 40 })
+        .withMessage("poliza_id must be a valid poliza identifier"),
+];
+
+export const validatePolizaListQuery = [
+    query("request_id").optional().isInt({ min: 1 }).toInt(),
+    query("limit").optional().isInt({ min: 1, max: 200 }).toInt(),
+    query("from").optional().isISO8601().toDate(),
+    query("to").optional().isISO8601().toDate(),
+];
+
+export const validatePolizaGenerarParam = [
+    param("request_id").isInt({ min: 1 }).toInt().withMessage("request_id must be a positive integer"),
+];
+
 export const validateInputs = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -586,6 +605,9 @@ export default {
   validateTravelRequest,
   validateExpenseReceipts,
   validateInputs,
+  validatePolizaIdParam,
+  validatePolizaListQuery,
+  validatePolizaGenerarParam,
   validateDraftTravelRequest,
   validateCreateUser,
   validateCfdi,

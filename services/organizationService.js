@@ -80,6 +80,52 @@ export async function createOrganization(input) {
 }
 
 /**
+ * Crea una org CLIENT en CONFIGURING + catálogos bootstrap, sin usuario admin inicial.
+ * Los usuarios se cargan después (p. ej. import JSON). Solo bypass cross-tenant (Ditta).
+ *
+ * @param {{ nombre: string, rfc?: string|null, razonSocial?: string|null, timezone?: string, baseCurrency?: string }} input
+ * @returns {Promise<{ organization: ReturnType<typeof serializeOrganization> }>}
+ */
+export async function createClientOrganizationOnly(input) {
+  const {
+    nombre,
+    rfc = null,
+    razonSocial = null,
+    timezone = "America/Mexico_City",
+    baseCurrency = "MXN",
+  } = input;
+
+  if (!nombre?.trim()) {
+    const err = new Error("El nombre de la organización es obligatorio");
+    err.status = 400;
+    throw err;
+  }
+  if (rfc && !/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i.test(rfc)) {
+    const err = new Error("RFC inválido (formato SAT)");
+    err.status = 400;
+    throw err;
+  }
+
+  return withRls(1n, { bypass: true }, async () => {
+    const org = await prisma.organization.create({
+      data: {
+        nombre: nombre.trim(),
+        rfc: rfc ?? null,
+        razonSocial: razonSocial ?? null,
+        timezone,
+        baseCurrency,
+        kind: "CLIENT",
+        status: "CONFIGURING",
+      },
+    });
+
+    await bootstrapOrganizationCatalogs(prisma, org.id, { includeDittaSuperAdmin: false });
+
+    return { organization: serializeOrganization(org) };
+  });
+}
+
+/**
  * Lista todas las orgs (solo Ditta). Permite filtros por kind, status.
  *
  * @param {{ kind?: 'ROOT'|'CLIENT', status?: 'CONFIGURING'|'ACTIVE'|'SUSPENDED', page?: number, pageSize?: number }} opts

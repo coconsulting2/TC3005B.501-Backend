@@ -173,6 +173,17 @@ const validateReceipt = async (req, res) => {
             return res.status(400).json({ error: "Failed to update travel request status" });
         }
 
+        if (approval === 1 && Number.isFinite(Number(receipt.request_id))) {
+            try {
+                await AccountsPayableService.validateReceiptsAndUpdateStatus(Number(receipt.request_id));
+            } catch (syncErr) {
+                console.warn(
+                    "[validateReceipt] Recibo actualizado; sync estado viaje:",
+                    syncErr?.message || syncErr,
+                );
+            }
+        }
+
         const statusLabel = approval === 1 ? "Aprobado" : "Rechazado";
         const summaryLabel = approval === 1 ? "Receipt approved" : "Receipt rejected";
         const messageLabel = approval === 1

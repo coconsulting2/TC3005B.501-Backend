@@ -26,6 +26,7 @@ import externalApiKeyRoutes from "./routes/externalApiKeyRoutes.js";
 import organizationRoutes from "./routes/organizationRoutes.js";
 import onboardingImportRoutes from "./routes/onboardingImportRoutes.js";
 import exportRoutes from "./routes/exportRoutes.js";
+import reportRoutes from "./routes/reportRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
@@ -110,6 +111,7 @@ app.use("/api/organizations", organizationRoutes);
 app.use("/api/onboarding/import", onboardingImportRoutes);
 // M1-010 — Exportación contable al ERP (polizas AV/GV).
 app.use("/api/export", exportRoutes);
+app.use("/api/reports", reportRoutes);
 
 const swaggerOptions = {
     explorer: true,
