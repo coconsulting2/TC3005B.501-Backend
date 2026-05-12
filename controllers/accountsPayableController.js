@@ -9,6 +9,7 @@ import ComprobantesModel from "../models/comprobantesModel.js";
 import { consultarCfdiWithRetries, acuseToCfdiRow } from "../services/satConsultaService.js";
 import mailData from "../services/email/mailData.js";
 import { Mail } from "../services/email/mail.cjs";
+import { isWithinDeadline } from "../services/reimbursementTimeService.js";
 
 const EFOS_EMISOR_BLACKLIST_APPROVAL = ["100", "101", "104"];
 
@@ -133,6 +134,14 @@ const validateReceipt = async (req, res) => {
         }
 
         if (approval === 1) {
+            if (receipt.request_id) {
+                const withinDeadline = await isWithinDeadline(receipt.request_id);
+                if (!withinDeadline) {
+                    return res.status(409).json({
+                        error: "No se puede aprobar el comprobante: han pasado más de 14 días desde el fin del viaje.",
+                    });
+                }
+            }
             if (!receipt.cfdiComprobante) {
                 return res.status(409).json({
                     error: "No hay CFDI registrado para este comprobante. No se puede aprobar el reembolso.",
