@@ -272,12 +272,37 @@ async function main() {
   console.log("  ✓ Jerarquía manager → solicitante");
 
   // ── 6. Workflow rules (pre/post aprobación) ────────────────────
-  await prisma.workflowRule.deleteMany({ where: { orgId: orgId } });
+  await prisma.workflowRule.deleteMany({ where: { organizationId: orgId } });
   await prisma.workflowRule.createMany({
     data: [
-      { orgId: orgId, ruleType: "pre", paramType: "importe", threshold: 50000,     approvalLevel: 1, priority: 10, active: true },
-      { orgId: orgId, ruleType: "pre", paramType: "importe", threshold: 999999999, approvalLevel: 2, priority: 20, active: true },
-      { orgId: orgId, ruleType: "pre", paramType: "importe", threshold: 999999999, approvalLevel: 2, skipIfBelow: 50000, priority: 5, active: true },
+      {
+        organizationId: orgId,
+        ruleType: "pre",
+        paramType: "importe",
+        threshold: 50000,
+        approvalLevel: 1,
+        priority: 10,
+        active: true,
+      },
+      {
+        organizationId: orgId,
+        ruleType: "pre",
+        paramType: "importe",
+        threshold: 999999999,
+        approvalLevel: 2,
+        priority: 20,
+        active: true,
+      },
+      {
+        organizationId: orgId,
+        ruleType: "pre",
+        paramType: "importe",
+        threshold: 999999999,
+        approvalLevel: 2,
+        skipIfBelow: 50000,
+        priority: 5,
+        active: true,
+      },
     ],
   });
   console.log("  ✓ Workflow rules (N1 ≤ $50k, N2 > $50k)");
