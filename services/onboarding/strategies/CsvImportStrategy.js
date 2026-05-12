@@ -3,19 +3,33 @@
  * @description Strategy para importar usuarios desde CSV.
  *
  * Columnas esperadas (header en primera fila, case-insensitive, separador coma o punto y coma):
- *   userName, email, password, roleName (o profile/perfil), department, firstName, lastName
+ *   userName, email, password (opcional), roleName (o profile/perfil), department, firstName, lastName
  *
  * Ejemplo:
- *   userName,email,password,roleName,department
- *   pedro.ramos,pedro@cliente.mx,Temp123!,N1,Operaciones
+ *   userName,email,roleName,department
+ *   pedro.ramos,pedro@cliente.mx,N1,Operaciones
  *
- * No depende de librerías externas: parser manual simple y robusto.
+ * Usa `csv-parse/sync` para manejar correctamente comillas, escapes y celdas con saltos de línea.
  */
+import { parse as parseCsvSync } from "csv-parse/sync";
 import { BaseImportStrategy } from "./BaseImportStrategy.js";
 
+/** Aliases por columna canónica (todos en minúsculas). */
+const COLUMN_ALIASES = {
+  username:   ["username", "user_name"],
+  email:      ["email"],
+  password:   ["password", "pass"],
+  rolename:   ["rolename", "role_name", "role", "profile", "perfil"],
+  department: ["department", "dept"],
+  firstname:  ["firstname", "first_name"],
+  lastname:   ["lastname", "last_name"],
+};
+
+const REQUIRED_COLUMNS = ["username", "email", "rolename"];
+
 export class CsvImportStrategy extends BaseImportStrategy {
-  static MAX_CSV_BYTES = 5 * 1024 * 1024; // 5MB
-  static MAX_CSV_LINE_LENGTH = 10000;
+  /** Tope defensivo de tamaño de buffer (5 MB). Evita DoS por archivos enormes. */
+  static MAX_CSV_BYTES = 5 * 1024 * 1024;
 
   get mimeTypes() {
     return ["text/csv", "text/plain", "application/vnd.ms-excel"];
@@ -34,37 +48,42 @@ export class CsvImportStrategy extends BaseImportStrategy {
       throw new Error("Archivo CSV inválido.");
     }
     if (buffer.length > CsvImportStrategy.MAX_CSV_BYTES) {
-      throw new Error("El archivo CSV excede el tamaño máximo permitido.");
+      throw new Error("El archivo CSV excede el tamaño máximo permitido (5 MB).");
     }
 
-    const text = buffer.toString("utf-8").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-    const lines = text.split("\n").filter((l) => l.trim().length > 0);
+    const text = buffer.toString("utf-8").replace(/^\uFEFF/, "");
 
-    if (lines.some((l) => l.length > CsvImportStrategy.MAX_CSV_LINE_LENGTH)) {
-      throw new Error("El CSV contiene líneas demasiado largas.");
+    if (!text.trim()) {
+      throw new Error("El CSV está vacío.");
     }
 
-    if (lines.length < 2) {
+    // Detección simple de separador: priorizamos ';' si aparece en la primera línea.
+    const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
+    const delimiter = firstLine.includes(";") ? ";" : ",";
+
+    /** @type {string[][]} */
+    let records;
+    try {
+      records = parseCsvSync(text, {
+        delimiter,
+        trim: true,
+        skip_empty_lines: true,
+        relax_column_count: true,
+        bom: true,
+      });
+    } catch (e) {
+      throw new Error(`No se pudo leer el CSV: ${e?.message ?? "formato inválido"}.`);
+    }
+
+    if (records.length < 2) {
       throw new Error("El CSV debe tener al menos una fila de encabezado y una de datos.");
     }
 
-    const sep = lines[0].includes(";") ? ";" : ",";
-    const headers = lines[0].split(sep).map((h) => h.trim().toLowerCase());
+    const headers = records[0].map((h) => String(h ?? "").trim().toLowerCase());
 
-    const required = ["username", "email", "password", "rolename"];
-    const aliases = {
-      username:   ["username", "username", "user_name"],
-      email:      ["email"],
-      password:   ["password", "pass"],
-      rolename:   ["rolename", "role_name", "role", "profile", "perfil"],
-      department: ["department", "dept"],
-      firstname:  ["firstname", "first_name"],
-      lastname:   ["lastname", "last_name"],
-    };
-
-    // Construye mapa canonico → índice en el header del CSV
+    /** canonicalKey → índice en el header */
     const colIndex = {};
-    for (const [canonical, variants] of Object.entries(aliases)) {
+    for (const [canonical, variants] of Object.entries(COLUMN_ALIASES)) {
       for (const v of variants) {
         const idx = headers.indexOf(v);
         if (idx !== -1) {
@@ -74,65 +93,27 @@ export class CsvImportStrategy extends BaseImportStrategy {
       }
     }
 
-    for (const req of required) {
+    for (const req of REQUIRED_COLUMNS) {
       if (colIndex[req] === undefined) {
-        const alias = aliases[req].join(" / ");
-        throw new Error(`Columna requerida no encontrada en el CSV: "${alias}".`);
+        const aliases = COLUMN_ALIASES[req].join(" / ");
+        throw new Error(`Columna requerida no encontrada en el CSV: "${aliases}".`);
       }
     }
 
-    const get = (row, key) => (colIndex[key] !== undefined ? (row[colIndex[key]] ?? "").trim() : "");
+    const get = (cols, key) =>
+      colIndex[key] !== undefined ? String(cols[colIndex[key]] ?? "").trim() : "";
 
-    const rows = lines.slice(1).map((line, i) => {
-      const cols = this.#splitCsvLine(line, sep);
-      return {
-        userName:   get(cols, "username"),
-        email:      get(cols, "email").toLowerCase(),
-        password:   get(cols, "password"),
-        roleName:   get(cols, "rolename"),
-        department: get(cols, "department") || undefined,
-        firstName:  get(cols, "firstname")  || undefined,
-        lastName:   get(cols, "lastname")   || undefined,
-        _row:       i + 2, // número de fila en el archivo (1-indexed, 1 = header)
-      };
-    });
+    const rows = records.slice(1).map((cols, i) => ({
+      userName:   get(cols, "username"),
+      email:      get(cols, "email").toLowerCase(),
+      password:   get(cols, "password") || undefined,
+      roleName:   get(cols, "rolename"),
+      department: get(cols, "department") || undefined,
+      firstName:  get(cols, "firstname")  || undefined,
+      lastName:   get(cols, "lastname")   || undefined,
+      _row:       i + 2,
+    }));
 
     return { rows, embeddedRoleMappings: {} };
-  }
-
-  /**
-   * Divide una línea CSV respetando comillas dobles.
-   * @param {string} line
-   * @param {string} sep
-   * @returns {string[]}
-   */
-  #splitCsvLine(line, sep) {
-    const safeLine = typeof line === "string" ? line : String(line ?? "");
-    if (safeLine.length > CsvImportStrategy.MAX_CSV_LINE_LENGTH) {
-      throw new Error("Línea CSV excede la longitud máxima permitida.");
-    }
-
-    const result = [];
-    let current = "";
-    let inQuotes = false;
-
-    for (let i = 0; i < safeLine.length; i++) {
-      const ch = safeLine[i];
-      if (ch === '"') {
-        if (inQuotes && safeLine[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (ch === sep && !inQuotes) {
-        result.push(current.trim());
-        current = "";
-      } else {
-        current += ch;
-      }
-    }
-    result.push(current.trim());
-    return result;
   }
 }
