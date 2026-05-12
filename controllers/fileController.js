@@ -4,7 +4,7 @@
  */
 import { ObjectId } from "mongodb";
 import sanitize from "mongo-sanitize";
-import { uploadReceiptFiles, getReceiptFile, getReceiptFilesMetadata, CfdiParseError } from "../services/receiptFileService.js";
+import { uploadReceiptFiles, getReceiptFile, getReceiptFilesMetadata, CfdiParseError, uploadInternationalReceiptImage } from "../services/receiptFileService.js";
 import { db } from "../services/fileStorage.js";
 import { upload, getPresignedUrl } from "../services/storageService.js";
 
@@ -16,11 +16,38 @@ import { upload, getPresignedUrl } from "../services/storageService.js";
  * @returns {void} 201 JSON with file IDs and names, or 400/500 error
  */
 export const uploadReceiptFilesController = async (req, res) => {
+  const receiptId = parseInt(sanitize(req.params.receipt_id), 10);
+
+  const q = String(req.query?.isInternational ?? "").toLowerCase();
+  const isInternational = q === "true" || q === "1";
+
+  if (isInternational) {
+    if (!req.file) {
+      return res.status(400).json({ error: "receipt_image (JPG o PNG) es requerido" });
+    }
+    try {
+      req.file.originalname = sanitize(req.file.originalname);
+      const result = await uploadInternationalReceiptImage(receiptId, req.file);
+      return res.status(201).json({
+        message: "International receipt image uploaded successfully",
+        international: true,
+        receipt_image: {
+          fileId: result.image.fileId,
+          fileName: result.image.fileName,
+        },
+      });
+    } catch (error) {
+      if (error.status) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      console.error("Error uploading international receipt:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  }
+
   if (!req.files || !req.files.pdf || !req.files.xml) {
     return res.status(400).json({ error: "Both PDF and XML files are required" });
   }
-
-  const receiptId = parseInt(sanitize(req.params.receipt_id), 10);
 
   try {
     const pdfFile = req.files.pdf[0];

@@ -570,6 +570,45 @@ export const validateCfdi = [
   body("sello_emisor").optional().isString().trim().isLength({ min: 1 }).withMessage("sello_emisor debe ser texto del XML si se envia"),
 ];
 
+/**
+ * Comprobante internacional (sin SAT / sin UUID real).
+ * @see TF-010
+ */
+export const validateInternationalExpense = [
+  param("receipt_id").isInt({ min: 1 }).toInt().withMessage("receipt_id debe ser entero positivo"),
+  body("is_international")
+    .custom((v) => v === true || v === "true")
+    .withMessage("is_international debe ser true"),
+  body("descripcion").isString().trim().notEmpty().isLength({ max: 254 }),
+  body("fecha_emision").isISO8601().withMessage("fecha_emision debe ser fecha ISO 8601"),
+  body("moneda").isIn(["USD", "EUR", "GBP", "JPY", "CAD"]).withMessage("moneda no permitida"),
+  body("total").isFloat({ min: 0.01 }).withMessage("total debe ser mayor a 0"),
+  body("receipt_type_id").optional().isInt({ min: 1 }).toInt(),
+  body("notas").optional().isString().trim().isLength({ max: 2000 }),
+];
+
+/**
+ * Ejecuta validateCfdi o validateInternationalExpense y luego validateInputs.
+ */
+export const chooseComprobanteValidation = (req, res, next) => {
+  const raw = req.body?.is_international;
+  const isIntl = raw === true || raw === "true";
+  const chain = isIntl ? validateInternationalExpense : validateCfdi;
+
+  let index = 0;
+  const run = (err) => {
+    if (err) {
+      return next(err);
+    }
+    if (index >= chain.length) {
+      return validateInputs(req, res, next);
+    }
+    const mw = chain[index++];
+    mw(req, res, run);
+  };
+  run();
+};
+
 /*
  * This reviews any errors received in previous validations
  */
@@ -611,6 +650,8 @@ export default {
   validateDraftTravelRequest,
   validateCreateUser,
   validateCfdi,
+  validateInternationalExpense,
+  chooseComprobanteValidation,
   validateViajeId,
   validateViajeTramoIds,
   validateGastoTramoBody,

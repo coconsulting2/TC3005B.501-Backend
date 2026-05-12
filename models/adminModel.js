@@ -14,7 +14,18 @@ const Admin = {
   async getUserList() {
     const ctx = getTenantContext();
     const where = { active: true };
-    if (ctx?.organizationId !== undefined && ctx?.organizationId !== null) {
+    // Admin cliente: acotado a su org. Super-admin ROOT sin impersonar: lista global (segmentación en UI).
+    // Con impersonación (bypass), solo la org elegida.
+    let narrowByOrg = false;
+    if (
+      ctx &&
+      ctx.organizationId !== undefined &&
+      ctx.organizationId !== null
+    ) {
+      if (!ctx.isRoot) narrowByOrg = true;
+      else if (ctx.bypassTenant) narrowByOrg = true;
+    }
+    if (narrowByOrg) {
       where.organizationId = ctx.organizationId;
     }
 

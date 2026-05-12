@@ -50,6 +50,34 @@ const attendTravelRequest = async (req, res) => {
     }
 };
 
+/**
+ * Guarda la oferta de vuelo elegida en la solicitud (TF-010).
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ */
+const saveSelectedFlightOffer = async (req, res) => {
+  const requestId = req.params.request_id;
+  const offer = req.body?.offer;
+  if (!offer || typeof offer !== "object" || Array.isArray(offer)) {
+    return res.status(400).json({ error: "offer must be a JSON object" });
+  }
+  try {
+    const exists = await TravelAgent.requestExists(requestId);
+    if (!exists) {
+      return res.status(404).json({ error: "Travel request not found" });
+    }
+    await TravelAgent.saveSelectedFlightOffer(requestId, offer);
+    return res.status(200).json({
+      message: "Flight offer saved",
+      requestId,
+    });
+  } catch (error) {
+    console.error("Error in saveSelectedFlightOffer:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 export default {
     attendTravelRequest,
+    saveSelectedFlightOffer,
 };

@@ -9,6 +9,8 @@
  *
  * @author Hector Lugo
  */
+import { randomUUID } from "node:crypto";
+import prisma from "../database/config/prisma.js";
 import ComprobantesModel from "../models/comprobantesModel.js";
 import { selloUltimos8FromSello } from "./cfdiParserService.js";
 import { consultarCfdiWithRetries, acuseToCfdiRow } from "./satConsultaService.js";
@@ -92,4 +94,95 @@ export async function insertarCfdi(receiptId, cfdiData) {
 
   // 5. Insertar con transacción atómica (rollback automático en error)
   return ComprobantesModel.createCfdi(receiptId, merged);
+}
+
+/**
+ * Registra comprobante internacional (sin consulta SAT, tipo_comprobante INTERNACIONAL).
+ * @param {number} receiptId
+ * @param {Object} body
+ * @returns {Promise<Object>}
+ */
+export async function insertarComprobanteInternacional(receiptId, body) {
+  const receipt = await ComprobantesModel.findReceiptById(receiptId);
+  if (!receipt) {
+    throw { status: 404, message: `Receipt ${receiptId} not found` };
+  }
+
+  if (receipt.requestId === null || receipt.requestId === undefined) {
+    throw { status: 400, message: "El recibo no está ligado a una solicitud de viaje" };
+  }
+  await assertRequestAllowsReceiptUpload(receipt.requestId);
+
+  const existingCfdi = await prisma.cfdiComprobante.findUnique({
+    where: { receiptId: Number(receiptId) },
+  });
+  if (existingCfdi) {
+    throw { status: 409, message: "Este recibo ya tiene un comprobante registrado" };
+  }
+
+  const uuid = randomUUID();
+
+  const fechaEmision = new Date(body.fecha_emision);
+  const descripcion = String(body.descripcion).trim().slice(0, 254);
+  const notas = body.notas ? String(body.notas).trim().slice(0, 240) : "";
+  const total = Number(body.total);
+  const moneda = String(body.moneda).toUpperCase().trim();
+
+  const nombreReceptor = notas ? `INTERNACIONAL — ${notas}` : "INTERNACIONAL";
+
+  return prisma.$transaction(async (tx) => {
+    const updateData = {
+      amount: total,
+      cfdiUuid: uuid,
+      cfdiEmisorRfc: "XEXX010101000",
+      cfdiReceptorRfc: "XAXX010101000",
+      cfdiFecha: fechaEmision,
+      cfdiTotal: total,
+    };
+    if (body.receipt_type_id) {
+      updateData.receiptTypeId = Number(body.receipt_type_id);
+    }
+    await tx.receipt.update({
+      where: { receiptId: Number(receiptId) },
+      data: updateData,
+    });
+
+    return tx.cfdiComprobante.create({
+      data: {
+        receiptId: Number(receiptId),
+        organizationId: receipt.organizationId,
+        uuid,
+        fechaTimbrado: fechaEmision,
+        rfcPac: "XEXX010101000",
+        version: "4.0",
+        serie: null,
+        folio: null,
+        fechaEmision,
+        tipoComprobante: "INTERNACIONAL",
+        lugarExpedicion: "00000",
+        exportacion: "01",
+        metodoPago: "PUE",
+        formaPago: "99",
+        moneda,
+        tipoCambio: 1.0,
+        subtotal: total,
+        descuento: 0.0,
+        iva: 0.0,
+        total,
+        rfcEmisor: "XEXX010101000",
+        nombreEmisor: descripcion,
+        regimenFiscalEmisor: "616",
+        rfcReceptor: "XAXX010101000",
+        nombreReceptor: nombreReceptor.slice(0, 254),
+        domicilioFiscalReceptor: "00000",
+        regimenFiscalReceptor: "616",
+        usoCfdi: "S01",
+        satCodigoEstatus: "N/A",
+        satEstado: "Internacional",
+        satEsCancelable: null,
+        satEstatusCancelacion: null,
+        satValidacionEfos: "000",
+      },
+    });
+  });
 }
