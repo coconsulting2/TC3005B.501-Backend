@@ -277,6 +277,8 @@ model Request {
   policyExceptions         PolicyException[]
   anticipoPolizaSnapshots  AnticipoPolizaSnapshot[]
   accountingPolizas        AccountingPoliza[]
+  /// Oferta de vuelo seleccionada por la agencia (Duffel o mock normalizado).
+  selectedFlightOffer      Json?                    @map("selected_flight_offer")
 
   @@index([requestStatusId, tripEndDate])
   @@index([organizationId, requestStatusId])
@@ -469,7 +471,8 @@ model CfdiComprobante {
   serie           String?  @db.VarChar(25)
   folio           String?  @db.VarChar(40)
   fechaEmision    DateTime @map("fecha_emision")
-  tipoComprobante String   @map("tipo_comprobante") @db.VarChar(1)
+  /// CFDI: I, E, T, P, N — o valor fijo INTERNACIONAL para recibos extranjeros (sin SAT).
+  tipoComprobante String   @map("tipo_comprobante") @db.VarChar(20)
   lugarExpedicion String   @map("lugar_expedicion") @db.VarChar(5)
   exportacion     String   @default("01") @db.VarChar(2)
   metodoPago      String   @map("metodo_pago") @db.VarChar(3)
