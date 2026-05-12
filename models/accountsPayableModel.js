@@ -112,6 +112,7 @@ const AccountsPayable = {
     if (!receipt) return undefined;
     return {
       receipt_id: receipt.receiptId,
+      request_id: receipt.requestId,
       validation: receipt.validation,
       cfdiComprobante: receipt.cfdiComprobante,
     };
