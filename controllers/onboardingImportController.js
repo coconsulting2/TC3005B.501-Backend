@@ -27,11 +27,13 @@ export async function postPreviewImport(req, res) {
     }
 
     const orgId = resolveTargetOrgId(req);
+    const actingUserId = resolveActingUserId(req);
     const result = await previewImport(
       req.file.buffer,
       req.file.mimetype,
       req.file.originalname,
-      orgId
+      orgId,
+      actingUserId
     );
 
     return res.status(200).json(result);
@@ -43,23 +45,40 @@ export async function postPreviewImport(req, res) {
 /**
  * POST /api/onboarding/import/apply
  *
- * Body: JSON { previewToken, roleMappings?, permissionExtras?, passwordGlobal?, passwordOverrides? }
- * permissionExtras: { [userName: string]: string[] } — códigos adicionales no cubiertos por el rol
+ * Body: JSON {
+ *   previewToken,
+ *   roleMappings?,        // etiqueta externa → rol de la org
+ *   roleOverrides?,       // userName → rol de la org (sobrescribe el del archivo)
+ *   permissionExtras?,    // userName → códigos de permiso adicionales (UserPermission)
+ *   passwordGlobal?,
+ *   passwordOverrides?    // userName → password individual
+ * }
  */
 export async function postApplyImport(req, res) {
   try {
-    const { previewToken, roleMappings, permissionExtras, passwordGlobal, passwordOverrides } =
-      req.body ?? {};
+    const {
+      previewToken,
+      roleMappings,
+      roleOverrides,
+      permissionExtras,
+      passwordGlobal,
+      passwordOverrides,
+    } = req.body ?? {};
     if (!previewToken) {
       return res.status(400).json({ error: "Se requiere el campo previewToken." });
     }
 
     const orgId = resolveTargetOrgId(req);
-    const actingUserId = req.user?.user_id ?? req.tenant?.userId;
+    const actingUserId = resolveActingUserId(req);
 
     const mappings =
       roleMappings && typeof roleMappings === "object" && !Array.isArray(roleMappings)
         ? roleMappings
+        : {};
+
+    const overrides =
+      roleOverrides && typeof roleOverrides === "object" && !Array.isArray(roleOverrides)
+        ? roleOverrides
         : {};
 
     const extras =
@@ -85,7 +104,8 @@ export async function postApplyImport(req, res) {
       actingUserId,
       mappings,
       extras,
-      passwordOptions
+      passwordOptions,
+      overrides
     );
 
     return res.status(201).json(result);
@@ -103,13 +123,23 @@ export async function postApplyImport(req, res) {
  * @returns {bigint}
  */
 function resolveTargetOrgId(req) {
-  // tenantContextMiddleware ya resolvió el override de X-Organization-Id en req.tenant
   if (req.tenant?.organizationId) {
     return req.tenant.organizationId;
   }
-  // Fallback: orgId del JWT directamente (tokens sin middleware de tenant)
   if (req.user?.organization_id) {
     return BigInt(req.user.organization_id);
   }
   throw new Error("No se pudo determinar la organización destino.");
+}
+
+/**
+ * @param {import('express').Request} req
+ * @returns {bigint}
+ */
+function resolveActingUserId(req) {
+  const raw = req.user?.user_id ?? req.tenant?.userId;
+  if (raw === undefined || raw === null || raw === "") {
+    throw new Error("No se pudo determinar el usuario que realiza la importación.");
+  }
+  return BigInt(raw);
 }

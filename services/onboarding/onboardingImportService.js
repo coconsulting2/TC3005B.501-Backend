@@ -3,15 +3,23 @@
  * @description Orquestador de la importación de usuarios para onboarding.
  *
  * Dos fases:
- *   1. preview(buffer, mimetype, originalname, organizationId)
+ *   1. preview(buffer, mimetype, originalname, organizationId, actingUserId)
  *      Parsea + valida + cruza con BD → resumen sin persistir.
  *
- *   2. apply(previewToken, organizationId, actingUserId, roleMappings?)
- *      Persiste usu válidos. Las etiquetas de rol externas (otra empresa) se resuelven
+ *   2. apply(previewToken, organizationId, actingUserId, roleMappings?, permissionExtras?, passwordOptions?)
+ *      Persiste usuarios válidos. Las etiquetas de rol externas (otra empresa) se resuelven
  *      con roleMappings desde el front si no hubo equivalencia automática ni en JSON.
  *
  * JSON raíz opcional: { "roleMappings": { "Approver": "Solicitante" }, "users": [...] }
+ *
+ * Seguridad:
+ *   - El previewToken se genera con crypto.randomBytes y queda atado a (organizationId, actingUserId).
+ *   - El cache NUNCA guarda contraseñas en claro (las del archivo, si vinieran, se descartan).
+ *     En `apply` deben suministrarse vía passwordGlobal o passwordOverrides[userName].
+ *   - Las colisiones de userName/email se evalúan globalmente (no por org) porque el
+ *     esquema tiene constraint UNIQUE global; además se traduce P2002 en mensajes claros.
  */
+import crypto from "crypto";
 import bcrypt from "bcrypt";
 import prisma from "../../database/config/prisma.js";
 import { resolveImportStrategy } from "./importStrategyResolver.js";
@@ -25,8 +33,21 @@ const SALT_ROUNDS = 10;
 const previewCache = new Map();
 const PREVIEW_TTL_MS = 10 * 60 * 1000;
 
+/** 32 bytes hex = 64 chars; no predecible. */
 function generatePreviewToken() {
-  return `prev_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  return `prev_${crypto.randomBytes(32).toString("hex")}`;
+}
+
+/**
+ * @param {bigint|number|string} a
+ * @param {bigint|number|string} b
+ */
+function sameBigInt(a, b) {
+  try {
+    return BigInt(a) === BigInt(b);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -53,6 +74,8 @@ function buildPreviewRow(row, roleNameToId, permByRoleId) {
     rolePermissionCodes,
     /** @deprecated usar rolePermissionCodes — se mantiene por compatibilidad. */
     effectivePermissions: rolePermissionCodes,
+    /** UI: avisa al admin que el archivo traía contraseñas (que ya descartamos). */
+    hasFilePassword: Boolean(row.hasFilePassword),
   };
 }
 
@@ -92,24 +115,38 @@ function validatePasswordApplyOptions(perUser, globalTrim) {
 }
 
 /**
- * @param {object} row
+ * Determina la contraseña final del usuario en `apply`. Por seguridad, las
+ * contraseñas del archivo NO se utilizan: deben llegar por opciones explícitas.
+ *
+ * @param {string} userName
  * @param {Record<string, string>} perUser
  * @param {string} globalTrim
+ * @returns {string|null} contraseña en claro o null si no hay
  */
-function resolvePlainPassword(row, perUser, globalTrim) {
-  const specific = String(perUser[row.userName] ?? "").trim();
+function resolvePlainPassword(userName, perUser, globalTrim) {
+  const specific = String(perUser[userName] ?? "").trim();
   if (specific) return specific;
   if (globalTrim) return globalTrim;
-  return row.password;
+  return null;
 }
 
 /**
  * Fase 1: parsea el archivo, valida DTOs, cruza userNames/emails contra la BD.
  *
+ * @param {Buffer} buffer
+ * @param {string} mimetype
+ * @param {string} originalname
+ * @param {bigint|number|string} organizationId
+ * @param {bigint|number|string} actingUserId
  * @returns {Promise<object>}
  */
-export async function previewImport(buffer, mimetype, originalname, organizationId) {
+export async function previewImport(buffer, mimetype, originalname, organizationId, actingUserId) {
   const orgIdBig = BigInt(organizationId);
+  if (actingUserId === undefined || actingUserId === null) {
+    throw new Error("Falta actingUserId para emitir el token de previsualización.");
+  }
+  const actingUserIdBig = BigInt(actingUserId);
+
   const strategy = resolveImportStrategy(mimetype, originalname);
   const { rows, embeddedRoleMappings } = await strategy.parse(buffer);
 
@@ -128,6 +165,7 @@ export async function previewImport(buffer, mimetype, originalname, organization
     );
     return {
       ...r,
+      hasFilePassword: Boolean(String(r.password ?? "").trim()),
       mappedRoleName,
       externalRoleLabel,
     };
@@ -138,12 +176,14 @@ export async function previewImport(buffer, mimetype, originalname, organization
   const userNamesToCheck = valid.map((r) => r.userName);
   const emailsToCheck = valid.map((r) => r.email);
 
+  // Las constraints UNIQUE de userName/email en Prisma son globales: si validamos por org,
+  // dejamos pasar duplicados que después harán fallar el apply con P2002.
   const existingByUsername = await prisma.user.findMany({
-    where: { userName: { in: userNamesToCheck }, organizationId: orgIdBig },
+    where: { userName: { in: userNamesToCheck } },
     select: { userName: true },
   });
   const existingByEmail = await prisma.user.findMany({
-    where: { email: { in: emailsToCheck }, organizationId: orgIdBig },
+    where: { email: { in: emailsToCheck } },
     select: { email: true },
   });
 
@@ -159,17 +199,22 @@ export async function previewImport(buffer, mimetype, originalname, organization
     }));
 
   const conflictUserNameSet = new Set(conflicts.map((c) => c.userName));
-  const applyable = valid.filter((r) => !conflictUserNameSet.has(r.userName));
+  const applyable = valid
+    .filter((r) => !conflictUserNameSet.has(r.userName))
+    // Importante: NO conservar contraseñas del archivo en memoria.
+    .map(({ password: _ignored, ...rest }) => rest);
 
   const previewToken = generatePreviewToken();
   previewCache.set(previewToken, {
     rows: applyable,
     organizationId: orgIdBig,
+    actingUserId: actingUserIdBig,
     orgRoles,
     validRoleNames,
     expiresAt: Date.now() + PREVIEW_TTL_MS,
   });
 
+  // GC oportunista de tokens vencidos.
   for (const [token, entry] of previewCache.entries()) {
     if (entry.expiresAt < Date.now()) previewCache.delete(token);
   }
@@ -209,6 +254,8 @@ export async function previewImport(buffer, mimetype, originalname, organization
   const embeddedRoleMappingsFromFile =
     Object.keys(embeddedRoleMappings).length > 0 ? embeddedRoleMappings : undefined;
 
+  const fileHadAnyPassword = processedRows.some((r) => r.hasFilePassword);
+
   return {
     previewToken,
     strategy: strategy.label,
@@ -219,6 +266,12 @@ export async function previewImport(buffer, mimetype, originalname, organization
     needsRoleMappingCount,
     unmappedExternalRoles,
     embeddedRoleMappingsFromFile,
+    /**
+     * Indica al front que el archivo traía contraseñas. Por seguridad, esas
+     * contraseñas se descartaron y será obligatorio definir global o por usuario
+     * en `apply`.
+     */
+    fileHadPasswords: fileHadAnyPassword,
     preview,
     applyableUsernames: applyable.map((r) => r.userName),
     permissionsCatalog,
@@ -231,9 +284,13 @@ export async function previewImport(buffer, mimetype, originalname, organization
 /**
  * Fase 2: persiste usuarios del preview en la BD.
  *
+ * @param {string} previewToken
+ * @param {bigint|number|string} organizationId
+ * @param {bigint|number|string} actingUserId
  * @param {Record<string, string>} [roleMappings] - Etiqueta externa → rol en CocoConsulting (nombre del catálogo)
  * @param {Record<string, string[]>} [permissionExtrasByUser] - userName → códigos de permiso adicionales (directos, no incluidos en el rol)
- * @param {{ globalPassword?: string, perUser?: Record<string, string> }} [passwordOptions] - sustituir contraseñas del archivo al aplicar
+ * @param {{ globalPassword?: string, perUser?: Record<string, string> }} [passwordOptions] - contraseñas (obligatorias por archivo o global)
+ * @param {Record<string, string>} [roleOverridesByUser] - userName → rol elegido en UI; tiene PRIORIDAD sobre mappedRoleName y sobre roleMappings
  */
 export async function applyImport(
   previewToken,
@@ -241,7 +298,8 @@ export async function applyImport(
   actingUserId,
   roleMappings = {},
   permissionExtrasByUser = {},
-  passwordOptions = {}
+  passwordOptions = {},
+  roleOverridesByUser = {}
 ) {
   const entry = previewCache.get(previewToken);
   if (!entry) {
@@ -251,10 +309,14 @@ export async function applyImport(
     previewCache.delete(previewToken);
     throw new Error("Token de previsualización expirado. Vuelve a subir el archivo.");
   }
-  if (entry.organizationId !== BigInt(organizationId)) {
+  if (!sameBigInt(entry.organizationId, organizationId)) {
     throw new Error("El token no corresponde a esta organización.");
   }
+  if (actingUserId === undefined || actingUserId === null || !sameBigInt(entry.actingUserId, actingUserId)) {
+    throw new Error("El token fue emitido para otro usuario; vuelve a subir el archivo.");
+  }
 
+  // Consumir el token solo después de validar el contexto.
   previewCache.delete(previewToken);
 
   const perUserPwd =
@@ -274,22 +336,61 @@ export async function applyImport(
   const roleMap = new Map(entry.orgRoles.map((r) => [r.roleName.toLowerCase(), r.roleId]));
   const validRoleNames = entry.validRoleNames;
 
-  const needsMappingRows = entry.rows.filter((r) => r.externalRoleLabel && !r.mappedRoleName);
+  const overridesByUser =
+    roleOverridesByUser &&
+    typeof roleOverridesByUser === "object" &&
+    !Array.isArray(roleOverridesByUser)
+      ? roleOverridesByUser
+      : {};
+
+  // Validamos que todos los overrides apunten a roles existentes en la org.
+  for (const [uname, overrideName] of Object.entries(overridesByUser)) {
+    const candidate = String(overrideName ?? "").trim();
+    if (!candidate) continue;
+    const canonical = resolveManualRoleMapping(candidate, validRoleNames);
+    if (!canonical) {
+      throw new Error(
+        `El rol "${candidate}" para «${uname}» no existe en esta organización.`
+      );
+    }
+  }
+
+  // Solo exigimos mapping de etiquetas externas para usuarios que NO tengan override.
+  const needsMappingRows = entry.rows.filter(
+    (r) =>
+      r.externalRoleLabel &&
+      !r.mappedRoleName &&
+      !String(overridesByUser[r.userName] ?? "").trim()
+  );
   for (const row of needsMappingRows) {
     const picked = pickRoleMapping(row.externalRoleLabel, roleMappings);
     if (!picked || !picked.trim()) {
       throw new Error(
         `Falta asignar un rol de esta organización para la etiqueta externa "${row.externalRoleLabel}". ` +
-          `Incluye roleMappings en el cuerpo (ej. { "${row.externalRoleLabel}": "Solicitante" }).`
+          `Incluye roleMappings en el cuerpo (ej. { "${row.externalRoleLabel}": "Solicitante" }) ` +
+          `o un rol por usuario en roleOverrides.`
       );
     }
   }
 
   const created = [];
   let skipped = 0;
+  /** @type {Array<{ userName: string, reason: string }>} */
+  const failures = [];
 
   for (const row of entry.rows) {
-    let canonical = row.mappedRoleName;
+    /**
+     * Prioridad para el rol final:
+     *   1. roleOverridesByUser[userName]  — elección explícita del admin en la UI.
+     *   2. row.mappedRoleName             — resuelto en el preview (archivo/aliases).
+     *   3. roleMappings[externalLabel]    — mapping manual de etiquetas externas.
+     */
+    let canonical = null;
+    const overrideRaw = String(overridesByUser[row.userName] ?? "").trim();
+    if (overrideRaw) {
+      canonical = resolveManualRoleMapping(overrideRaw, validRoleNames);
+    }
+    if (!canonical) canonical = row.mappedRoleName ?? null;
     if (!canonical && row.externalRoleLabel) {
       const picked = pickRoleMapping(row.externalRoleLabel, roleMappings);
       canonical = resolveManualRoleMapping(picked, validRoleNames);
@@ -310,32 +411,48 @@ export async function applyImport(
       continue;
     }
 
-    const existing = await prisma.user.findFirst({
-      where: { organizationId: orgIdBig, userName: row.userName },
-    });
-    if (existing) {
-      skipped++;
-      continue;
+    const plain = resolvePlainPassword(row.userName, perUserPwd, globalPwdTrim);
+    if (!plain) {
+      throw new Error(
+        `No hay contraseña para «${row.userName}». Define una contraseña global o por usuario.`
+      );
     }
-
-    const plain = resolvePlainPassword(row, perUserPwd, globalPwdTrim);
     if (!isValidImportPassword(plain)) {
       throw new Error(`Contraseña inválida para ${row.userName}.`);
     }
 
     const passwordHash = await bcrypt.hash(plain, SALT_ROUNDS);
-    const user = await prisma.user.create({
-      data: {
-        organizationId: orgIdBig,
-        roleId,
-        userName: row.userName,
-        password: passwordHash,
-        email: row.email,
-        workstation: row.department ?? "importado",
-        active: true,
-      },
-      select: { userId: true, userName: true, email: true },
-    });
+
+    let user;
+    try {
+      user = await prisma.user.create({
+        data: {
+          organizationId: orgIdBig,
+          roleId,
+          userName: row.userName,
+          password: passwordHash,
+          email: row.email,
+          workstation: row.department ?? "importado",
+          active: true,
+        },
+        select: { userId: true, userName: true, email: true },
+      });
+    } catch (e) {
+      if (e?.code === "P2002") {
+        const target = Array.isArray(e.meta?.target)
+          ? e.meta.target.join(",").toLowerCase()
+          : String(e.meta?.target ?? "").toLowerCase();
+        const field = target.includes("email") ? "email" : "userName";
+        failures.push({
+          userName: row.userName,
+          reason: `${field} ya existe (otro usuario lo tomó después del preview).`,
+        });
+        skipped++;
+        continue;
+      }
+      throw e;
+    }
+
     created.push(user);
 
     const extraCodes = permissionExtrasByUser[row.userName];
@@ -374,5 +491,6 @@ export async function applyImport(
     skipped,
     createdUsers: created,
     appliedBy: actingUserId,
+    failures,
   };
 }
