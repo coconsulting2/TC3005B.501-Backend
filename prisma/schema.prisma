@@ -230,6 +230,8 @@ model Request {
   creationDate             DateTime             @default(now()) @map("creation_date")
   lastModDate              DateTime             @default(now()) @updatedAt @map("last_mod_date")
   active                   Boolean              @default(true)
+  isExported               Boolean              @default(false) @map("is_exported")
+  exportedAt               DateTime?            @map("exported_at")
   organization             Organization         @relation(fields: [organizationId], references: [id])
   user                     User?                @relation(fields: [userId], references: [userId])
   requestStatus            RequestStatus        @relation(fields: [requestStatusId], references: [requestStatusId])

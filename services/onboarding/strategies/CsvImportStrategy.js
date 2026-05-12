@@ -28,6 +28,9 @@ const COLUMN_ALIASES = {
 const REQUIRED_COLUMNS = ["username", "email", "rolename"];
 
 export class CsvImportStrategy extends BaseImportStrategy {
+  /** Tope defensivo de tamaño de buffer (5 MB). Evita DoS por archivos enormes. */
+  static MAX_CSV_BYTES = 5 * 1024 * 1024;
+
   get mimeTypes() {
     return ["text/csv", "text/plain", "application/vnd.ms-excel"];
   }
@@ -41,6 +44,13 @@ export class CsvImportStrategy extends BaseImportStrategy {
    * @returns {Promise<{ rows: import('./BaseImportStrategy.js').ImportUserDTO[], embeddedRoleMappings: Record<string, string> }>}
    */
   async parse(buffer) {
+    if (!Buffer.isBuffer(buffer)) {
+      throw new Error("Archivo CSV inválido.");
+    }
+    if (buffer.length > CsvImportStrategy.MAX_CSV_BYTES) {
+      throw new Error("El archivo CSV excede el tamaño máximo permitido (5 MB).");
+    }
+
     const text = buffer.toString("utf-8").replace(/^\uFEFF/, "");
 
     if (!text.trim()) {
