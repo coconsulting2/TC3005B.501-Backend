@@ -133,6 +133,8 @@ services:
              if [ ! -f /app/node_modules/.seeded ]; then
                echo '[migrate] First run — seeding reference data + dummy data...' &&
                node prisma/seed.js dev &&
+               echo '[migrate] Seeding usability test data (CocoFuego)...' &&
+               node prisma/seed-usability.js &&
                touch /app/node_modules/.seeded;
              else
                echo '[migrate] Re-applying reference seed (idempotent — permissions, roles, statuses)...' &&
