@@ -249,7 +249,7 @@ const polizasToXml = (polizas) => {
 
 const AccountingExportService = {
     /**
-     * Obtiene y arma las polizas de UN Request finalizado.
+     * Obtiene y arma las polizas de UN Request finalizado y lo marca como exportado.
      * @param {number} requestId
      * @returns {Promise<Array<Object>>}
      * @throws {NotFoundError|ConflictError}
@@ -262,18 +262,27 @@ const AccountingExportService = {
                 "Request not finalized. Accounting export is only available once the request is in status 'Finalizado'."
             );
         }
-        return buildPolizasFromRequest(request);
+        const polizas = buildPolizasFromRequest(request);
+        await AccountingExport.markRequestsAsExported([request.requestId]);
+        return polizas;
     },
 
     /**
      * Obtiene y arma las polizas de todos los Requests finalizados con validaciones en el rango [from, to].
+     * Marca los requests como exportados tras generar las polizas.
      * @param {Date} from
      * @param {Date} to
+     * @param {Object} [options]
+     * @param {boolean} [options.force=false] - Si true, incluye registros ya exportados (Sincronizado).
      * @returns {Promise<Array<Object>>}
      */
-    async getPolizasInRange(from, to) {
-        const requests = await AccountingExport.getFinalizedRequestsInRange(from, to);
-        return requests.flatMap(buildPolizasFromRequest);
+    async getPolizasInRange(from, to, { force = false } = {}) {
+        const requests = await AccountingExport.getFinalizedRequestsInRange(from, to, force);
+        const polizas = requests.flatMap(buildPolizasFromRequest);
+        if (requests.length > 0) {
+            await AccountingExport.markRequestsAsExported(requests.map((r) => r.requestId));
+        }
+        return polizas;
     },
 
     polizasToXml,
