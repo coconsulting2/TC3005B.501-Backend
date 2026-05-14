@@ -22,4 +22,7 @@ router.route("/attend-travel-request/:request_id")
 router.route("/travel-request/:request_id/selected-flight")
     .put(generalRateLimiter, ...requirePermission("travel_agent:attend"), validateId, validateInputs, travelAgentController.saveSelectedFlightOffer);
 
+router.route("/travel-request/:request_id/selected-hotel")
+    .put(generalRateLimiter, ...requirePermission("travel_agent:attend"), validateId, validateInputs, travelAgentController.saveSelectedHotelOffer);
+
 export default router;

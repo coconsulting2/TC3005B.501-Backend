@@ -4,6 +4,7 @@
  */
 import prisma from "../database/config/prisma.js";
 import { getTenantContext } from "../middleware/tenantContext.js";
+import { ensureTenantApplicantUserPermissions } from "../services/tenantApplicantUserGrants.js";
 
 const Admin = {
   /**
@@ -141,7 +142,7 @@ const Admin = {
       throw new Error("User with this email or username already exists in this organization");
     }
 
-    await prisma.user.create({
+    const created = await prisma.user.create({
       data: {
         organizationId: orgId,
         roleId: userData.role_id,
@@ -152,7 +153,9 @@ const Admin = {
         email: userData.email,
         phoneNumber: userData.phone_number,
       },
+      select: { userId: true },
     });
+    await ensureTenantApplicantUserPermissions(orgId, created.userId);
   },
 
   /**

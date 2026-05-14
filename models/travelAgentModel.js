@@ -44,6 +44,20 @@ const TravelAgent = {
     });
     return true;
   },
+
+  /**
+   * Persiste la oferta de hospedaje seleccionada (Duffel Stays / JSON normalizado).
+   * @param {number|string} requestId
+   * @param {Object} offerPayload
+   * @returns {Promise<boolean>}
+   */
+  async saveSelectedHotelOffer(requestId, offerPayload) {
+    await prisma.request.update({
+      where: { requestId: Number(requestId) },
+      data: { selectedHotelOffer: offerPayload },
+    });
+    return true;
+  },
 };
 
 export default TravelAgent;
