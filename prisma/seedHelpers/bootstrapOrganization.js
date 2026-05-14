@@ -188,6 +188,30 @@ const ROLE_GROUP_ASSIGNMENTS_DEFAULT = {
 };
 
 /**
+ * Vista previa sin consultar BD: permisos efectivos que tendrá un usuario activo con este
+ * rol default tras `bootstrapOrganizationCatalogs` en una org CLIENT nueva.
+ * Alineado con los grupos en `ROLE_GROUP_ASSIGNMENTS_DEFAULT` + `PERMISSION_GROUPS_DEFAULTS`
+ * y con la unión de capacidad solicitante por tenant (CocoAPI §7.5).
+ *
+ * @param {string} roleName
+ * @returns {string[]}
+ */
+export function getDefaultRolePreviewPermissionCodes(roleName) {
+  const groups = ROLE_GROUP_ASSIGNMENTS_DEFAULT[roleName];
+  const codes = new Set();
+  if (Array.isArray(groups)) {
+    for (const gn of groups) {
+      const def = PERMISSION_GROUPS_DEFAULTS.find((g) => g.groupName === gn);
+      if (def) {
+        for (const c of def.permissions) codes.add(c);
+      }
+    }
+  }
+  for (const c of TENANT_APPLICANT_CAPABILITY_CODES) codes.add(c);
+  return Array.from(codes).sort((a, b) => a.localeCompare(b));
+}
+
+/**
  * Bootstrappa los catálogos default de una organización.
  * Idempotente: usa upsert por unique compuesto (organizationId, code/name).
  *

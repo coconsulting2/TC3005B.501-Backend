@@ -29,7 +29,7 @@ paths:
             type: integer
       responses:
         "200":
-          description: List of filtered travel requests
+          description: Lista filtrada; si no hay coincidencias devuelve `[]`.
           content:
             application/json:
               schema:
@@ -51,13 +51,19 @@ paths:
                       format: date
                     request_status:
                       type: string
-                example:
-                  - request_id: 8759
-                    user_id: 56
-                    destination_country: "Argentina"
-                    beginning_date: "2025-02-15"
-                    ending_date: "2025-03-20"
-                    request_status: "Primera Revisión"
+              examples:
+                withRows:
+                  summary: Con resultados
+                  value:
+                    - request_id: 8759
+                      user_id: 56
+                      destination_country: "Argentina"
+                      beginning_date: "2025-02-15"
+                      ending_date: "2025-03-20"
+                      request_status: "Primera Revisión"
+                empty:
+                  summary: Sin resultados
+                  value: []
         "401":
           description: Unauthorized
           content:
@@ -69,17 +75,6 @@ paths:
                     type: string
               example:
                 error: "Unauthorized access"
-        "404":
-          description: No travel requests found
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-              example:
-                error: "No travel requests found"
         "500":
           description: Internal server error
           content:

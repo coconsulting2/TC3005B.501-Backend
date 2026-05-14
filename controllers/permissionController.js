@@ -226,6 +226,98 @@ export const removePermissionFromGroup = async (req, res) => {
   }
 };
 
+// ─── Roles (per-tenant) — must register before /roles/:roleId/... ───────────
+
+/**
+ * GET /api/admin/roles
+ * @param {import('express').Request} req - Express request
+ * @param {import('express').Response} res - Express response
+ * @returns {void}
+ */
+export const listRoles = async (req, res) => {
+  try {
+    const rows = await permissionService.listTenantRolesForAdmin();
+    res.status(200).json(rows);
+  } catch (err) {
+    if (err.status === 400) {
+      return res.status(400).json({ error: err.message });
+    }
+    console.error("listRoles error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * POST /api/admin/roles
+ * @param {import('express').Request} req - Express request
+ * @param {import('express').Response} res - Express response
+ * @returns {void}
+ */
+export const createRole = async (req, res) => {
+  try {
+    const row = await permissionService.createTenantRole(req.body);
+    res.status(201).json(row);
+  } catch (err) {
+    if (err.status === 400) {
+      return res.status(400).json({ error: err.message });
+    }
+    if (err.status === 409) {
+      return res.status(409).json({ error: err.message });
+    }
+    console.error("createRole error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * PUT /api/admin/roles/:roleId
+ * @param {import('express').Request} req - Express request
+ * @param {import('express').Response} res - Express response
+ * @returns {void}
+ */
+export const updateRole = async (req, res) => {
+  try {
+    const roleId = Number(req.params.roleId);
+    const row = await permissionService.updateTenantRole(roleId, req.body);
+    res.status(200).json(row);
+  } catch (err) {
+    if (err.status === 400) {
+      return res.status(400).json({ error: err.message });
+    }
+    if (err.status === 404) {
+      return res.status(404).json({ error: err.message });
+    }
+    if (err.status === 409) {
+      return res.status(409).json({ error: err.message });
+    }
+    console.error("updateRole error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * DELETE /api/admin/roles/:roleId
+ * @param {import('express').Request} req - Express request
+ * @param {import('express').Response} res - Express response
+ * @returns {void}
+ */
+export const deleteRole = async (req, res) => {
+  try {
+    const roleId = Number(req.params.roleId);
+    await permissionService.deleteTenantRole(roleId);
+    res.status(204).end();
+  } catch (err) {
+    if (err.status === 400) {
+      return res.status(400).json({ error: err.message });
+    }
+    if (err.status === 404) {
+      return res.status(404).json({ error: err.message });
+    }
+    console.error("deleteRole error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 // ─── Role assignments ───────────────────────────────────────────────────────
 
 /**

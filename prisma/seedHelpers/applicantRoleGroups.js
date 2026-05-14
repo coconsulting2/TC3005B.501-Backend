@@ -10,14 +10,14 @@ export const APPLICANT_DEFAULT_GROUP_NAMES = Object.freeze(["BaseColaborador", "
 /**
  * Idempotente: enlaza `BaseColaborador` y `TravelRequestAuthor` de la org al rol si existen.
  *
- * @param {import("@prisma/client").PrismaClient} prisma
+ * @param {import("@prisma/client").PrismaClient | import("@prisma/client").Prisma.TransactionClient} prismaOrTx
  * @param {bigint|number|string} organizationId
  * @param {number} roleId
  * @returns {Promise<{ linkedGroupIds: number[] }>}
  */
-export async function ensureApplicantGroupsForRole(prisma, organizationId, roleId) {
+export async function ensureApplicantGroupsForRole(prismaOrTx, organizationId, roleId) {
   const orgIdBig = BigInt(organizationId);
-  const groups = await prisma.permissionGroup.findMany({
+  const groups = await prismaOrTx.permissionGroup.findMany({
     where: {
       organizationId: orgIdBig,
       groupName: { in: [...APPLICANT_DEFAULT_GROUP_NAMES] },
@@ -27,7 +27,7 @@ export async function ensureApplicantGroupsForRole(prisma, organizationId, roleI
   });
   const data = groups.map((g) => ({ roleId, groupId: g.groupId }));
   if (data.length > 0) {
-    await prisma.rolePermissionGroup.createMany({ data, skipDuplicates: true });
+    await prismaOrTx.rolePermissionGroup.createMany({ data, skipDuplicates: true });
   }
   return { linkedGroupIds: groups.map((g) => g.groupId) };
 }

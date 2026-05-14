@@ -38,6 +38,7 @@ describe("loadEffectivePermissions", () => {
   test("usuario activo sin rol recibe capacidad solicitante del tenant", async () => {
     mockPermissionModel.findUserWithPermissions.mockResolvedValue({
       active: true,
+      organizationId: 99n,
       organization: { kind: "CLIENT" },
       role: null,
       userPermissions: [],
@@ -53,6 +54,7 @@ describe("loadEffectivePermissions", () => {
   test("usuario sin organización cargada no une capacidad solicitante", async () => {
     mockPermissionModel.findUserWithPermissions.mockResolvedValue({
       active: true,
+      organizationId: null,
       organization: null,
       role: null,
       userPermissions: [],
@@ -65,6 +67,7 @@ describe("loadEffectivePermissions", () => {
   test("une permisos del rol con capacidad solicitante", async () => {
     mockPermissionModel.findUserWithPermissions.mockResolvedValue({
       active: true,
+      organizationId: 1n,
       organization: { kind: "ROOT" },
       role: {
         rolePermissions: [{ permission: { code: "travel_request:authorize", active: true } }],
@@ -82,6 +85,7 @@ describe("loadEffectivePermissions", () => {
 describe("loadEffectivePermissionsForRole", () => {
   test("rol sin grupos incluye capacidad solicitante (vista previa alineada)", async () => {
     mockPermissionModel.findRoleWithPermissions.mockResolvedValue({
+      organizationId: 7n,
       organization: { kind: "CLIENT" },
       rolePermissions: [],
       rolePermissionGroups: [],
