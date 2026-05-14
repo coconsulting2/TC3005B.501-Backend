@@ -6,7 +6,7 @@
 import { describe, it, expect, afterAll } from "@jest/globals";
 import request from "supertest";
 import app from "../../app.js";
-import { prisma } from "../../database/config/prisma.js";
+import prisma from "../../database/config/prisma.js";
 import { createTestJWT } from "../utils/createTestAuthToken.js";
 
 async function createTestFixture() {
