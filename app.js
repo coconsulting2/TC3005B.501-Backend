@@ -44,7 +44,7 @@ import swaggerUi from "swagger-ui-express";
 
 // JSON serialization patch for Prisma BigInt fields (M2-006: orgId, etc.).
 // Express's res.json uses JSON.stringify which throws on BigInt by default.
-// eslint-disable-next-line no-extend-native
+
 BigInt.prototype.toJSON = function () { return this.toString(); };
 
 const app = express();
