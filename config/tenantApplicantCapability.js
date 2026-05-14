@@ -35,11 +35,20 @@ export const TENANT_APPLICANT_CAPABILITY_CODES = Object.freeze([
 /**
  * @param {object} ctx
  * @param {boolean} ctx.userActive - Requerido para resolución por usuario
- * @param {string|undefined} ctx.organizationKind - `Organization.kind` de Prisma
+ * @param {string|null|undefined} ctx.organizationKind - `Organization.kind` de Prisma (opcional)
+ * @param {bigint|number|string|null|undefined} ctx.organizationId - `User.organizationId`; si hay org y no está en la lista excluida, aplica merge
  * @returns {boolean}
  */
-export function shouldMergeTenantApplicantCapability({ userActive, organizationKind }) {
+export function shouldMergeTenantApplicantCapability({ userActive, organizationKind, organizationId }) {
   if (!userActive) return false;
-  if (organizationKind === undefined || organizationKind === null) return false;
-  return !EXCLUDED_ORGANIZATION_KINDS_FOR_APPLICANT_MERGE.includes(organizationKind);
+  const hasOrg =
+    organizationId !== undefined &&
+    organizationId !== null &&
+    String(organizationId).trim() !== "" &&
+    String(organizationId).trim() !== "0";
+  if (!hasOrg) return false;
+  if (organizationKind !== undefined && organizationKind !== null) {
+    if (EXCLUDED_ORGANIZATION_KINDS_FOR_APPLICANT_MERGE.includes(organizationKind)) return false;
+  }
+  return true;
 }

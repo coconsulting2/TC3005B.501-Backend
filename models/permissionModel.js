@@ -334,3 +334,33 @@ export const removeGroupFromUser = (userId, groupId) =>
   prisma.userPermissionGroup.delete({
     where: { userId_groupId: { userId, groupId } },
   });
+
+// ─── Tenant roles (CRUD) ─────────────────────────────────────────────────────
+
+/**
+ * Lista roles del tenant actual (RLS + extensión de tenant) con conteo de usuarios activos
+ * y asignaciones de permisos directos + vía grupos.
+ *
+ * @returns {Promise<Array>}
+ */
+export const listRolesWithAssignments = () =>
+  prisma.role.findMany({
+    orderBy: { roleName: "asc" },
+    include: {
+      _count: {
+        select: {
+          users: { where: { active: true } },
+        },
+      },
+      rolePermissions: { include: { permission: true } },
+      rolePermissionGroups: {
+        include: {
+          group: {
+            include: {
+              items: { include: { permission: true } },
+            },
+          },
+        },
+      },
+    },
+  });
