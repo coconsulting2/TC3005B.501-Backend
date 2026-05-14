@@ -7,6 +7,7 @@ import Admin from "../models/adminModel.js";
 import userModel from "../models/userModel.js";
 import employeeSyncService from "../services/employeeSyncService.js";
 import EmployeeModel from "../models/employeeModel.js";
+import employeeHierarchyService from "../services/employeeHierarchyService.js";
 
 /**
  * Org activa (JWT o tenant tras impersonación).
@@ -75,7 +76,14 @@ export const createMultipleUsers = async (req, res) => {
  */
 export const createUser = async (req, res) => {
     try {
-        const userData = req.body;
+        const userData = { ...req.body };
+        const orgFromTenant = resolveActiveOrganizationId(req);
+        if (userData.organization_id == null && orgFromTenant != null) {
+            userData.organization_id = String(orgFromTenant);
+        }
+        if (userData.organization_id == null || String(userData.organization_id).trim() === "") {
+            return res.status(400).json({ error: "organization_id is required to create a user" });
+        }
         await adminService.createUser(userData);
         return res.status(201).json({ message: "User created succesfully" });
     } catch (error) {
@@ -195,6 +203,61 @@ export const getEmployees = async (req, res) => {
 };
 
 /**
+ * Valida si un cambio de jefe directo crearía ciclo en `User.managerUserId` (onboarding / organigrama §8.4).
+ * Body: { user_id: number, proposed_manager_user_id?: number|null }
+ * @param {import('express').Request} req
+ * @param {import('express').Response} res
+ * @returns {Promise<void>}
+ */
+export const validateManagerCycle = async (req, res) => {
+    try {
+        const organizationId = resolveActiveOrganizationId(req);
+        if (organizationId == null) {
+            return res.status(401).json({
+                error: "organization_id no disponible en contexto (token o impersonación)",
+            });
+        }
+        const userId = Number(req.body?.user_id);
+        const proposedRaw = req.body?.proposed_manager_user_id;
+        const proposed =
+            proposedRaw === undefined || proposedRaw === null || proposedRaw === ""
+                ? null
+                : Number(proposedRaw);
+
+        if (!Number.isFinite(userId) || userId < 1) {
+            return res.status(400).json({ error: "user_id inválido" });
+        }
+        if (proposed !== null && (!Number.isFinite(proposed) || proposed < 1)) {
+            return res.status(400).json({ error: "proposed_manager_user_id inválido" });
+        }
+
+        const subject = await Admin.findUserByIdInOrg(userId, organizationId);
+        if (!subject) {
+            return res.status(404).json({ error: "User not found in organization" });
+        }
+        if (proposed !== null) {
+            const managerUser = await Admin.findUserByIdInOrg(proposed, organizationId);
+            if (!managerUser) {
+                return res.status(404).json({ error: "Proposed manager not found in organization" });
+            }
+        }
+
+        const wouldCreateCycle = await employeeHierarchyService.wouldCreateManagerCycle(
+            userId,
+            proposed,
+        );
+        return res.status(200).json({
+            user_id: userId,
+            proposed_manager_user_id: proposed,
+            would_create_cycle: wouldCreateCycle,
+        });
+    } catch (error) {
+        console.error("validateManagerCycle:", error);
+        return res.status(500).json({ error: "Internal server error" });
+    }
+};
+
+/**
  * Vincula/desvincula un usuario con no_empleado.
  * Body: { no_empleado: string|null }
  * @param {import('express').Request} req
@@ -244,5 +307,6 @@ export default {
     updateUser,
     syncEmployee,
     getEmployees,
+    validateManagerCycle,
     linkUserEmployee,
 };

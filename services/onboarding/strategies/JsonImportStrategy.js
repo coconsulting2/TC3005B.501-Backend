@@ -154,11 +154,13 @@ export class JsonImportStrategy extends BaseImportStrategy {
     const sapProveedor = this.#pick(row, "sapProveedor", "proveedor", "vendor_no", "vendor_number");
     const sapCeco = this.#pick(row, "sapCeco", "ceco", "cost_center");
     const managerNoEmpleado = this.#pick(row, "managerNoEmpleado", "jefe_inmediato", "jefeInmediato", "manager_id");
+    const managerUserName = this.#pick(row, "managerUserName", "manager_username", "reports_to", "manager");
     const sapStatus = this.#pick(row, "sapStatus", "status");
     if (noEmpleado) dto.noEmpleado = noEmpleado;
     if (sapProveedor) dto.sapProveedor = sapProveedor;
     if (sapCeco) dto.sapCeco = sapCeco;
     if (managerNoEmpleado) dto.managerNoEmpleado = managerNoEmpleado;
+    if (managerUserName) dto.managerUserName = managerUserName;
     if (sapStatus && (sapStatus === "A" || sapStatus === "I")) dto.sapStatus = sapStatus;
     return dto;
   }

@@ -160,7 +160,7 @@ model User {
   managerUserId                Int?                     @map("manager_user_id")
   noEmpleado                   String?                  @map("no_empleado") @db.VarChar(10)
   organizationId               BigInt                   @map("organization_id")
-  userName                     String                   @unique @map("user_name") @db.VarChar(60)
+  userName                     String                   @map("user_name") @db.VarChar(60)
   password                     String                   @db.VarChar(60)
   workstation                  String                   @db.VarChar(20)
   email                        String                   @unique @db.VarChar(254)
@@ -190,6 +190,7 @@ model User {
   approvalSubstitutesAsBackup  ApprovalSubstitute[]     @relation("ApprovalSubstituteBackup")
   apiKeysCreated               ApiKey[]
 
+  @@unique([organizationId, userName])
   @@index([organizationId, active])
   @@index([organizationId, managerUserId])
   @@index([organizationId, noEmpleado])
