@@ -4,7 +4,8 @@
  *
  * Columnas esperadas (header en primera fila, case-insensitive, separador coma o punto y coma):
  *   Modo estándar:
- *     userName, email, password (opcional), roleName (o profile/perfil), department, firstName, lastName
+ *     userName, email, password (opcional), roleName (o profile/perfil), department, firstName, lastName,
+ *     manager (opcional: userName del jefe → managerUserId en apply)
  *   Modo SAP (catálogo empleado):
  *     no_empleado, nombre, email, jefe_inmediato, proveedor, ceco, status
  *     (roleName es opcional; si no existe se usa "Solicitante")
@@ -27,12 +28,13 @@ const COLUMN_ALIASES = {
   department: ["department", "dept"],
   firstname:  ["firstname", "first_name"],
   lastname:   ["lastname", "last_name"],
+  managerusername: ["manager", "manager_username", "managerusername", "reports_to", "jefe_usuario"],
   noempleado: ["no_empleado", "noempleado", "employee_id", "emp_id"],
   nombre:     ["nombre", "name", "full_name"],
   ceco:       ["ceco", "centro_costo", "cost_center"],
   proveedor:  ["proveedor", "vendor", "vendor_no", "vendor_number"],
   status:     ["status", "estatus"],
-  jefeinmediato: ["jefe_inmediato", "jefeinmediato", "manager", "manager_id"],
+  jefeinmediato: ["jefe_inmediato", "jefeinmediato", "manager_id"],
 };
 
 const REQUIRED_COLUMNS = ["username", "email", "rolename"];
@@ -152,6 +154,7 @@ export class CsvImportStrategy extends BaseImportStrategy {
 
     const rows = records.slice(1).map((cols, i) => {
       if (!isSapLike) {
+        const mgr = get(cols, "managerusername");
         return {
           userName:   get(cols, "username"),
           email:      get(cols, "email").toLowerCase(),
@@ -160,6 +163,7 @@ export class CsvImportStrategy extends BaseImportStrategy {
           department: get(cols, "department") || undefined,
           firstName:  get(cols, "firstname")  || undefined,
           lastName:   get(cols, "lastname")   || undefined,
+          ...(mgr ? { managerUserName: mgr } : {}),
           _row:       i + 2,
         };
       }

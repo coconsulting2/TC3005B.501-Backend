@@ -165,21 +165,42 @@ const User = {
   },
 
   /**
-   * Get user by username (for auth).
+   * Get user by username (for auth). userName es único por organización;
+   * si hay varias coincidencias y no se pasa organizationId, se lanza error explícito.
    * @param {string} username - Username.
+   * @param {bigint|number|string|undefined} [organizationId] - Org esperada si el mismo userName existe en varios tenants.
    * @returns {Promise<Object|undefined>} User row or undefined.
    */
-  async getUserUsername(username) {
+  async getUserUsername(username, organizationId = undefined) {
     // Login ocurre sin tenantContext ni GUC de Postgres. La política RLS en User
     // exige organization_id = current_setting(...) o bypass; sin SET la fila no
     // aparece y el login siempre devuelve 401. Transacción + bypass local solo
     // para esta lectura (no filtra al pool).
     const user = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT set_config('app.bypass_tenant', 'on', true)`;
-      return tx.user.findUnique({
+      const matches = await tx.user.findMany({
         where: { userName: username },
         include: { role: true, organization: true, empleado: true },
       });
+      if (!matches.length) return undefined;
+      const hint =
+        organizationId !== undefined && organizationId !== null && String(organizationId).trim() !== ""
+          ? BigInt(String(organizationId).trim())
+          : null;
+      if (hint !== null) {
+        return matches.find((u) => BigInt(u.organizationId) === hint) ?? undefined;
+      }
+      if (matches.length === 1) return matches[0];
+      const err = new Error(
+        "Varias organizaciones tienen un usuario con este nombre. " +
+          "Envía organization_id (id numérico de la organización) en el cuerpo del login."
+      );
+      err.code = "AMBIGUOUS_USERNAME";
+      err.organizations = matches.map((u) => ({
+        id: String(u.organizationId),
+        nombre: u.organization?.nombre ?? "",
+      }));
+      throw err;
     });
 
     if (!user) return undefined;

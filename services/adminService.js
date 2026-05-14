@@ -63,6 +63,7 @@ export async function createUser(userData) {
     const encryptedPhone = encrypt(userData.phone_number);
 
     const newUser = {
+      organization_id: userData.organization_id,
       role_id: userData.role_id,
       department_id: userData.department_id,
       user_name: userData.user_name,
