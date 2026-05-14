@@ -310,7 +310,10 @@ export const createDraftTravelRequest = async (req, res) => {
  * @returns {string} Formatted date string
  */
 const formatDate = (date) => {
-  return new Date(date).toISOString().split("T")[0];
+  if (date == null) return null;
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return null;
+  return d.toISOString().split("T")[0];
 };
 
 /**
