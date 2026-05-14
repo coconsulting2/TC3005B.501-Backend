@@ -3,20 +3,48 @@
  * @description Integration tests for request comment endpoints
  */
 
-import { describe, it, expect, afterAll } from "@jest/globals";
+import { describe, it, expect, afterAll, beforeAll } from "@jest/globals";
 import request from "supertest";
 import app from "../../app.js";
-import prisma from "../../database/config/prisma.js";
-import { createTestJWT } from "../utils/createTestAuthToken.js";
+import prisma, { connectPostgres, disconnectPostgres, resetPostgres } from "../../database/config/prisma.js";
+import { createTestJWT, LOCALHOST } from "../utils/createTestAuthToken.js";
+
+app.set("trust proxy", "loopback");
+
+let fixtureCounter = 0;
+
+function nextFixtureIds() {
+  const seed = (Date.now() % 1_000_000) + fixtureCounter++;
+  return {
+    orgId: BigInt(10_000_000_000 + seed),
+    roleId: 1_000_000 + seed,
+    deptId: 2_000_000 + seed,
+    requesterId: 3_000_000 + (seed * 2),
+    observerId: 3_000_001 + (seed * 2),
+    requestId: 4_000_000 + seed,
+  };
+}
+
+function authHeaders(userId, organizationId) {
+  return {
+    Authorization: `Bearer ${createTestJWT("none", {
+      user_id: userId,
+      IP: LOCALHOST,
+      organization_id: Number(organizationId),
+      organization_kind: "CLIENT",
+    })}`,
+    "x-forwarded-for": LOCALHOST,
+  };
+}
 
 async function createTestFixture() {
-  // Use unique suffix per run to avoid unique constraint collisions
-  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const ids = nextFixtureIds();
 
   // Create test organization
   const org = await prisma.organization.create({
     data: {
-      nombre: `Test Org Comments ${suffix}`,
+      id: ids.orgId,
+      nombre: `Test Org Comments ${Date.now()}`,
       kind: "CLIENT",
       status: "ACTIVE",
     },
@@ -25,7 +53,8 @@ async function createTestFixture() {
   // Create test role
   const role = await prisma.role.create({
     data: {
-      roleName: `TestRole-${suffix}`,
+      roleId: ids.roleId,
+      roleName: `TestRole-${ids.roleId}`,
       organizationId: org.id,
     },
   });
@@ -33,7 +62,8 @@ async function createTestFixture() {
   // Create test department
   const dept = await prisma.department.create({
     data: {
-      departmentName: `TestDept-${suffix}`,
+      departmentId: ids.deptId,
+      departmentName: `TestDept-${ids.deptId}`,
       organizationId: org.id,
     },
   });
@@ -41,8 +71,9 @@ async function createTestFixture() {
   // Create test users with unique usernames/emails
   const requester = await prisma.user.create({
     data: {
-      userName: `requester-comment-test-${suffix}`,
-      email: `requester-${suffix}@test.com`,
+      userId: ids.requesterId,
+      userName: `requester-comment-test-${ids.requesterId}`,
+      email: `requester-${ids.requesterId}@test.com`,
       password: "hashed-password",
       workstation: "TEST-001",
       organizationId: org.id,
@@ -53,8 +84,9 @@ async function createTestFixture() {
 
   const observer = await prisma.user.create({
     data: {
-      userName: `observer-comment-test-${suffix}`,
-      email: `observer-${suffix}@test.com`,
+      userId: ids.observerId,
+      userName: `observer-comment-test-${ids.observerId}`,
+      email: `observer-${ids.observerId}@test.com`,
       password: "hashed-password",
       workstation: "TEST-002",
       organizationId: org.id,
@@ -74,6 +106,7 @@ async function createTestFixture() {
   // Create test request
   const testRequest = await prisma.request.create({
     data: {
+      requestId: ids.requestId,
       userId: requester.userId,
       organizationId: org.id,
       requestStatusId: status.requestStatusId,
@@ -140,8 +173,13 @@ async function createTestFixture() {
 }
 
 describe("Request Comment Controller", () => {
+  beforeAll(async () => {
+    await connectPostgres();
+    await resetPostgres();
+  });
+
   afterAll(async () => {
-    await prisma.$disconnect();
+    await disconnectPostgres();
   });
 
   describe("POST /api/solicitudes/:id/comments", () => {
@@ -151,7 +189,7 @@ describe("Request Comment Controller", () => {
       try {
         const response = await request(app)
           .post(`/api/solicitudes/${fixture.testRequest.requestId}/comments`)
-          .set("Authorization", `Bearer ${createTestJWT("none", { user_id: fixture.requester.userId })}`)
+          .set(authHeaders(fixture.requester.userId, fixture.org.id))
           .send({
             user_id: fixture.requester.userId,
             content: "This is a test comment",
@@ -194,7 +232,7 @@ describe("Request Comment Controller", () => {
       try {
         const response = await request(app)
           .post(`/api/solicitudes/${fixture.testRequest.requestId}/comments`)
-          .set("Authorization", `Bearer ${createTestJWT("none", { user_id: fixture.requester.userId })}`)
+          .set(authHeaders(fixture.requester.userId, fixture.org.id))
           .send({
             user_id: fixture.observer.userId, // Mismatch
             content: "This is a test comment",
@@ -212,7 +250,7 @@ describe("Request Comment Controller", () => {
       try {
         const response = await request(app)
           .post(`/api/solicitudes/${fixture.testRequest.requestId}/comments`)
-          .set("Authorization", `Bearer ${createTestJWT("none", { user_id: fixture.requester.userId })}`)
+          .set(authHeaders(fixture.requester.userId, fixture.org.id))
           .send({
             user_id: fixture.requester.userId,
             content: "", // Empty
@@ -243,7 +281,7 @@ describe("Request Comment Controller", () => {
 
         const response = await request(app)
           .get(`/api/solicitudes/${fixture.testRequest.requestId}/comments`)
-          .set("Authorization", `Bearer ${createTestJWT("none", { user_id: fixture.requester.userId })}`)
+          .set(authHeaders(fixture.requester.userId, fixture.org.id))
           .query({
             user_id: fixture.requester.userId,
             limit: 10,
@@ -281,7 +319,7 @@ describe("Request Comment Controller", () => {
       try {
         const response = await request(app)
           .get(`/api/solicitudes/${fixture.testRequest.requestId}/comments`)
-          .set("Authorization", `Bearer ${createTestJWT("none", { user_id: fixture.requester.userId })}`)
+          .set(authHeaders(fixture.requester.userId, fixture.org.id))
           .query({
             user_id: fixture.observer.userId, // Mismatch
             limit: 10,
