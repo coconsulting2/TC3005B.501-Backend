@@ -20,7 +20,8 @@
  * @property {string}  [firstName]
  * @property {string}  [lastName]
  * @property {string}  [noEmpleado]        - clave empleado externa (SAP/RH)
- * @property {string}  [managerNoEmpleado] - jefe inmediato (adjacency list)
+ * @property {string}  [managerNoEmpleado] - jefe inmediato (adjacency list SAP: no_empleado)
+ * @property {string}  [managerUserName]   - login del jefe (CSV/JSON estándar → User.managerUserId)
  * @property {string}  [sapCeco]
  * @property {string}  [sapProveedor]
  * @property {"A"|"I"|string} [sapStatus]

@@ -4,7 +4,22 @@
  * Effective-permission resolution is the read hot path (called by
  * permissionMiddleware.loadPermissions on every authenticated request).
  */
+import {
+  TENANT_APPLICANT_CAPABILITY_CODES,
+  shouldMergeTenantApplicantCapability,
+} from "../config/tenantApplicantCapability.js";
 import * as permissionModel from "../models/permissionModel.js";
+
+/**
+ * @param {Set<string>} codes
+ * @param {{ userActive: boolean, organizationKind?: string|null }} ctx
+ */
+function mergeTenantApplicantCapabilityCodes(codes, { userActive, organizationKind }) {
+  if (!shouldMergeTenantApplicantCapability({ userActive, organizationKind })) return;
+  for (const c of TENANT_APPLICANT_CAPABILITY_CODES) {
+    codes.add(c);
+  }
+}
 
 /**
  * Computes the effective permission codes for a user by unioning:
@@ -12,9 +27,10 @@ import * as permissionModel from "../models/permissionModel.js";
  *   ∪ role.rolePermissionGroups[*].items
  *   ∪ user.userPermissions
  *   ∪ user.userPermissionGroups[*].items
+ *   ∪ tenant applicant capability (CocoAPI_flujos §7.5) when user is active and org allows it
  *
- * Inactive permissions are filtered out. Missing user or missing role
- * yields an empty array — never throws for "no permissions".
+ * Inactive permissions are filtered out. Missing user yields an empty array.
+ * Inactive users yield an empty array. Missing role does not block tenant applicant merge.
  *
  * @param {number} userId - Target user id
  * @returns {Promise<string[]>} Array of permission codes (deduped)
@@ -22,6 +38,7 @@ import * as permissionModel from "../models/permissionModel.js";
 export async function loadEffectivePermissions(userId) {
   const user = await permissionModel.findUserWithPermissions(userId);
   if (!user) return [];
+  if (!user.active) return [];
 
   const codes = new Set();
 
@@ -51,11 +68,17 @@ export async function loadEffectivePermissions(userId) {
     }
   }
 
+  mergeTenantApplicantCapabilityCodes(codes, {
+    userActive: user.active,
+    organizationKind: user.organization?.kind,
+  });
+
   return Array.from(codes);
 }
 
 /**
- * Permisos efectivos que tendría un usuario solo por su rol (sin grants directos).
+ * Permisos efectivos que tendría un usuario solo por su rol (sin grants directos al usuario),
+ * más la capacidad solicitante implícita del tenant (misma unión que en `loadEffectivePermissions`).
  * Útil para vista previa de importación / onboarding.
  *
  * @param {number} roleId - Rol
@@ -80,6 +103,11 @@ export async function loadEffectivePermissionsForRole(roleId) {
       addPerm(item.permission);
     }
   }
+
+  mergeTenantApplicantCapabilityCodes(codes, {
+    userActive: true,
+    organizationKind: role.organization?.kind,
+  });
 
   return Array.from(codes).sort((a, b) => a.localeCompare(b));
 }
