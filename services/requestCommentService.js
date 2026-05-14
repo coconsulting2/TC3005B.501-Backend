@@ -5,6 +5,7 @@
 
 import { randomBytes, createCipheriv, createDecipheriv } from "crypto";
 import prisma from "../database/config/prisma.js";
+import { withRls } from "../database/config/rlsConnection.js";
 import { Prisma } from "@prisma/client";
 
 const CHAT_CURSOR_SECRET = process.env.CHAT_CURSOR_SECRET || process.env.JWT_SECRET || "";
@@ -40,12 +41,33 @@ const partialSelect = {
  */
 export async function createComment(userId, requestId, content) {
   try {
-    await prisma.requestComment.create({
-      data: {
-        content,
-        userId,
-        requestId,
-      },
+    const [request, user] = await Promise.all([
+      prisma.request.findUnique({
+        where: { requestId },
+        select: { organizationId: true },
+      }),
+      prisma.user.findUnique({
+        where: { userId },
+        select: { organizationId: true },
+      }),
+    ]);
+
+    if (!request) {
+      return { success: false, error: "Invalid request id" };
+    }
+
+    if (!user) {
+      return { success: false, error: "Invalid user id" };
+    }
+
+    await withRls(request.organizationId, {}, async (tx) => {
+      await tx.requestComment.create({
+        data: {
+          content,
+          userId,
+          requestId,
+        },
+      });
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
@@ -66,6 +88,14 @@ export async function createComment(userId, requestId, content) {
  * @returns {Promise<{success: boolean, data?: Object, next?: string, error?: string}>}
  */
 export async function readComments(requestId, userId, limit, cursor) {
+  const request = await prisma.request.findUnique({
+    where: { requestId },
+    select: { organizationId: true },
+  });
+  if (!request) {
+    return { success: false, error: "Invalid request id" };
+  }
+
   const take = limit + 1;
   const query = {
     where: { requestId },
@@ -90,10 +120,10 @@ export async function readComments(requestId, userId, limit, cursor) {
 
   let page;
   try {
-    page = await prisma.requestComment.findMany({
+    page = await withRls(request.organizationId, {}, async (tx) => tx.requestComment.findMany({
       ...query,
       select: partialSelect,
-    });
+    }));
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
       return { success: false, error: "Invalid request id" };
