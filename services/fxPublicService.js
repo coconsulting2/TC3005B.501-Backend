@@ -5,6 +5,11 @@
 /* global fetch */
 const cache = new Map();
 
+/**
+ *
+ * @param from
+ * @param to
+ */
 function cacheKey(from, to) {
   const day = new Date().toISOString().slice(0, 10);
   return `${day}|${from}|${to}`;

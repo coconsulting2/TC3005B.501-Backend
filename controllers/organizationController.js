@@ -4,6 +4,12 @@
  */
 import * as organizationService from "../services/organizationService.js";
 
+/**
+ *
+ * @param req
+ * @param res
+ * @param next
+ */
 export async function postOrganization(req, res, next) {
   try {
     const result = await organizationService.createOrganization(req.body);
@@ -13,6 +19,12 @@ export async function postOrganization(req, res, next) {
   }
 }
 
+/**
+ *
+ * @param req
+ * @param res
+ * @param next
+ */
 export async function getOrganizations(req, res, next) {
   try {
     const { kind, status, page, pageSize } = req.query;
@@ -28,6 +40,12 @@ export async function getOrganizations(req, res, next) {
   }
 }
 
+/**
+ *
+ * @param req
+ * @param res
+ * @param next
+ */
 export async function getOrganizationMe(req, res, next) {
   try {
     if (!req.tenant) {
@@ -41,6 +59,12 @@ export async function getOrganizationMe(req, res, next) {
   }
 }
 
+/**
+ *
+ * @param req
+ * @param res
+ * @param next
+ */
 export async function getOrganizationById(req, res, next) {
   try {
     // Ditta puede ver cualquiera (bypass); resto solo su propia org.
@@ -57,6 +81,12 @@ export async function getOrganizationById(req, res, next) {
   }
 }
 
+/**
+ *
+ * @param req
+ * @param res
+ * @param next
+ */
 export async function patchOrganization(req, res, next) {
   try {
     const bypass = req.tenant?.isRoot === true;
@@ -70,6 +100,12 @@ export async function patchOrganization(req, res, next) {
   }
 }
 
+/**
+ *
+ * @param req
+ * @param res
+ * @param next
+ */
 export async function postActivate(req, res, next) {
   try {
     const updated = await organizationService.activateOrganization(req.params.id);
@@ -79,6 +115,12 @@ export async function postActivate(req, res, next) {
   }
 }
 
+/**
+ *
+ * @param req
+ * @param res
+ * @param next
+ */
 export async function postSuspend(req, res, next) {
   try {
     const updated = await organizationService.suspendOrganization(req.params.id);

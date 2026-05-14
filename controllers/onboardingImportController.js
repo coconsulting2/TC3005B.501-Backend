@@ -20,6 +20,8 @@ import {
  *   create_new_org=1 — vista previa para importar creando una org CLIENT nueva desde el bloque
  *     `organization` del JSON (solo ROOT + permiso organization:create). El token queda ligado
  *     a la org del JWT (Ditta), no a la org impersonada.
+ * @param req
+ * @param res
  */
 export async function postPreviewImport(req, res) {
   try {
@@ -63,6 +65,8 @@ export async function postPreviewImport(req, res) {
  *   passwordOverrides?,    // userName → password individual
  *   createNewOrganization?: boolean  // debe coincidir con la vista previa; crea org CLIENT + usuarios
  * }
+ * @param req
+ * @param res
  */
 export async function postApplyImport(req, res) {
   try {

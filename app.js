@@ -30,6 +30,7 @@ import reportRoutes from "./routes/reportRoutes.js";
 import viaticasPolicyRoutes from "./routes/viaticasPolicyRoutes.js";
 import fxRoutes from "./routes/fxRoutes.js";
 import flightsRoutes from "./routes/flightsRoutes.js";
+import requestCommentRoutes from "./routes/requestCommentRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
@@ -90,6 +91,7 @@ app.use("/api/authorizer", authorizerRoutes);
 // no se interprete como /:id/aprobar.
 app.use("/api/solicitudes", inboxRoutes);
 app.use("/api/solicitudes", solicitudWorkflowRoutes);
+app.use("/api/solicitudes", requestCommentRoutes);
 app.use("/api/approval-substitutes", approvalSubstituteRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/travel-agent", travelAgentRoutes);

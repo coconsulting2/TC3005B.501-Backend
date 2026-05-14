@@ -589,6 +589,9 @@ export const validateInternationalExpense = [
 
 /**
  * Ejecuta validateCfdi o validateInternationalExpense y luego validateInputs.
+ * @param req
+ * @param res
+ * @param next
  */
 export const chooseComprobanteValidation = (req, res, next) => {
   const raw = req.body?.is_international;

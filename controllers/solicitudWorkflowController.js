@@ -6,6 +6,10 @@ import authorizerServices from "../services/authorizerService.js";
 import { Mail } from "../services/email/mail.cjs";
 import mailData from "../services/email/mailData.js";
 
+/**
+ *
+ * @param request_id
+ */
 async function notifyApplicantSafe(request_id) {
   try {
     const { user_email, user_name, status } = await mailData(request_id);
@@ -20,6 +24,8 @@ async function notifyApplicantSafe(request_id) {
 
 /**
  * POST /api/solicitudes/:id/aprobar
+ * @param req
+ * @param res
  */
 export const approveSolicitud = async (req, res) => {
   const request_id = Number(req.params.id);
@@ -47,6 +53,8 @@ export const approveSolicitud = async (req, res) => {
 
 /**
  * POST /api/solicitudes/:id/rechazar  body: { comentario }
+ * @param req
+ * @param res
  */
 export const rejectSolicitud = async (req, res) => {
   const request_id = Number(req.params.id);
@@ -72,6 +80,8 @@ export const rejectSolicitud = async (req, res) => {
 
 /**
  * POST /api/solicitudes/:id/reasignar  body: { userId, motivo }
+ * @param req
+ * @param res
  */
 export const reassignSolicitud = async (req, res) => {
   const request_id = Number(req.params.id);
