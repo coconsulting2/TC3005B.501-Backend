@@ -51,6 +51,17 @@ class ExchangeRateService {
   }
 
   /**
+   * Disconnects from MongoDB.
+   * @returns {Promise<void>}
+   */
+  async disconnect() {
+    if (this.mongoClient) {
+      await this.mongoClient.close();
+      this.db = null;
+    }
+  }
+
+  /**
    * Creates an axios instance configured with mTLS client certificates.
    * @returns {Object} A configured axios instance.
    */

@@ -2,6 +2,9 @@
  * Tres vuelos estáticos (fallback demo / FLIGHT_PROVIDER=mock).
  */
 
+/**
+ *
+ */
 export class MockFlightProvider {
   /**
    * @param {import("./flightProvider.js").FlightSearchParams} params

@@ -57,6 +57,9 @@ export function withTenantContext(ctx, fn) {
 
 /**
  * Express middleware. Debe correr DESPUÉS de authenticateToken.
+ * @param req
+ * @param res
+ * @param next
  */
 export const tenantContextMiddleware = (req, res, next) => {
   if (!req.user) {

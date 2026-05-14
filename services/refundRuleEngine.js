@@ -170,6 +170,11 @@ function unitAmountFor(amount, capUnit, receipt) {
   }
 }
 
+/**
+ *
+ * @param capUnit
+ * @param receipt
+ */
 function unitsCount(capUnit, receipt) {
   if (capUnit === "per_night") return Math.max(1, Number(receipt.nights || 1));
   if (capUnit === "per_day")   return Math.max(1, Number(receipt.days || 1));

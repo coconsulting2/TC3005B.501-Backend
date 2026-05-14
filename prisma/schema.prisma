@@ -179,6 +179,7 @@ model User {
   solicitudHistorial           SolicitudHistorial[]
   userPermissions              UserPermission[]
   userPermissionGroups         UserPermissionGroup[]
+  requestComments              RequestComment[]
   preference                   UserPreference?
   notifications                Notification[]
   pushSubscriptions            PushSubscription[]
@@ -277,12 +278,26 @@ model Request {
   policyExceptions         PolicyException[]
   anticipoPolizaSnapshots  AnticipoPolizaSnapshot[]
   accountingPolizas        AccountingPoliza[]
+  requestComments          RequestComment[]
   /// Oferta de vuelo seleccionada por la agencia (Duffel o mock normalizado).
   selectedFlightOffer      Json?                    @map("selected_flight_offer")
 
   @@index([requestStatusId, tripEndDate])
   @@index([organizationId, requestStatusId])
   @@map("Request")
+}
+
+model RequestComment {
+  id        Int      @id @default(autoincrement()) @map("id")
+  content   String   @map("content") @db.Text
+  at        DateTime @default(now())
+  userId    Int      @map("user_id")
+  requestId Int      @map("request_id")
+
+  user    User    @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  request Request @relation(fields: [requestId], references: [requestId], onDelete: Cascade)
+
+  @@map("Request_Comment")
 }
 
 /// Póliza de anticipo (AV) generada en hitos del ciclo de vida (aprobación de solicitud / comprobación de gastos).

@@ -34,6 +34,10 @@ const ROLE_ALIAS_ENTRIES = [
 
 const ROLE_ALIASES = new Map(ROLE_ALIAS_ENTRIES);
 
+/**
+ *
+ * @param s
+ */
 function normalizeKey(s) {
   return String(s || "")
     .trim()

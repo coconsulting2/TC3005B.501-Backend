@@ -3,6 +3,11 @@
  */
 import { createDuffelClient } from "./duffel.js";
 
+/**
+ *
+ * @param isoStart
+ * @param isoEnd
+ */
 function formatDuration(isoStart, isoEnd) {
   const a = new Date(isoStart).getTime();
   const b = new Date(isoEnd).getTime();
@@ -13,6 +18,10 @@ function formatDuration(isoStart, isoEnd) {
   return `${h}h ${m}m`;
 }
 
+/**
+ *
+ * @param offer
+ */
 function mapOffer(offer) {
   const slices = offer.slices || [];
   const firstSlice = slices[0];
@@ -38,6 +47,9 @@ function mapOffer(offer) {
   };
 }
 
+/**
+ *
+ */
 export class DuffelFlightProvider {
   /**
    * @param {import("./flightProvider.js").FlightSearchParams} params
