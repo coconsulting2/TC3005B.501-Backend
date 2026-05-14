@@ -42,7 +42,12 @@ export class BaseImportStrategy {
    * @param {object} [_options]
    * @returns {Promise<{ rows: import('./BaseImportStrategy.js').ImportUserDTO[], embeddedRoleMappings: Record<string, string> }>}
    */
-  // eslint-disable-next-line no-unused-vars
+
+  /**
+   *
+   * @param _buffer
+   * @param _options
+   */
   async parse(_buffer, _options = {}) {
     throw new Error(`${this.constructor.name}: parse() no implementado`);
   }

@@ -7,6 +7,10 @@ import * as timeService from "../services/reimbursementTimeService.js";
 import * as exceptionService from "../services/policyExceptionService.js";
 import { summarizeRequestPolicyResult } from "../services/refundRuleEngine.js";
 
+/**
+ *
+ * @param req
+ */
 async function resolveOrgId(req) {
   const userId = Number(req.user.user_id);
   const user = await prisma.user.findUnique({ where: { userId }, select: { organizationId: true } });
@@ -18,6 +22,12 @@ async function resolveOrgId(req) {
   return user.organizationId;
 }
 
+/**
+ *
+ * @param res
+ * @param error
+ * @param label
+ */
 function handleError(res, error, label) {
   if (error.status) return res.status(error.status).json({ error: error.message });
   console.error(`${label}:`, error);

@@ -15,7 +15,10 @@ export function createTestJWT(role, options) {
         {
             user_id: options?.user_id ?? ++ids,
             role: role,
-            ip: options?.IP ?? "127.0.0.1"
+            ip: options?.IP ?? "127.0.0.1",
+            ...(options?.extraClaims ?? {}),
+            ...(options?.organization_id != null ? { organization_id: options.organization_id } : {}),
+            ...(options?.organization_kind != null ? { organization_kind: options.organization_kind } : {}),
         },
         process.env.JWT_SECRET,
         { expiresIn: options?.expiresIn ?? "1h" }

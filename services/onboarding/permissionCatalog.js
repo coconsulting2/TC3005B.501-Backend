@@ -26,6 +26,10 @@ const RESOURCE_LABELS_ES = {
   audit: "Auditoría",
 };
 
+/**
+ *
+ * @param resource
+ */
 function formatResourceFallback(resource) {
   return String(resource || "")
     .replace(/_/g, " ")

@@ -54,7 +54,7 @@ export function resolveManualRoleMapping(pickedRoleName, validRoleNames) {
 
   const lowerValid = new Map(validRoleNames.map((n) => [n.toLowerCase(), n]));
 
-  let resolved = resolveCanonicalRoleName(raw, validRoleNames);
+  const resolved = resolveCanonicalRoleName(raw, validRoleNames);
   let canonical = lowerValid.get(resolved.toLowerCase());
   if (canonical) return canonical;
 

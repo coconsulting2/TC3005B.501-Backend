@@ -8,6 +8,10 @@ import { snapshotPolicyForRequest } from "./policyService.js";
 
 const HOME_COUNTRY_ID = 1; // México
 
+/**
+ *
+ * @param routes
+ */
 function inferDestinationScope(routes) {
   const isInternational = (routes || []).some((r) => {
     if (r.idDestinationCountry == null) return false;
@@ -16,6 +20,10 @@ function inferDestinationScope(routes) {
   return isInternational ? "internacional" : "nacional";
 }
 
+/**
+ *
+ * @param routes
+ */
 function maxEndingDate(routes) {
   let max = null;
   for (const r of routes || []) {

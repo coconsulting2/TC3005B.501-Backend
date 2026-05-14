@@ -10,6 +10,10 @@ import { createNotification } from "./notificationService.js";
 
 const MIN_JUSTIFICATION_LEN = 10;
 
+/**
+ *
+ * @param snapshot
+ */
 function authorizerIdsFromSnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return [];
   const ids = [];

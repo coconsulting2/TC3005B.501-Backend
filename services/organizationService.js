@@ -155,6 +155,12 @@ export async function listOrganizations(opts = {}) {
   });
 }
 
+/**
+ *
+ * @param id
+ * @param root0
+ * @param root0.bypass
+ */
 export async function getOrganization(id, { bypass = false } = {}) {
   const organizationId = BigInt(id);
   return withRls(organizationId, { bypass }, async () => {
@@ -163,10 +169,21 @@ export async function getOrganization(id, { bypass = false } = {}) {
   });
 }
 
+/**
+ *
+ * @param organizationId
+ */
 export async function getOrganizationMe(organizationId) {
   return getOrganization(organizationId, { bypass: false });
 }
 
+/**
+ *
+ * @param id
+ * @param patch
+ * @param root0
+ * @param root0.bypass
+ */
 export async function updateOrganization(id, patch, { bypass = false } = {}) {
   const organizationId = BigInt(id);
   const allowed = ["nombre", "logoUrl", "timezone", "baseCurrency", "razonSocial", "rfc"];
@@ -185,6 +202,10 @@ export async function updateOrganization(id, patch, { bypass = false } = {}) {
   });
 }
 
+/**
+ *
+ * @param id
+ */
 export async function activateOrganization(id) {
   const organizationId = BigInt(id);
   return withRls(1n, { bypass: true }, async () => {
@@ -196,6 +217,10 @@ export async function activateOrganization(id) {
   });
 }
 
+/**
+ *
+ * @param id
+ */
 export async function suspendOrganization(id) {
   const organizationId = BigInt(id);
   if (organizationId === 1n) {
@@ -212,6 +237,10 @@ export async function suspendOrganization(id) {
   });
 }
 
+/**
+ *
+ * @param o
+ */
 function serializeOrganization(o) {
   return {
     id: typeof o.id === "bigint" ? o.id.toString() : String(o.id),

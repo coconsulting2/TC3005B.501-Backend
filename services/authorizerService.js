@@ -31,6 +31,10 @@ function authorizerMatchesTier(snapshot, tier, authorId, roleName) {
   return false;
 }
 
+/**
+ *
+ * @param ctx
+ */
 function requestAmount(ctx) {
   const f = ctx.requestedFee;
   return f == null ? 0 : Number(f);
@@ -46,6 +50,10 @@ function amountExceedsLimit(amount, maxAmount) {
   return Number(amount) > Number(maxAmount);
 }
 
+/**
+ *
+ * @param statusId
+ */
 function labelForStatusId(statusId) {
   if (statusId === 3) return "Segunda Revisión";
   if (statusId === 4) return "Cotización del Viaje";
@@ -53,6 +61,9 @@ function labelForStatusId(statusId) {
   return "Actualizado";
 }
 
+/**
+ *
+ */
 function useHierarchyApprovalMode() {
   return String(process.env.WORKFLOW_APPROVAL_MODE || "").toLowerCase() === "hierarchy";
 }

@@ -2,7 +2,7 @@
  * @file tests/services/BER/exchangeRate.test.js
  * @description Unit tests for exchange-rate service orchestration and conversion behavior.
  */
-import { describe, it, expect, beforeEach, jest } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterAll, jest } from "@jest/globals";
 import axios from "axios";
 import exchangeRateService from "../../../services/exchangeRateService.js";
 import { mutedConsoleWarnError } from "../../utils/muteConsole.js";
@@ -20,6 +20,10 @@ describe("ExchangeRateService", () => {
     jest.clearAllMocks();
     process.env.BMX_API_URL = "https://banxico.example.test/api";
     process.env.BANXICO_API_KEY = "test-token";
+  });
+
+  afterAll(async () => {
+    await exchangeRateService.disconnect();
   });
 
   describe("getExchangeRate", () => {

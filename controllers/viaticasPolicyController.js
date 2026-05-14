@@ -2,6 +2,10 @@ import prisma from "../database/config/prisma.js";
 import ViaticasPolicy from "../models/viaticasPolicyModel.js";
 import { body, validationResult } from "express-validator";
 
+/**
+ *
+ * @param req
+ */
 async function resolveOrgId(req) {
   const userId = Number(req.user.user_id);
   const user = await prisma.user.findUnique({ where: { userId }, select: { organizationId: true } });

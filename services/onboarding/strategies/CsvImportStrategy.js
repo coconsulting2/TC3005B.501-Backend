@@ -37,14 +37,23 @@ const COLUMN_ALIASES = {
 
 const REQUIRED_COLUMNS = ["username", "email", "rolename"];
 
+/**
+ *
+ */
 export class CsvImportStrategy extends BaseImportStrategy {
   /** Tope defensivo de tamaño de buffer (5 MB). Evita DoS por archivos enormes. */
   static MAX_CSV_BYTES = 5 * 1024 * 1024;
 
+  /**
+   *
+   */
   get mimeTypes() {
     return ["text/csv", "text/plain", "application/vnd.ms-excel"];
   }
 
+  /**
+   *
+   */
   get label() {
     return "CSV";
   }

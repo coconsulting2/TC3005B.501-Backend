@@ -132,6 +132,10 @@ function resolvePlainPassword(userName, perUser, globalTrim) {
   return null;
 }
 
+/**
+ *
+ * @param row
+ */
 function buildEmpleadoNombre(row) {
   const fn = String(row.firstName ?? "").trim();
   const ln = String(row.lastName ?? "").trim();
@@ -139,6 +143,10 @@ function buildEmpleadoNombre(row) {
   return full || String(row.userName ?? "").trim();
 }
 
+/**
+ *
+ * @param userId
+ */
 function fallbackProveedorFromUserId(userId) {
   const base = 20000000000n + BigInt(Number(userId));
   return base.toString().padStart(11, "0").slice(-11);

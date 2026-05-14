@@ -6,12 +6,20 @@ import EmployeeModel from "../models/employeeModel.js";
 
 const VALID_TYPES = new Set(["Alta", "Baja", "Cambio", "Reingreso"]);
 
+/**
+ *
+ * @param isoDate
+ */
 function asDate(isoDate) {
   const d = new Date(String(isoDate));
   if (Number.isNaN(d.getTime())) return null;
   return d;
 }
 
+/**
+ *
+ * @param payload
+ */
 function validatePayload(payload) {
   const idTransaction = payload?.header?.idTransaction;
   const detalle = payload?.detalle;
@@ -30,6 +38,10 @@ function validatePayload(payload) {
   return { idTransaction: String(idTransaction), detalle, fechaAlta: parsed };
 }
 
+/**
+ *
+ * @param reqUser
+ */
 function actorFromReqUser(reqUser) {
   if (reqUser?.user_name) return String(reqUser.user_name).slice(0, 30);
   if (reqUser?.user_id != null) return `user_${String(reqUser.user_id)}`.slice(0, 30);

@@ -8,6 +8,10 @@ import { buildPolicyEvaluationSnapshot, findApplicablePolicy } from "./refundRul
 const VALID_DESTINATION_SCOPES = ["nacional", "internacional", "any"];
 const VALID_CAP_UNITS = ["per_night", "per_trip", "per_day", "per_event"];
 
+/**
+ *
+ * @param scope
+ */
 function ensureScope(scope) {
   if (!VALID_DESTINATION_SCOPES.includes(scope)) {
     const err = new Error(`destinationScope inválido: ${scope}`);
@@ -16,6 +20,10 @@ function ensureScope(scope) {
   }
 }
 
+/**
+ *
+ * @param unit
+ */
 function ensureCapUnit(unit) {
   if (!VALID_CAP_UNITS.includes(unit)) {
     const err = new Error(`capUnit inválido: ${unit}`);
@@ -24,6 +32,11 @@ function ensureCapUnit(unit) {
   }
 }
 
+/**
+ *
+ * @param validFrom
+ * @param validTo
+ */
 function ensureValidDates(validFrom, validTo) {
   if (!validFrom) {
     const err = new Error("validFrom requerido.");
@@ -227,6 +240,12 @@ export async function deactivatePolicy(policyId, organizationId) {
   });
 }
 
+/**
+ *
+ * @param tx
+ * @param policyId
+ * @param caps
+ */
 async function setExpenseCapsTx(tx, policyId, caps) {
   await tx.policyExpenseCap.deleteMany({ where: { policyId } });
   if (caps.length === 0) return;

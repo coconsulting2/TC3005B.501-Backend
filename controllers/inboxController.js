@@ -8,12 +8,20 @@ import prisma from "../database/config/prisma.js";
 
 const NACIONAL_HOME_COUNTRY_ID = 1; // México
 
+/**
+ *
+ * @param role
+ */
 function statusForRole(role) {
   if (role === "N1") return [2];
   if (role === "N2") return [3];
   return [2, 3];
 }
 
+/**
+ *
+ * @param routes
+ */
 function tripType(routes) {
   const isInternational = (routes || []).some((rr) => {
     const r = rr.route;
