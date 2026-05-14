@@ -132,7 +132,7 @@ export const getTravelRequestsByDeptStatus = async (req, res) => {
     const travelRequests = await User.getTravelRequestsByDeptStatus(deptId, statusId, n);
 
     if (!travelRequests || travelRequests.length === 0) {
-      return res.status(404).json({ error: "No travel requests found" });
+      return res.json([]);
     }
 
     const formatted = travelRequests.map((r) => ({

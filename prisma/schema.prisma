@@ -282,6 +282,8 @@ model Request {
   requestComments          RequestComment[]
   /// Oferta de vuelo seleccionada por la agencia (Duffel o mock normalizado).
   selectedFlightOffer      Json?                    @map("selected_flight_offer")
+  /// Oferta de hospedaje seleccionada por la agencia (Duffel Stays u otro JSON normalizado).
+  selectedHotelOffer       Json?                    @map("selected_hotel_offer")
 
   @@index([requestStatusId, tripEndDate])
   @@index([organizationId, requestStatusId])

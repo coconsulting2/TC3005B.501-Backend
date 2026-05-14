@@ -30,6 +30,7 @@ import reportRoutes from "./routes/reportRoutes.js";
 import viaticasPolicyRoutes from "./routes/viaticasPolicyRoutes.js";
 import fxRoutes from "./routes/fxRoutes.js";
 import flightsRoutes from "./routes/flightsRoutes.js";
+import hotelsRoutes from "./routes/hotelsRoutes.js";
 import requestCommentRoutes from "./routes/requestCommentRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
@@ -104,6 +105,7 @@ app.use("/api/viajes", gastoTramoRoutes);
 app.use("/api/exchange-rate", exchangeRateRoutes);
 app.use("/api/fx", fxRoutes);
 app.use("/api/flights", flightsRoutes);
+app.use("/api/hotels", hotelsRoutes);
 app.use("/api/notifications", notificationRoutes);
 // M2-006 — Refund rule engine
 app.use("/api/policies", policyRoutes);

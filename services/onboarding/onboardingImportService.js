@@ -28,8 +28,12 @@ import { validateImportRows, isValidImportPassword } from "./onboardingImportVal
 import { resolveImportRole, resolveManualRoleMapping } from "./importRoleResolution.js";
 import { loadEffectivePermissionsForRole } from "../permissionService.js";
 import { buildPermissionsCatalogGrouped } from "./permissionCatalog.js";
-import { getDefaultClientRoleNamesForOnboardingImport } from "../../prisma/seedHelpers/bootstrapOrganization.js";
+import {
+  getDefaultClientRoleNamesForOnboardingImport,
+  getDefaultRolePreviewPermissionCodes,
+} from "../../prisma/seedHelpers/bootstrapOrganization.js";
 import { createClientOrganizationOnly } from "../organizationService.js";
+import { ensureTenantApplicantUserPermissions } from "../tenantApplicantUserGrants.js";
 
 const SALT_ROUNDS = 10;
 
@@ -73,7 +77,7 @@ function buildPreviewRow(row, roleNameToId, permByRoleId) {
     roleName: canonical ?? undefined,
     externalRoleLabel: row.externalRoleLabel ?? undefined,
     needsRoleMapping: Boolean(row.externalRoleLabel && !row.mappedRoleName),
-    /** Permisos que aporta solo el rol (referencia para UI). */
+    /** Permisos efectivos del rol asignado (catálogo del rol + capacidad base de solicitante del tenant). */
     rolePermissionCodes,
     /** @deprecated usar rolePermissionCodes — se mantiene por compatibilidad. */
     effectivePermissions: rolePermissionCodes,
@@ -299,7 +303,8 @@ export async function previewImport(
   await Promise.all(
     orgRoles.map(async (r) => {
       if (r.roleId < 0) {
-        permByRoleId.set(r.roleId, []);
+        // Org nueva aún sin filas Role en BD: mismos códigos que tras bootstrap + merge solicitante.
+        permByRoleId.set(r.roleId, getDefaultRolePreviewPermissionCodes(r.roleName));
         return;
       }
       const codes = await loadEffectivePermissionsForRole(r.roleId);
@@ -560,6 +565,7 @@ export async function applyImport(
         },
         select: { userId: true, userName: true, email: true },
       });
+      await ensureTenantApplicantUserPermissions(orgIdBig, user.userId);
     } catch (e) {
       if (e?.code === "P2002") {
         const target = Array.isArray(e.meta?.target)
