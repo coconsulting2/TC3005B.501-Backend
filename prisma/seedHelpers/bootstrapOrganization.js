@@ -12,38 +12,31 @@
  */
 import bcrypt from "bcrypt";
 import { ACCOUNTING_CATALOG_DEFAULTS } from "../../config/accountingCatalogs.js";
+import { TENANT_APPLICANT_CAPABILITY_CODES } from "../../config/tenantApplicantCapability.js";
 
 const SALT_ROUNDS = 10;
 
-/**
- * Catálogo de permisos del sistema. La fuente de verdad está en prisma/seed.js
- * (PERMISSION_CATALOG). Aquí solo se referencian por code.
- */
+export { ensureApplicantGroupsForRole } from "./applicantRoleGroups.js";
+
 const PERMISSION_GROUPS_DEFAULTS = [
+  {
+    groupName: "BaseColaborador",
+    description: "Mínimo para cualquier usuario: ver perfil propio y datos básicos",
+    permissions: ["user:view_self"],
+  },
   {
     groupName: "TravelRequestAuthor",
     description: "Solicitante — crea y da seguimiento a sus propias solicitudes",
-    permissions: [
-      "travel_request:create", "travel_request:view_own", "travel_request:view_any",
-      "travel_request:edit_own", "travel_request:submit", "travel_request:cancel",
-      "receipt:upload", "receipt:delete_own", "receipt:view_sat",
-      "expense:view", "expense:submit",
-      "policy:read",
-      "user:view_self",
-    ],
+    permissions: [...TENANT_APPLICANT_CAPABILITY_CODES],
   },
   {
     groupName: "TravelRequestApprover",
     description: "Autorizadores N1/N2 — solicitante + autorizar/rechazar",
     permissions: [
-      "travel_request:create", "travel_request:view_own", "travel_request:view_any",
-      "travel_request:edit_own", "travel_request:submit", "travel_request:cancel",
+      ...TENANT_APPLICANT_CAPABILITY_CODES,
       "travel_request:authorize",
-      "receipt:upload", "receipt:delete_own", "receipt:view_sat",
-      "expense:view", "expense:submit",
       "authorizer:view_alerts",
-      "policy:read", "expense:authorize_exception",
-      "user:view_self",
+      "expense:authorize_exception",
     ],
   },
   {
@@ -184,13 +177,14 @@ export function getDefaultClientRoleNamesForOnboardingImport() {
 }
 
 const ROLE_GROUP_ASSIGNMENTS_DEFAULT = {
-  "Solicitante":         ["TravelRequestAuthor"],
-  "N1":                  ["TravelRequestApprover"],
-  "N2":                  ["TravelRequestApprover"],
-  "Agencia de viajes":   ["TravelAgencyOps"],
-  "Cuentas por pagar":   ["AccountsPayableOps"],
-  "Administrador":       ["OrgAdmin"],
-  "Observador":          ["TravelNotifyOnly"],
+  /** Todos los roles incluyen BaseColaborador + TravelRequestAuthor (solicitante) además de su paquete. */
+  "Solicitante":         ["BaseColaborador", "TravelRequestAuthor"],
+  "N1":                  ["BaseColaborador", "TravelRequestAuthor", "TravelRequestApprover"],
+  "N2":                  ["BaseColaborador", "TravelRequestAuthor", "TravelRequestApprover"],
+  "Agencia de viajes":   ["BaseColaborador", "TravelRequestAuthor", "TravelAgencyOps"],
+  "Cuentas por pagar":   ["BaseColaborador", "TravelRequestAuthor", "AccountsPayableOps"],
+  "Administrador":       ["BaseColaborador", "TravelRequestAuthor", "OrgAdmin"],
+  "Observador":          ["BaseColaborador", "TravelRequestAuthor", "TravelNotifyOnly"],
 };
 
 /**
@@ -272,7 +266,7 @@ export async function bootstrapOrganizationCatalogs(prisma, organizationId, opts
 
   const assignments = { ...ROLE_GROUP_ASSIGNMENTS_DEFAULT };
   if (includeDittaSuperAdmin) {
-    assignments["Admin Ditta"] = ["DittaSuperAdmin"];
+    assignments["Admin Ditta"] = ["BaseColaborador", "TravelRequestAuthor", "DittaSuperAdmin"];
   }
 
   for (const [roleName, groupNames] of Object.entries(assignments)) {
@@ -380,7 +374,12 @@ export async function ensureOrganizationAdmin(prisma, organizationId, params) {
   }
   const passwordHash = await bcrypt.hash(params.password, SALT_ROUNDS);
   await prisma.user.upsert({
-    where: { userName: params.userName },
+    where: {
+      organizationId_userName: {
+        organizationId: orgIdBig,
+        userName: params.userName,
+      },
+    },
     update: { active: true, organizationId: orgIdBig, roleId: role.roleId },
     create: {
       organizationId: orgIdBig,

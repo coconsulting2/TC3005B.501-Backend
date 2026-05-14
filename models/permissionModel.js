@@ -7,6 +7,9 @@ import prisma from "../database/config/prisma.js";
 import { getTenantContext } from "../middleware/tenantContext.js";
 
 const USER_WITH_PERMISSIONS_INCLUDE = {
+  organization: {
+    select: { kind: true },
+  },
   role: {
     include: {
       rolePermissions: {
@@ -66,6 +69,9 @@ export async function findUserWithPermissions(userId) {
 }
 
 const ROLE_WITH_PERMISSIONS_INCLUDE = {
+  organization: {
+    select: { kind: true },
+  },
   rolePermissions: {
     include: { permission: true },
   },

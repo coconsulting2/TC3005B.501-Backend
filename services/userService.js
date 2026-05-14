@@ -50,9 +50,11 @@ export async function getUserById(userId) {
  */
 export async function authenticateUser(username, password, req) {
   try {
-    const user = await userModel.getUserUsername(username);
+    const orgHint =
+      req.body?.organization_id ?? req.body?.organizationId ?? undefined;
+    const user = await userModel.getUserUsername(username, orgHint);
 
-    if (!user || user.length === 0) {
+    if (!user) {
       throw new Error("Invalid username or password");
     }
 
@@ -98,6 +100,7 @@ export async function authenticateUser(username, password, req) {
       empleado_jefe_inmediato: user.empleado_jefe_inmediato ?? null,
     };
   } catch (error) {
+    if (error?.code === "AMBIGUOUS_USERNAME") throw error;
     throw new Error(`Authentication failed: ${error.message}`);
   }
 }
