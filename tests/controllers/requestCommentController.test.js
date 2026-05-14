@@ -10,10 +10,13 @@ import prisma from "../../database/config/prisma.js";
 import { createTestJWT } from "../utils/createTestAuthToken.js";
 
 async function createTestFixture() {
+  // Use unique suffix per run to avoid unique constraint collisions
+  const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   // Create test organization
   const org = await prisma.organization.create({
     data: {
-      nombre: "Test Org Comments",
+      nombre: `Test Org Comments ${suffix}`,
       kind: "CLIENT",
       status: "ACTIVE",
     },
@@ -22,7 +25,7 @@ async function createTestFixture() {
   // Create test role
   const role = await prisma.role.create({
     data: {
-      roleName: "TestRole",
+      roleName: `TestRole-${suffix}`,
       organizationId: org.id,
     },
   });
@@ -30,16 +33,16 @@ async function createTestFixture() {
   // Create test department
   const dept = await prisma.department.create({
     data: {
-      departmentName: "TestDept",
+      departmentName: `TestDept-${suffix}`,
       organizationId: org.id,
     },
   });
 
-  // Create test users
+  // Create test users with unique usernames/emails
   const requester = await prisma.user.create({
     data: {
-      userName: "requester-comment-test",
-      email: "requester@test.com",
+      userName: `requester-comment-test-${suffix}`,
+      email: `requester-${suffix}@test.com`,
       password: "hashed-password",
       workstation: "TEST-001",
       organizationId: org.id,
@@ -50,8 +53,8 @@ async function createTestFixture() {
 
   const observer = await prisma.user.create({
     data: {
-      userName: "observer-comment-test",
-      email: "observer@test.com",
+      userName: `observer-comment-test-${suffix}`,
+      email: `observer-${suffix}@test.com`,
       password: "hashed-password",
       workstation: "TEST-002",
       organizationId: org.id,
@@ -60,13 +63,13 @@ async function createTestFixture() {
     },
   });
 
-  // Create request status
-  const status = await prisma.requestStatus.create({
-    data: {
-      status: "PENDING",
-      organizationId: org.id,
-    },
-  });
+  // Ensure a PENDING request status exists (RequestStatus is a global catalog)
+  let createdStatus = false;
+  let status = await prisma.requestStatus.findUnique({ where: { status: "PENDING" } });
+  if (!status) {
+    status = await prisma.requestStatus.create({ data: { status: "PENDING" } });
+    createdStatus = true;
+  }
 
   // Create test request
   const testRequest = await prisma.request.create({
@@ -80,31 +83,59 @@ async function createTestFixture() {
   return { org, testRequest, requester, observer, cleanup };
 
   async function cleanup() {
-    // Delete comments
-    await prisma.requestComment.deleteMany({
-      where: { requestId: testRequest.requestId },
-    });
-    // Delete request
-    await prisma.request.delete({
-      where: { requestId: testRequest.requestId },
-    });
-    // Delete users
-    await prisma.user.deleteMany({
-      where: { organizationId: org.id },
-    });
+    try {
+      // Delete comments
+      await prisma.requestComment.deleteMany({
+        where: { requestId: testRequest.requestId },
+      });
+    } catch (e) {
+      // ignore
+    }
+
+    try {
+      // Delete request (use deleteMany to avoid throwing if not found)
+      await prisma.request.deleteMany({
+        where: { requestId: testRequest.requestId },
+      });
+    } catch (e) {
+      // ignore
+    }
+
+    try {
+      // Delete users created for this org
+      await prisma.user.deleteMany({
+        where: { organizationId: org.id },
+      });
+    } catch (e) {
+      // ignore
+    }
+
     // Delete other data
-    await prisma.requestStatus.delete({
-      where: { requestStatusId: status.requestStatusId },
-    });
-    await prisma.department.delete({
-      where: { departmentId: dept.departmentId },
-    });
-    await prisma.role.delete({
-      where: { roleId: role.roleId },
-    });
-    await prisma.organization.delete({
-      where: { id: org.id },
-    });
+    if (createdStatus) {
+      try {
+        await prisma.requestStatus.deleteMany({
+          where: { requestStatusId: status.requestStatusId },
+        });
+      } catch (e) {
+        // ignore (may be referenced by other requests)
+      }
+    }
+
+    try {
+      await prisma.department.deleteMany({ where: { departmentId: dept.departmentId } });
+    } catch (e) {
+      // ignore
+    }
+    try {
+      await prisma.role.deleteMany({ where: { roleId: role.roleId } });
+    } catch (e) {
+      // ignore
+    }
+    try {
+      await prisma.organization.deleteMany({ where: { id: org.id } });
+    } catch (e) {
+      // ignore
+    }
   }
 }
 
@@ -120,7 +151,7 @@ describe("Request Comment Controller", () => {
       try {
         const response = await request(app)
           .post(`/api/solicitudes/${fixture.testRequest.requestId}/comments`)
-          .set("Authorization", `Bearer ${createTestJWT("none", fixture.requester.userId)}`)
+          .set("Authorization", `Bearer ${createTestJWT("none", { user_id: fixture.requester.userId })}`)
           .send({
             user_id: fixture.requester.userId,
             content: "This is a test comment",
@@ -163,7 +194,7 @@ describe("Request Comment Controller", () => {
       try {
         const response = await request(app)
           .post(`/api/solicitudes/${fixture.testRequest.requestId}/comments`)
-          .set("Authorization", `Bearer ${createTestJWT("none", fixture.requester.userId)}`)
+          .set("Authorization", `Bearer ${createTestJWT("none", { user_id: fixture.requester.userId })}`)
           .send({
             user_id: fixture.observer.userId, // Mismatch
             content: "This is a test comment",
@@ -181,7 +212,7 @@ describe("Request Comment Controller", () => {
       try {
         const response = await request(app)
           .post(`/api/solicitudes/${fixture.testRequest.requestId}/comments`)
-          .set("Authorization", `Bearer ${createTestJWT("none", fixture.requester.userId)}`)
+          .set("Authorization", `Bearer ${createTestJWT("none", { user_id: fixture.requester.userId })}`)
           .send({
             user_id: fixture.requester.userId,
             content: "", // Empty
@@ -212,7 +243,7 @@ describe("Request Comment Controller", () => {
 
         const response = await request(app)
           .get(`/api/solicitudes/${fixture.testRequest.requestId}/comments`)
-          .set("Authorization", `Bearer ${createTestJWT("none", fixture.requester.userId)}`)
+          .set("Authorization", `Bearer ${createTestJWT("none", { user_id: fixture.requester.userId })}`)
           .query({
             user_id: fixture.requester.userId,
             limit: 10,
@@ -250,7 +281,7 @@ describe("Request Comment Controller", () => {
       try {
         const response = await request(app)
           .get(`/api/solicitudes/${fixture.testRequest.requestId}/comments`)
-          .set("Authorization", `Bearer ${createTestJWT("none", fixture.requester.userId)}`)
+          .set("Authorization", `Bearer ${createTestJWT("none", { user_id: fixture.requester.userId })}`)
           .query({
             user_id: fixture.observer.userId, // Mismatch
             limit: 10,

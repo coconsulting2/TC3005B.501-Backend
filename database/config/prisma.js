@@ -43,6 +43,17 @@ async function resetPostgres() {
     );
 }
 
+/**
+ * Alias that fully resets Postgres for test runs. Kept as an explicit
+ * function name to make test intent clearer (drop-like semantics).
+ * Currently this uses TRUNCATE + RESTART IDENTITY which is safe and
+ * sufficient for test isolation.
+ */
+async function dropPostgresDatabase() {
+    // For safety, reuse resetPostgres which truncates all public tables
+    await resetPostgres();
+}
+
 async function disconnectPostgres() {
     if (process.env.NODE_ENV !== "test") {
         console.warn("Call 'disconnectPostgres' was call outside a testing env.");
@@ -53,4 +64,4 @@ async function disconnectPostgres() {
 }
 
 export default prisma;
-export { connectPostgres, disconnectPostgres, resetPostgres };
+export { connectPostgres, disconnectPostgres, resetPostgres, dropPostgresDatabase };

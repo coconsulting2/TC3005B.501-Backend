@@ -84,6 +84,8 @@ const HEADERS = {
     "Authorization": `Bearer ${createTestJWT(ROLES.ACCOUNTS_PAYABLE, { IP: LOCALHOST })}`,
     "x-forwarded-for": LOCALHOST
 };
+let testMongoClient = null;
+
 app.set("trust proxy", "loopback");
 
 /**
@@ -119,13 +121,20 @@ describe("BER — Banxico Exchange Rate Service E2E [ NT-010 ]", () => {
             await BmxApi.store.resetAll();
         });
         const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/test_cocoadb";
-        const mongoClient = new MongoClient(mongoUri);
-        await mongoClient.connect();
-        const db = mongoClient.db("cocoadb");
+        testMongoClient = new MongoClient(mongoUri);
+        await testMongoClient.connect();
+        const db = testMongoClient.db("cocoadb");
         if (!db) throw Error("Mongo not connected");
 
         const collections = await db.collections();
         await Promise.all(collections.map((c) => c.deleteMany({})));
+    }, 5_000);
+
+    afterEach(async () => {
+        if (testMongoClient) {
+            await testMongoClient.close();
+            testMongoClient = null;
+        }
     }, 5_000);
 
     afterAll(async () => {
@@ -133,6 +142,16 @@ describe("BER — Banxico Exchange Rate Service E2E [ NT-010 ]", () => {
         jest.resetAllMocks();
         try {
             await mutedConsoleLogs(async () => {
+                // Import and disconnect the exchangeRateService to close its MongoDB connection
+                const exchangeRateService = (await import("../../../services/exchangeRateService.js")).default;
+                await exchangeRateService.disconnect();
+
+                // Close test MongoDB client if still open
+                if (testMongoClient) {
+                    await testMongoClient.close();
+                    testMongoClient = null;
+                }
+
                 await disconnectMongo();
                 await disconnectPostgres();
                 await bmx_api.stop();

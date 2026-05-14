@@ -48,6 +48,17 @@ async function resetMongo() {
 }
 
 /**
+ * Drops the entire MongoDB test database. Use with caution — only available
+ * in the testing environment. This is useful for fully isolating test runs.
+ */
+async function dropMongoDatabase() {
+  if (process.env.NODE_ENV !== "test") throw new Error("Call outside testing environment.");
+  if (!db) throw Error("Mongo not connected");
+
+  await db.dropDatabase();
+}
+
+/**
  * Disconnects from mongo db.
  */
 async function disconnectMongo() {
@@ -111,4 +122,4 @@ async function getFile(fileId) {
   return bucket.openDownloadStream(fileId);
 }
 
-export { connectMongo, disconnectMongo, resetMongo, uploadFile, getFile, db, bucket };
+export { connectMongo, disconnectMongo, resetMongo, dropMongoDatabase, uploadFile, getFile, db, bucket };
