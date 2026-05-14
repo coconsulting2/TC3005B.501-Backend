@@ -9,6 +9,10 @@ import {
   findApplicablePolicy,
 } from "./refundRuleEngine.js";
 
+/**
+ *
+ * @param request
+ */
 function inferDestinationScope(request) {
   // Si Request.policyEvaluationSnapshot ya tiene el scope congelado, úsalo.
   const snap = request.policyEvaluationSnapshot;

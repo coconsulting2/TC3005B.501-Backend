@@ -27,6 +27,9 @@ import { DuffelFlightProvider } from "./duffelFlightProvider.js";
  * @property {string} [rawOfferId] - id proveedor (Duffel offer id)
  */
 
+/**
+ *
+ */
 export function getFlightProvider() {
   const mode = String(process.env.FLIGHT_PROVIDER || "mock").toLowerCase();
   if (mode === "duffel") {

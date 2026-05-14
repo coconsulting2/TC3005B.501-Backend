@@ -54,12 +54,18 @@ export async function resolveIntegration(organizationId, provider) {
   return value;
 }
 
+/**
+ *
+ * @param organizationId
+ * @param provider
+ */
 export function invalidateIntegrationCache(organizationId, provider) {
   cache.delete(`${String(organizationId)}:${provider}`);
 }
 
 /**
  * Fallback global desde env vars. Documento de referencia: .env.example.
+ * @param provider
  */
 function getFallbackConfig(provider) {
   switch (provider) {
