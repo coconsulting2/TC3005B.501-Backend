@@ -37,7 +37,8 @@ const AccountingExport = {
     },
 
     /**
-     * Obtiene todos los Requests Finalizados cuyo ultimo validationDate cae dentro del rango.
+     * Obtiene todos los Requests Finalizados con al menos un recibo Aprobado cuya
+     * validationDate cae en [from, to], o (respaldo) validationDate nula y submissionDate en rango.
      * @param {Date} from
      * @param {Date} to
      * @param {boolean} [force=false] - Si true, incluye registros ya exportados.
@@ -49,7 +50,15 @@ const AccountingExport = {
             receipts: {
                 some: {
                     validation: "Aprobado",
-                    validationDate: { gte: from, lte: to },
+                    OR: [
+                        { validationDate: { gte: from, lte: to } },
+                        {
+                            AND: [
+                                { validationDate: null },
+                                { submissionDate: { gte: from, lte: to } },
+                            ],
+                        },
+                    ],
                 },
             },
         };

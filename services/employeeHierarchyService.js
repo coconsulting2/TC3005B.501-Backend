@@ -68,8 +68,42 @@ export async function getHierarchyDepth(userId, maxDepth = 8) {
   return chain.length;
 }
 
+/**
+ * Indica si asignar `proposedManagerUserId` como `User.managerUserId` de `userId` crearía un ciclo
+ * en la jerarquía actual (adjacency list). `null` / `undefined` en el jefe propuesto nunca crea ciclo.
+ *
+ * @param {number} userId
+ * @param {number|null|undefined} proposedManagerUserId
+ * @param {number} [maxDepth=32]
+ * @returns {Promise<boolean>}
+ */
+export async function wouldCreateManagerCycle(userId, proposedManagerUserId, maxDepth = 32) {
+  const u = Number(userId);
+  if (!Number.isFinite(u) || u < 1) return false;
+  if (proposedManagerUserId === undefined || proposedManagerUserId === null) {
+    return false;
+  }
+  const m = Number(proposedManagerUserId);
+  if (!Number.isFinite(m) || m < 1) return false;
+  if (m === u) return true;
+
+  const seen = new Set([m]);
+  let current = m;
+  for (let depth = 0; depth < maxDepth; depth += 1) {
+    const next = await Authorizer.getManagerUserId(current);
+    if (next === null || next === undefined) return false;
+    const n = Number(next);
+    if (n === u) return true;
+    if (seen.has(n)) return true;
+    seen.add(n);
+    current = n;
+  }
+  return true;
+}
+
 export default {
   getApprovalChain,
   getSubordinatesRecursive,
   getHierarchyDepth,
+  wouldCreateManagerCycle,
 };

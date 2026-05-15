@@ -58,6 +58,32 @@ const validateGroupIds = [
   body("groupIds.*").isInt({ min: 1 }).toInt().withMessage("each groupId must be a positive integer"),
 ];
 
+const validateCreateRole = [
+  body("name").trim().isLength({ min: 2, max: 40 }).withMessage("name must be 2–40 chars"),
+  body("permissions").isArray().withMessage("permissions must be an array"),
+  body("permissions.*").optional().isString().trim(),
+  body("max_authorization_amount").optional({ nullable: true }).custom((v) => {
+    if (v === "" || v === null || v === undefined) return true;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) throw new Error("max_authorization_amount invalid");
+    return true;
+  }),
+  body("is_admin").optional().isBoolean().toBoolean(),
+];
+
+const validateUpdateRole = [
+  body("name").optional().trim().isLength({ min: 2, max: 40 }),
+  body("permissions").optional().isArray(),
+  body("permissions.*").optional().isString().trim(),
+  body("max_authorization_amount").optional({ nullable: true }).custom((v) => {
+    if (v === "" || v === null || v === undefined) return true;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) throw new Error("max_authorization_amount invalid");
+    return true;
+  }),
+  body("is_admin").optional().isBoolean().toBoolean(),
+];
+
 // ─── Permission catalog ─────────────────────────────────────────────────────
 
 router.route("/permissions")
@@ -102,6 +128,23 @@ router.route("/permission-groups/:id/permissions/:permissionId")
   .delete(generalRateLimiter, ...requirePermission("permission_group:manage"),
     validateIntParam("id"), validateIntParam("permissionId"), validateInputs,
     permissionController.removePermissionFromGroup);
+
+// ─── Roles (per-tenant CRUD) — before /roles/:roleId/... assignments ─────────
+
+router.route("/roles")
+  .get(generalRateLimiter, ...requirePermission("role:manage_permissions"),
+    permissionController.listRoles)
+  .post(generalRateLimiter, ...requirePermission("role:manage_permissions"),
+    validateCreateRole, validateInputs,
+    permissionController.createRole);
+
+router.route("/roles/:roleId")
+  .put(generalRateLimiter, ...requirePermission("role:manage_permissions"),
+    validateIntParam("roleId"), validateUpdateRole, validateInputs,
+    permissionController.updateRole)
+  .delete(generalRateLimiter, ...requirePermission("role:manage_permissions"),
+    validateIntParam("roleId"), validateInputs,
+    permissionController.deleteRole);
 
 // ─── Role assignments ───────────────────────────────────────────────────────
 

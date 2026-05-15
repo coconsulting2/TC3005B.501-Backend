@@ -36,7 +36,7 @@ export async function getUserData(req, res) {
 
 /**
  * Authenticates a user and sets session cookies (token, role, username, id, department_id).
- * @param {import('express').Request} req - Express request (body: { username, password })
+ * @param {import('express').Request} req - Express request (body: { username, password, organization_id? })
  * @param {import('express').Response} res - Express response
  * @returns {void} JSON with auth result and cookies, or 401 error
  */
@@ -85,7 +85,14 @@ export const login = async (req, res) => {
         maxAge: 1000 * 60 * 60,
       })
       .json({ ...result, permissions });
-  } catch {
+  } catch (error) {
+    if (error?.code === "AMBIGUOUS_USERNAME") {
+      return res.status(400).json({
+        error: error.message,
+        code: "AMBIGUOUS_USERNAME",
+        organizations: error.organizations ?? [],
+      });
+    }
     res.status(401).json({ error: "Invalid credentials" });
   }
 };
@@ -125,7 +132,7 @@ export const getTravelRequestsByDeptStatus = async (req, res) => {
     const travelRequests = await User.getTravelRequestsByDeptStatus(deptId, statusId, n);
 
     if (!travelRequests || travelRequests.length === 0) {
-      return res.status(404).json({ error: "No travel requests found" });
+      return res.json([]);
     }
 
     const formatted = travelRequests.map((r) => ({

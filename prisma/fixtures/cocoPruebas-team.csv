@@ -1,0 +1,11 @@
+userName,email,password,roleName,department,firstName,lastName,managerUserName
+pruebas.mariano,pruebas.mariano@cocopruebas.mx,Prueba2026!,Administrador,Dirección,Mariano,Carretero,
+pruebas.hector,pruebas.hector@cocopruebas.mx,Prueba2026!,Administrador,Ingeniería,Hector,Lugo,pruebas.mariano
+pruebas.kevin,pruebas.kevin@cocopruebas.mx,Prueba2026!,N2,Dirección,Kevin,Esquivel,pruebas.mariano
+pruebas.n1.ops,pruebas.n1.ops@cocopruebas.mx,Prueba2026!,N1,Operaciones,Santino,Im,pruebas.kevin
+pruebas.n1.fin,pruebas.n1.fin@cocopruebas.mx,Prueba2026!,N1,Finanzas,Leonardo,Rodríguez,pruebas.kevin
+pruebas.sol.angel,pruebas.sol.angel@cocopruebas.mx,Prueba2026!,Solicitante,Operaciones,Ángel,Montemayor,pruebas.n1.ops
+pruebas.sol.emi1,pruebas.sol.emi1@cocopruebas.mx,Prueba2026!,Solicitante,Operaciones,Emiliano,Delgadillo,pruebas.n1.ops
+pruebas.sol.emi2,pruebas.sol.emi2@cocopruebas.mx,Prueba2026!,Solicitante,Operaciones,Emiliano,Deyta,pruebas.n1.fin
+pruebas.cxp,pruebas.cxp@cocopruebas.mx,Prueba2026!,Cuentas por pagar,Contabilidad,Eder,Cantero,pruebas.n1.fin
+pruebas.agencia,pruebas.agencia@cocopruebas.mx,Prueba2026!,Agencia de viajes,Logística,Erick,Morales,pruebas.mariano

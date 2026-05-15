@@ -23,11 +23,17 @@ jobs:
     steps:
     # Step 1: Download the code
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
-    # Step 2: Install dependencies
+    # Step 2: Install dependencies (Bun + bun.lock — mismo criterio que ci.yml; evita
+    # postinstall nativo de @swc/core vía npm, que en ubuntu-latest puede fallar con bus error)
+    - name: Set up Bun
+      uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: 1.3.10
+
     - name: Install dependencies
-      run: npm install
+      run: bun install --frozen-lockfile
 
     # Step 3: Initialize CodeQL
     - name: Initialize CodeQL

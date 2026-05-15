@@ -5,7 +5,7 @@ import express from "express";
 const router = express.Router();
 import applicantController from "../controllers/applicantController.js";
 import { validateId, validateTravelRequest, validateExpenseReceipts, validateInputs, validateDraftTravelRequest } from "../middleware/validation.js";
-import { requirePermission } from "../middleware/permissionMiddleware.js";
+import { requireAnyPermission, requirePermission } from "../middleware/permissionMiddleware.js";
 import { generalRateLimiter } from "../middleware/rateLimiters.js";
 
 router.use((req, res, next) => {
@@ -34,11 +34,24 @@ router.route("/create-expense-validation")
 router.route("/get-completed-requests/:user_id")
     .get(generalRateLimiter, ...requirePermission("travel_request:view_own"), validateId, validateInputs, applicantController.getCompletedRequests);
 
+/** Agencia de viajes tiene `travel_agent:attend`; incluimos OR para no depender solo de view_any en edge cases. */
 router.route("/get-user-request/:user_id")
-    .get(generalRateLimiter, ...requirePermission("travel_request:view_any"), validateId, validateInputs, applicantController.getApplicantRequest);
+    .get(
+      generalRateLimiter,
+      ...requireAnyPermission("travel_request:view_any", "travel_agent:attend"),
+      validateId,
+      validateInputs,
+      applicantController.getApplicantRequest
+    );
 
 router.route("/get-user-requests/:user_id")
-    .get(generalRateLimiter, ...requirePermission("travel_request:view_any"), validateId, validateInputs, applicantController.getApplicantRequests);
+    .get(
+      generalRateLimiter,
+      ...requireAnyPermission("travel_request:view_any", "travel_agent:attend"),
+      validateId,
+      validateInputs,
+      applicantController.getApplicantRequests
+    );
 
 router.route("/create-draft-travel-request/:user_id")
     .post(generalRateLimiter, ...requirePermission("travel_request:create"), validateId, validateDraftTravelRequest, validateInputs, applicantController.createDraftTravelRequest);

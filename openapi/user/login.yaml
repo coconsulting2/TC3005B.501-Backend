@@ -21,6 +21,11 @@ paths:
                 password:
                   type: string
                   format: password
+                organization_id:
+                  type: string
+                  description: >
+                    Opcional. Id numérico de la organización (tenant). Obligatorio si el mismo
+                    nombre de usuario existe en más de una organización.
               example:
                 username: "jdoe"
                 password: "SecurePass123!"
@@ -48,6 +53,29 @@ paths:
                   username: "jdoe"
                   user_id: 2
                   department_id: 3
+        "400":
+          description: >
+            Login ambiguo — el mismo username existe en varias organizaciones.
+            Reenvía la petición con organization_id.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  code:
+                    type: string
+                    enum: [AMBIGUOUS_USERNAME]
+                  organizations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nombre:
+                          type: string
         "401":
           description: Authentication failed
           content:
