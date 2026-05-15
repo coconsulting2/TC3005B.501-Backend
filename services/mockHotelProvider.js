@@ -58,7 +58,7 @@ export class MockHotelProvider {
       },
       {
         id: `mock-hotel-002-${city}`,
-        hotelName: "CocoStay Demo (mock)",
+        hotelName: "CocoStay Demo",
         addressHint: `Cerca de avenida principal · ${city}`,
         checkIn,
         checkOut,
@@ -70,7 +70,7 @@ export class MockHotelProvider {
       },
       {
         id: `mock-hotel-003-${city}`,
-        hotelName: "Business Inn Express (mock)",
+        hotelName: "Business Inn Express",
         addressHint: `Distrito financiero · ${city}`,
         checkIn,
         checkOut,

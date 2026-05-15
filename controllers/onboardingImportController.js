@@ -78,6 +78,7 @@ export async function postApplyImport(req, res) {
       passwordGlobal,
       passwordOverrides,
       createNewOrganization: createNewOrganizationRaw,
+      customImportRoles: customImportRolesBody,
     } = req.body ?? {};
     if (!previewToken) {
       return res.status(400).json({ error: "Se requiere el campo previewToken." });
@@ -118,6 +119,13 @@ export async function postApplyImport(req, res) {
       passwordOptions.perUser = passwordOverrides;
     }
 
+    const customImportRoles =
+      customImportRolesBody &&
+      typeof customImportRolesBody === "object" &&
+      !Array.isArray(customImportRolesBody)
+        ? customImportRolesBody
+        : {};
+
     const result = await applyImport(
       previewToken,
       orgId,
@@ -126,7 +134,8 @@ export async function postApplyImport(req, res) {
       extras,
       passwordOptions,
       overrides,
-      { createNewOrganization }
+      { createNewOrganization },
+      customImportRoles
     );
 
     return res.status(201).json(result);
