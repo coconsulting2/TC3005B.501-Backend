@@ -13,6 +13,7 @@ const {
   getApprovalChain,
   getSubordinatesRecursive,
   getHierarchyDepth,
+  wouldCreateManagerCycle,
 } = await import("../../services/employeeHierarchyService.js");
 
 beforeEach(() => {
@@ -55,5 +56,29 @@ describe("employeeHierarchyService", () => {
       .mockResolvedValueOnce(null);
     const depth = await getHierarchyDepth(10);
     expect(depth).toBe(1);
+  });
+
+  test("wouldCreateManagerCycle: sin jefe propuesto → false", async () => {
+    await expect(wouldCreateManagerCycle(10, null)).resolves.toBe(false);
+    await expect(wouldCreateManagerCycle(10, undefined)).resolves.toBe(false);
+  });
+
+  test("wouldCreateManagerCycle: auto-jefe → true", async () => {
+    await expect(wouldCreateManagerCycle(10, 10)).resolves.toBe(true);
+  });
+
+  test("wouldCreateManagerCycle: cadena ascendente alcanza al usuario → true", async () => {
+    mockAuthorizer.getManagerUserId
+      .mockResolvedValueOnce(30)
+      .mockResolvedValueOnce(10)
+      .mockResolvedValueOnce(null);
+    await expect(wouldCreateManagerCycle(10, 20)).resolves.toBe(true);
+  });
+
+  test("wouldCreateManagerCycle: sin ciclo → false", async () => {
+    mockAuthorizer.getManagerUserId
+      .mockResolvedValueOnce(30)
+      .mockResolvedValueOnce(null);
+    await expect(wouldCreateManagerCycle(10, 20)).resolves.toBe(false);
   });
 });

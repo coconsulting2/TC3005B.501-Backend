@@ -132,10 +132,14 @@ const AccountsPayable = {
     // Map the old integer-based enum indexing to string values
     const validationMap = { 1: "Pendiente", 2: "Aprobado", 3: "Rechazado" };
     const validationValue = validationMap[approval] || "Pendiente";
+    // `accountingExportModel.getFinalizedRequestsInRange` filtra por validationDate;
+    // sin esta fecha, las solicitudes finalizadas no aparecen en exportación contable.
+    const validationDate =
+      validationValue === "Pendiente" ? null : new Date();
 
     await prisma.receipt.update({
       where: { receiptId: Number(receiptId) },
-      data: { validation: validationValue },
+      data: { validation: validationValue, validationDate },
     });
     return true;
   },

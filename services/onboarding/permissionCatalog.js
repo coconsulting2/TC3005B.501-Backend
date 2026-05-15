@@ -24,6 +24,9 @@ const RESOURCE_LABELS_ES = {
   report: "Reportes",
   organization: "Organización",
   audit: "Auditoría",
+  accounting: "Contabilidad (Accounting)",
+  accounts_payable: "Cuentas por pagar",
+  travel_agent: "Agencia de viajes",
 };
 
 /**

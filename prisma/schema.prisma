@@ -161,7 +161,7 @@ model User {
   managerUserId                Int?                     @map("manager_user_id")
   noEmpleado                   String?                  @map("no_empleado") @db.VarChar(10)
   organizationId               BigInt                   @map("organization_id")
-  userName                     String                   @unique @map("user_name") @db.VarChar(60)
+  userName                     String                   @map("user_name") @db.VarChar(60)
   password                     String                   @db.VarChar(60)
   workstation                  String                   @db.VarChar(20)
   email                        String                   @unique @db.VarChar(254)
@@ -191,6 +191,7 @@ model User {
   approvalSubstitutesAsBackup  ApprovalSubstitute[]     @relation("ApprovalSubstituteBackup")
   apiKeysCreated               ApiKey[]
 
+  @@unique([organizationId, userName])
   @@index([organizationId, active])
   @@index([organizationId, managerUserId])
   @@index([organizationId, noEmpleado])
@@ -282,6 +283,8 @@ model Request {
   requestComments          RequestComment[]
   /// Oferta de vuelo seleccionada por la agencia (Duffel o mock normalizado).
   selectedFlightOffer      Json?                    @map("selected_flight_offer")
+  /// Oferta de hospedaje seleccionada por la agencia (Duffel Stays u otro JSON normalizado).
+  selectedHotelOffer       Json?                    @map("selected_hotel_offer")
 
   @@index([requestStatusId, tripEndDate])
   @@index([organizationId, requestStatusId])

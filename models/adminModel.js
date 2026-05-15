@@ -4,6 +4,7 @@
  */
 import prisma from "../database/config/prisma.js";
 import { getTenantContext } from "../middleware/tenantContext.js";
+import { ensureTenantApplicantUserPermissions } from "../services/tenantApplicantUserGrants.js";
 
 const Admin = {
   /**
@@ -123,22 +124,27 @@ const Admin = {
    * @returns {Promise<void>}
    */
   async createUser(userData) {
+    const orgId = userData.organization_id != null ? BigInt(String(userData.organization_id)) : null;
+    if (orgId === null) {
+      throw new Error("organization_id is required");
+    }
     const existing = await prisma.user.findFirst({
       where: {
         OR: [
           { email: userData.email },
-          { userName: userData.user_name },
+          { userName: userData.user_name, organizationId: orgId },
         ],
       },
       select: { userId: true },
     });
 
     if (existing) {
-      throw new Error("User with this email or username already exists");
+      throw new Error("User with this email or username already exists in this organization");
     }
 
-    await prisma.user.create({
+    const created = await prisma.user.create({
       data: {
+        organizationId: orgId,
         roleId: userData.role_id,
         departmentId: userData.department_id,
         userName: userData.user_name,
@@ -147,7 +153,9 @@ const Admin = {
         email: userData.email,
         phoneNumber: userData.phone_number,
       },
+      select: { userId: true },
     });
+    await ensureTenantApplicantUserPermissions(orgId, created.userId);
   },
 
   /**

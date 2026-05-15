@@ -16,8 +16,9 @@
  *   - El previewToken se genera con crypto.randomBytes y queda atado a (organizationId, actingUserId).
  *   - El cache NUNCA guarda contraseñas en claro (las del archivo, si vinieran, se descartan).
  *     En `apply` deben suministrarse vía passwordGlobal o passwordOverrides[userName].
- *   - Las colisiones de userName/email se evalúan globalmente (no por org) porque el
- *     esquema tiene constraint UNIQUE global; además se traduce P2002 en mensajes claros.
+ *   - Las colisiones de email se evalúan globalmente (email único en todo el sistema).
+ *     userName es único por (organization_id, user_name): el mismo login puede repetirse
+ *     en otra organización; en preview/apply solo chocan filas contra la org destino.
  */
 import crypto from "crypto";
 import bcrypt from "bcrypt";
@@ -27,8 +28,12 @@ import { validateImportRows, isValidImportPassword } from "./onboardingImportVal
 import { resolveImportRole, resolveManualRoleMapping } from "./importRoleResolution.js";
 import { loadEffectivePermissionsForRole } from "../permissionService.js";
 import { buildPermissionsCatalogGrouped } from "./permissionCatalog.js";
-import { getDefaultClientRoleNamesForOnboardingImport } from "../../prisma/seedHelpers/bootstrapOrganization.js";
+import {
+  getDefaultClientRoleNamesForOnboardingImport,
+  getDefaultRolePreviewPermissionCodes,
+} from "../../prisma/seedHelpers/bootstrapOrganization.js";
 import { createClientOrganizationOnly } from "../organizationService.js";
+import { ensureTenantApplicantUserPermissions } from "../tenantApplicantUserGrants.js";
 
 const SALT_ROUNDS = 10;
 
@@ -72,7 +77,7 @@ function buildPreviewRow(row, roleNameToId, permByRoleId) {
     roleName: canonical ?? undefined,
     externalRoleLabel: row.externalRoleLabel ?? undefined,
     needsRoleMapping: Boolean(row.externalRoleLabel && !row.mappedRoleName),
-    /** Permisos que aporta solo el rol (referencia para UI). */
+    /** Permisos efectivos del rol asignado (catálogo del rol + capacidad base de solicitante del tenant). */
     rolePermissionCodes,
     /** @deprecated usar rolePermissionCodes — se mantiene por compatibilidad. */
     effectivePermissions: rolePermissionCodes,
@@ -243,12 +248,16 @@ export async function previewImport(
   const userNamesToCheck = valid.map((r) => r.userName);
   const emailsToCheck = valid.map((r) => r.email);
 
-  // Las constraints UNIQUE de userName/email en Prisma son globales: si validamos por org,
-  // dejamos pasar duplicados que después harán fallar el apply con P2002.
-  const existingByUsername = await prisma.user.findMany({
-    where: { userName: { in: userNamesToCheck } },
-    select: { userName: true },
-  });
+  /** userName solo choca dentro de la misma org destino (o ninguna si se crea org nueva). */
+  const existingByUsername =
+    createNewOrganization
+      ? []
+      : await prisma.user.findMany({
+          where: { userName: { in: userNamesToCheck }, organizationId: orgIdBig },
+          select: { userName: true },
+        });
+
+  // Email sigue siendo único globalmente en el esquema.
   const existingByEmail = await prisma.user.findMany({
     where: { email: { in: emailsToCheck } },
     select: { email: true },
@@ -294,7 +303,8 @@ export async function previewImport(
   await Promise.all(
     orgRoles.map(async (r) => {
       if (r.roleId < 0) {
-        permByRoleId.set(r.roleId, []);
+        // Org nueva aún sin filas Role en BD: mismos códigos que tras bootstrap + merge solicitante.
+        permByRoleId.set(r.roleId, getDefaultRolePreviewPermissionCodes(r.roleName));
         return;
       }
       const codes = await loadEffectivePermissionsForRole(r.roleId);
@@ -555,6 +565,7 @@ export async function applyImport(
         },
         select: { userId: true, userName: true, email: true },
       });
+      await ensureTenantApplicantUserPermissions(orgIdBig, user.userId);
     } catch (e) {
       if (e?.code === "P2002") {
         const target = Array.isArray(e.meta?.target)
@@ -678,6 +689,34 @@ export async function applyImport(
       await prisma.user.update({
         where: { userId: Number(link.userId) },
         data: { managerUserId: Number(managerUserId) },
+      });
+    }
+  }
+
+  /** Jerarquía por userName (CSV/JSON estándar con columna manager / managerUserName). */
+  const stdManagerLinks = entry.rows
+    .map((r) => ({
+      subUserName: String(r.userName ?? "").trim(),
+      mgrUserName: String(r.managerUserName ?? "").trim(),
+    }))
+    .filter((l) => l.subUserName && l.mgrUserName);
+
+  if (stdManagerLinks.length > 0) {
+    const allNames = [
+      ...new Set(stdManagerLinks.flatMap((l) => [l.subUserName, l.mgrUserName])),
+    ];
+    const usersInOrg = await prisma.user.findMany({
+      where: { organizationId: orgIdBig, userName: { in: allNames } },
+      select: { userId: true, userName: true },
+    });
+    const byLower = new Map(usersInOrg.map((u) => [u.userName.toLowerCase(), u.userId]));
+    for (const { subUserName, mgrUserName } of stdManagerLinks) {
+      const sid = byLower.get(subUserName.toLowerCase());
+      const mid = byLower.get(mgrUserName.toLowerCase());
+      if (!sid || !mid || Number(sid) === Number(mid)) continue;
+      await prisma.user.update({
+        where: { userId: Number(sid) },
+        data: { managerUserId: Number(mid) },
       });
     }
   }
