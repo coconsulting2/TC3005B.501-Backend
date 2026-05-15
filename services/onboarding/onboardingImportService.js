@@ -40,6 +40,130 @@ const SALT_ROUNDS = 10;
 const previewCache = new Map();
 const PREVIEW_TTL_MS = 10 * 60 * 1000;
 
+/**
+ * Nombre base del rol creado en import (máx. 40 chars en BD). Coincide con el prefijo que muestra el front.
+ * @param {string} userName
+ * @returns {string}
+ */
+function buildImportCustomRoleBaseName(userName) {
+  const u = String(userName ?? "").trim() || "user";
+  const prefix = "Imp·";
+  const combined = prefix + u;
+  return combined.length <= 40 ? combined : combined.slice(0, 40);
+}
+
+/**
+ * @param {bigint} organizationId
+ * @param {string} desired
+ * @returns {Promise<string>}
+ */
+async function uniqueRoleNameInOrg(organizationId, desired) {
+  const root = String(desired ?? "").trim().slice(0, 40) || "Imp·rol";
+  for (let i = 0; i < 200; i++) {
+    const suffix = i === 0 ? "" : `·${i}`;
+    const candidate = (root.slice(0, 40 - suffix.length) + suffix).slice(0, 40);
+    const exists = await prisma.role.findFirst({
+      where: { organizationId, roleName: candidate },
+      select: { roleId: true },
+    });
+    if (!exists) return candidate;
+  }
+  throw new Error("No se pudo generar un nombre de rol único para la importación.");
+}
+
+/**
+ * Crea roles «a medida» antes de validar overrides: cada entrada es userName → { templateRoleName, permissions }.
+ *
+ * @param {object} opts
+ * @param {bigint} opts.organizationId
+ * @param {Map<string, number>} opts.roleMap
+ * @param {string[]} opts.validRoleNames
+ * @param {Array<{ userName: string }>} opts.rows
+ * @param {Record<string, { templateRoleName?: string, permissions?: unknown }>} opts.customImportRolesByUser
+ * @returns {Promise<Record<string, string>>} userName → roleName creado
+ */
+async function createCustomImportRolesInApply(opts) {
+  const { organizationId, roleMap, validRoleNames, rows, customImportRolesByUser } = opts;
+  const applyable = new Set(rows.map((r) => String(r.userName ?? "").trim()).filter(Boolean));
+  const out = {};
+
+  const specs =
+    customImportRolesByUser && typeof customImportRolesByUser === "object" && !Array.isArray(customImportRolesByUser)
+      ? customImportRolesByUser
+      : {};
+
+  for (const [userNameRaw, spec] of Object.entries(specs)) {
+    const userName = String(userNameRaw ?? "").trim();
+    if (!userName || !applyable.has(userName)) {
+      throw new Error(`customImportRoles: el usuario «${userName || userNameRaw}» no está en la importación.`);
+    }
+    const s = spec && typeof spec === "object" ? spec : {};
+    const templateRoleName = String(s.templateRoleName ?? "").trim();
+    const permissionsRaw = Array.isArray(s.permissions) ? s.permissions : [];
+    const permissions = [...new Set(permissionsRaw.map((c) => String(c ?? "").trim()).filter(Boolean))];
+
+    if (!templateRoleName) {
+      throw new Error(`customImportRoles[${userName}]: falta «templateRoleName» (rol base).`);
+    }
+    if (permissions.length === 0) {
+      throw new Error(`customImportRoles[${userName}]: la lista de permisos no puede estar vacía.`);
+    }
+
+    const templateId = roleMap.get(templateRoleName.toLowerCase());
+    if (!templateId) {
+      throw new Error(
+        `customImportRoles[${userName}]: el rol base «${templateRoleName}» no existe en esta organización.`
+      );
+    }
+
+    const templateRow = await prisma.role.findUnique({
+      where: { roleId: Number(templateId) },
+      select: { maxApprovalAmount: true, organizationId: true },
+    });
+    if (!templateRow || BigInt(templateRow.organizationId) !== BigInt(organizationId)) {
+      throw new Error(`customImportRoles[${userName}]: rol base inválido.`);
+    }
+
+    const permRows = await prisma.permission.findMany({
+      where: { code: { in: permissions }, active: true },
+      select: { permissionId: true, code: true },
+    });
+    const foundCodes = new Set(permRows.map((p) => p.code));
+    const missing = permissions.filter((c) => !foundCodes.has(c));
+    if (missing.length > 0) {
+      throw new Error(
+        `customImportRoles[${userName}]: permisos no válidos o inactivos en catálogo: ${missing.join(", ")}`
+      );
+    }
+
+    const desiredName = await uniqueRoleNameInOrg(organizationId, buildImportCustomRoleBaseName(userName));
+
+    const newRole = await prisma.role.create({
+      data: {
+        organizationId,
+        roleName: desiredName,
+        maxApprovalAmount: templateRow.maxApprovalAmount ?? null,
+        isSystem: false,
+      },
+      select: { roleId: true, roleName: true },
+    });
+
+    await prisma.rolePermission.createMany({
+      data: permRows.map((p) => ({
+        roleId: newRole.roleId,
+        permissionId: p.permissionId,
+      })),
+      skipDuplicates: true,
+    });
+
+    roleMap.set(newRole.roleName.toLowerCase(), newRole.roleId);
+    validRoleNames.push(newRole.roleName);
+    out[userName] = newRole.roleName;
+  }
+
+  return out;
+}
+
 /** 32 bytes hex = 64 chars; no predecible. */
 function generatePreviewToken() {
   return `prev_${crypto.randomBytes(32).toString("hex")}`;
@@ -392,6 +516,7 @@ export async function previewImport(
  * @param {{ globalPassword?: string, perUser?: Record<string, string> }} [passwordOptions] - contraseñas (obligatorias por archivo o global)
  * @param {Record<string, string>} [roleOverridesByUser] - userName → rol elegido en UI; tiene PRIORIDAD sobre mappedRoleName y sobre roleMappings
  * @param {{ createNewOrganization?: boolean }} [applyOptions]
+ * @param {Record<string, { templateRoleName: string, permissions: string[] }>} [customImportRolesByUser] - userName → rol nuevo (se crea en BD al aplicar) clonando tope del rol base
  */
 export async function applyImport(
   previewToken,
@@ -401,7 +526,8 @@ export async function applyImport(
   permissionExtrasByUser = {},
   passwordOptions = {},
   roleOverridesByUser = {},
-  applyOptions = {}
+  applyOptions = {},
+  customImportRolesByUser = {}
 ) {
   const entry = previewCache.get(previewToken);
   if (!entry) {
@@ -470,8 +596,18 @@ export async function applyImport(
       ? roleOverridesByUser
       : {};
 
+  const customCreatedRoleNames = await createCustomImportRolesInApply({
+    organizationId: orgIdBig,
+    roleMap,
+    validRoleNames,
+    rows: entry.rows,
+    customImportRolesByUser,
+  });
+
+  const resolvedOverrides = { ...overridesByUser, ...customCreatedRoleNames };
+
   // Validamos que todos los overrides apunten a roles existentes en la org.
-  for (const [uname, overrideName] of Object.entries(overridesByUser)) {
+  for (const [uname, overrideName] of Object.entries(resolvedOverrides)) {
     const candidate = String(overrideName ?? "").trim();
     if (!candidate) continue;
     const canonical = resolveManualRoleMapping(candidate, validRoleNames);
@@ -487,7 +623,7 @@ export async function applyImport(
     (r) =>
       r.externalRoleLabel &&
       !r.mappedRoleName &&
-      !String(overridesByUser[r.userName] ?? "").trim()
+      !String(resolvedOverrides[r.userName] ?? "").trim()
   );
   for (const row of needsMappingRows) {
     const picked = pickRoleMapping(row.externalRoleLabel, roleMappings);
@@ -514,7 +650,7 @@ export async function applyImport(
      *   3. roleMappings[externalLabel]    — mapping manual de etiquetas externas.
      */
     let canonical = null;
-    const overrideRaw = String(overridesByUser[row.userName] ?? "").trim();
+    const overrideRaw = String(resolvedOverrides[row.userName] ?? "").trim();
     if (overrideRaw) {
       canonical = resolveManualRoleMapping(overrideRaw, validRoleNames);
     }
