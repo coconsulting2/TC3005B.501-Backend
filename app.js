@@ -43,11 +43,15 @@ import csrf from "csurf";
 import path from "path";
 import { fileURLToPath } from "url";
 import swaggerUi from "swagger-ui-express";
+import { close } from "./utils/log/logger.js";
+import { httpLogger } from "./utils/log/logger.http.js";
 
 // JSON serialization patch for Prisma BigInt fields (M2-006: orgId, etc.).
 // Express's res.json uses JSON.stringify which throws on BigInt by default.
 
-BigInt.prototype.toJSON = function () { return this.toString(); };
+BigInt.prototype.toJSON = function () {
+    return this.toString();
+};
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -55,18 +59,30 @@ const __dirname = path.dirname(__filename);
 // Serve openapi directory statically for Swagger UI to fetch YAMLs
 app.use("/openapi", express.static(path.join(__dirname, "openapi")));
 
-const corsOrigins = process.env.CORS_ORIGIN
+const allowedCORS = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
     : ["https://localhost:4321", "http://localhost:4321"];
 
 app.use(cors({
-    origin: corsOrigins,
+    origin: (origin, callback) => {
+        if (!origin) {
+            return callback(null, true);
+        }
+
+        if (origin && allowedCORS.includes(origin)) {
+            return callback(null, true);
+        }
+
+        console.warn(`CORS rejected: ${origin}`);
+        return callback(new Error(`CORS policy blocked: ${origin}`));
+    },
     credentials: true,
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 }));
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(httpLogger);
 
 if (process.env.NODE_ENV !== "test") {
     const csrfProtection = csrf({ cookie: true });
@@ -172,5 +188,21 @@ app.get("/", (req, res) => {
 app.get("/health", (req, res) => {
     res.status(200).send("Server running OK");
 });
+
+async function deallocate_resources() {
+    await close();
+    console.log("Pino prisma clean ups done.");
+}
+
+process.on("SIGTERM", async () => {
+    await deallocate_resources();
+    process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+    await deallocate_resources();
+    process.exit(0);
+});
+
 
 export default app;
