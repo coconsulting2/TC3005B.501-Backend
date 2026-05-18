@@ -2,6 +2,7 @@
  * Llamadas HTTP a Duffel Stays (v2). Radio de búsqueda en kilómetros (1–100).
  * @see https://duffel.com/docs/api/v2/search/stays-search
  */
+/* global fetch */
 
 const DUFFEL_API = "https://api.duffel.com";
 

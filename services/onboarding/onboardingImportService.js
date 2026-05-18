@@ -37,6 +37,11 @@ import { ensureTenantApplicantUserPermissions } from "../tenantApplicantUserGran
 
 const SALT_ROUNDS = 10;
 
+/** Contraseña temporal para admin bootstrap (solo se devuelve una vez en la respuesta de apply). */
+function generateBootstrapAdminPassword() {
+  return crypto.randomBytes(16).toString("base64url");
+}
+
 const previewCache = new Map();
 const PREVIEW_TTL_MS = 10 * 60 * 1000;
 
@@ -643,6 +648,7 @@ export async function applyImport(
   }
 
   const createdSocieties = [];
+  const catalogErrors = [];
   if (entry.societies && entry.societies.length > 0) {
     for (const soc of entry.societies) {
       try {
@@ -653,8 +659,15 @@ export async function applyImport(
         });
         createdSocieties.push(dbSoc);
       } catch (e) {
-        console.error("Failed to insert society:", soc.code, e);
+        catalogErrors.push(
+          `Sociedad "${soc.code}": ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
+    }
+    if (catalogErrors.length > 0) {
+      throw new Error(
+        `No se pudo importar el catálogo de sociedades: ${catalogErrors.join("; ")}`,
+      );
     }
   }
 
@@ -671,8 +684,15 @@ export async function applyImport(
         });
         createdDepartments.push(dbDep);
       } catch (e) {
-        console.error("Failed to insert department:", dep.departmentName, e);
+        catalogErrors.push(
+          `Departamento "${dep.departmentName}": ${e instanceof Error ? e.message : String(e)}`,
+        );
       }
+    }
+    if (catalogErrors.length > 0) {
+      throw new Error(
+        `No se pudo importar el catálogo de departamentos/CeCo: ${catalogErrors.join("; ")}`,
+      );
     }
   }
 
@@ -910,26 +930,34 @@ export async function applyImport(
     }
   }
 
+  /** @type {{ userName: string, email: string, temporaryPassword: string } | undefined} */
+  let bootstrapAdmin = undefined;
   if (entry.createNewOrganization && created.length > 0) {
     const adminRole = await prisma.role.findFirst({ where: { organizationId: orgIdBig, roleName: 'Administrador' }});
     if (adminRole) {
       const hasAdmin = await prisma.user.findFirst({ where: { organizationId: orgIdBig, roleId: adminRole.roleId } });
       if (!hasAdmin) {
-         const plain = "Admin.1234!";
+         const plain = generateBootstrapAdminPassword();
          const passwordHash = await bcrypt.hash(plain, SALT_ROUNDS);
          const orgNameSafe = String(entry.newOrgSpec?.nombre ?? "empresa").replace(/\s+/g, "").toLowerCase();
+         const adminUserName = `admin@${orgNameSafe}.com`;
          const newAdmin = await prisma.user.create({
            data: {
              organizationId: orgIdBig,
              roleId: adminRole.roleId,
-             userName: `admin@${orgNameSafe}.com`,
-             email: `admin@${orgNameSafe}.com`,
+             userName: adminUserName,
+             email: adminUserName,
              password: passwordHash,
              workstation: "Sistemas",
              active: true,
            }
          });
          created.push(newAdmin);
+         bootstrapAdmin = {
+           userName: adminUserName,
+           email: adminUserName,
+           temporaryPassword: plain,
+         };
       }
     }
   }
@@ -948,5 +976,12 @@ export async function applyImport(
     appliedBy: actingUserId,
     failures,
     createdOrganization,
+    ...(bootstrapAdmin
+      ? {
+          bootstrapAdmin,
+          bootstrapAdminNotice:
+            "Contraseña temporal del administrador inicial. Guárdala ahora; no se volverá a mostrar.",
+        }
+      : {}),
   };
 }

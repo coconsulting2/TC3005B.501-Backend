@@ -16,7 +16,7 @@ const N2_NAME = "N2";
  */
 export async function resolveN1N2Approvers(db, organizationId, departmentId, userId) {
   if (organizationId === null || organizationId === undefined) {
-    return { n1UserId: null, n2UserId: null };
+    return { n1UserId: null, n2UserId: null, approverIds: [] };
   }
 
   const org = BigInt(organizationId);
