@@ -123,6 +123,11 @@ const User = {
   /**
    * Get travel requests by department and status, optionally limited.
    * Returns one row per request (picks the first route's destination country).
+   *
+   * @deprecated Usar `getTravelRequestsForApprover` que filtra por aprobador
+   * esperado en `workflow_pre_snapshot` (no por departamento del solicitante).
+   * Se mantiene por compatibilidad con consumidores legados.
+   *
    * @param {string|number} deptId - Department ID.
    * @param {string|number} statusId - Request status ID.
    * @param {number} [n] - Optional limit.
@@ -149,6 +154,140 @@ const User = {
       },
       orderBy: { creationDate: "desc" },
       ...(n ? { take: Number(n) } : {}),
+    });
+
+    return requests.map((r) => {
+      const firstRoute = r.routeRequests[0]?.route;
+      return {
+        request_id: r.requestId,
+        user_id: r.userId,
+        destination_country: firstRoute?.destinationCountry?.countryName || null,
+        beginning_date: firstRoute?.beginningDate || null,
+        ending_date: firstRoute?.endingDate || null,
+        request_status: r.requestStatus.status,
+      };
+    });
+  },
+
+  /**
+   * Lista de subordinados directos (depth=1) de un manager.
+   * @param {number} managerUserId
+   * @returns {Promise<number[]>}
+   */
+  async _getDirectSubordinates(managerUserId) {
+    const rows = await prisma.user.findMany({
+      where: { managerUserId: Number(managerUserId), active: true },
+      select: { userId: true },
+    });
+    return rows.map((r) => Number(r.userId));
+  },
+
+  /**
+   * Subordinados a profundidad exacta `depth` siguiendo `User.managerUserId`.
+   * depth=1 → reportes directos; depth=2 → reportes de reportes; etc.
+   *
+   * @param {number} rootUserId
+   * @param {number} depth
+   * @returns {Promise<number[]>}
+   */
+  async _getSubordinatesAtDepth(rootUserId, depth) {
+    if (!Number.isFinite(depth) || depth <= 0) return [];
+    let frontier = [Number(rootUserId)];
+    const visited = new Set(frontier);
+    for (let i = 0; i < depth; i += 1) {
+      const next = [];
+      for (const u of frontier) {
+        const direct = await User._getDirectSubordinates(u);
+        for (const s of direct) {
+          if (visited.has(s)) continue;
+          visited.add(s);
+          next.push(s);
+        }
+      }
+      frontier = next;
+      if (frontier.length === 0) return [];
+    }
+    return frontier;
+  },
+
+  /**
+   * Bandeja de aprobador basada en el snapshot del workflow (no en departamento).
+   *
+   * Reglas:
+   *  - statusId=2 → solicitudes con `workflow_pre_snapshot.n1UserId === actorUserId`.
+   *  - statusId=3 → solicitudes con `workflow_pre_snapshot.n2UserId === actorUserId`.
+   *  - Fallback opcional por jerarquía cuando WORKFLOW_APPROVAL_MODE=hierarchy:
+   *    incluye solicitudes sin snapshot cuyo solicitante esté a la profundidad
+   *    correcta dentro de la cadena `managerUserId` del actor.
+   *
+   * El motor de reglas (`services/workflowRulesEngine.js`) sigue siendo la
+   * única autoridad para construir el snapshot; aquí sólo se lee.
+   *
+   * @param {number} actorUserId - userId que consulta la bandeja.
+   * @param {number} statusId - 2 (Primera Revisión) o 3 (Segunda Revisión).
+   * @param {{ organizationId?: bigint|number|string|null, n?: number }} [opts]
+   * @returns {Promise<Array>}
+   */
+  async getTravelRequestsForApprover(actorUserId, statusId, opts = {}) {
+    const actor = Number(actorUserId);
+    const status = Number(statusId);
+
+    if (!Number.isFinite(actor) || actor < 1) return [];
+    if (status !== 2 && status !== 3) return [];
+
+    const tierField = status === 2 ? "n1UserId" : "n2UserId";
+    const tierDepth = status === 2 ? 1 : 2;
+
+    const hierarchyMode =
+      String(process.env.WORKFLOW_APPROVAL_MODE || "").toLowerCase() === "hierarchy";
+
+    const orClauses = [
+      {
+        workflowPreSnapshot: {
+          path: [tierField],
+          equals: actor,
+        },
+      },
+    ];
+
+    if (hierarchyMode) {
+      const subs = await User._getSubordinatesAtDepth(actor, tierDepth);
+      if (subs.length > 0) {
+        orClauses.push({
+          AND: [
+            { workflowPreSnapshot: { equals: null } },
+            { userId: { in: subs } },
+          ],
+        });
+      }
+    }
+
+    const where = {
+      requestStatusId: status,
+      OR: orClauses,
+    };
+
+    if (opts.organizationId != null && String(opts.organizationId).trim() !== "") {
+      where.organizationId = BigInt(String(opts.organizationId).trim());
+    }
+
+    const requests = await prisma.request.findMany({
+      where,
+      include: {
+        user: true,
+        requestStatus: true,
+        routeRequests: {
+          include: {
+            route: {
+              include: { destinationCountry: true },
+            },
+          },
+          orderBy: { route: { routerIndex: "asc" } },
+          take: 1,
+        },
+      },
+      orderBy: { creationDate: "desc" },
+      ...(opts.n ? { take: Number(opts.n) } : {}),
     });
 
     return requests.map((r) => {
