@@ -62,15 +62,25 @@ export class DuffelFlightProvider {
     const departureDate = String(params.departureDate || "");
     const passengers = Math.max(1, Math.min(9, Number(params.passengers) || 1));
 
+    const returnDate = params.returnDate ? String(params.returnDate) : "";
+    const slices = [
+      {
+        origin,
+        destination,
+        departure_date: departureDate,
+      },
+    ];
+    if (returnDate && returnDate > departureDate) {
+      slices.push({
+        origin: destination,
+        destination: origin,
+        departure_date: returnDate,
+      });
+    }
+
     const { data } = await duffel.offerRequests.create({
       return_offers: true,
-      slices: [
-        {
-          origin,
-          destination,
-          departure_date: departureDate,
-        },
-      ],
+      slices,
       passengers: Array.from({ length: passengers }, () => ({ type: "adult" })),
       cabin_class: "economy",
     });

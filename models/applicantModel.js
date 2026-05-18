@@ -102,6 +102,7 @@ const Applicant = {
       }
 
       const { pre, post } = await buildRequestWorkflowSnapshots(tx, {
+        userId: Number(userId),
         organizationId: user.organizationId,
         departmentId: user.departmentId,
         requestedFee: requested_fee,
@@ -615,6 +616,7 @@ const Applicant = {
       }
 
       const { pre, post } = await buildRequestWorkflowSnapshots(tx, {
+        userId: Number(userId),
         organizationId: user.organizationId,
         departmentId: user.departmentId,
         requestedFee: reqRow.requestedFee ?? 0,

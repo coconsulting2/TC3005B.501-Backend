@@ -18,6 +18,7 @@ import { resolveN1N2Approvers } from "./approverResolver.js";
  */
 export async function buildRequestWorkflowSnapshots(tx, opts) {
   const {
+    userId,
     organizationId,
     departmentId,
     requestedFee,
@@ -37,7 +38,7 @@ export async function buildRequestWorkflowSnapshots(tx, opts) {
     where: { organizationId: oid, active: true },
   });
 
-  const approvers = await resolveN1N2Approvers(tx, oid, departmentId);
+  const approvers = await resolveN1N2Approvers(tx, oid, departmentId, userId);
 
   const ctx = {
     amount: Number(requestedFee) || 0,
@@ -45,6 +46,7 @@ export async function buildRequestWorkflowSnapshots(tx, opts) {
     destinationCountryIds: destinationCountryIds || [],
     receiptTypeIds,
     orgLevel,
+    departmentId,
   };
 
   const pre = buildSnapshot(rules, ctx, "pre", approvers);

@@ -14,9 +14,11 @@ export class MockFlightProvider {
     const origin = String(params.origin || "MEX").toUpperCase();
     const dest = String(params.destination || "CUN").toUpperCase();
     const date = String(params.departureDate || "2026-06-01");
+    const returnDate = params.returnDate ? String(params.returnDate) : "";
     const pax = Math.max(1, Math.min(9, Number(params.passengers) || 1));
+    const roundTrip = returnDate && returnDate > date;
 
-    return [
+    const offers = [
       {
         id: "mock-zz-001",
         airlineName: "Duffel Airways (sandbox)",
@@ -55,7 +57,15 @@ export class MockFlightProvider {
       },
     ].map((o) => ({
       ...o,
-      id: `${o.id}-${origin}-${dest}`,
+      id: `${o.id}-${origin}-${dest}${roundTrip ? "-rt" : ""}`,
+      ...(roundTrip
+        ? {
+            durationLabel: `${o.durationLabel} (ida y vuelta)`,
+            totalAmount: o.totalAmount * 1.85,
+          }
+        : {}),
     }));
+
+    return offers;
   }
 }

@@ -96,13 +96,43 @@ export class CsvImportStrategy extends BaseImportStrategy {
       throw new Error(`No se pudo leer el CSV: ${e?.message ?? "formato inválido"}.`);
     }
 
-    if (records.length < 2) {
-      throw new Error("El CSV debe tener al menos una fila de encabezado y una de datos.");
+    let sectionSociedades = null;
+    let sectionContable = null;
+    let sectionCeCo = null;
+    let sectionEmpleados = null;
+
+    const firstRowStr = (records[0] || []).join(',').toLowerCase();
+    const isMultiSection = firstRowStr.includes('catalogo sociedades') || records.some(r => r[0] && String(r[0]).toLowerCase().includes('catalogo de empleados'));
+
+    if (isMultiSection) {
+      let currentSection = null;
+      for (const row of records) {
+        const firstCell = String(row[0] || '').trim().toLowerCase();
+        
+        if (firstCell.startsWith('catalogo sociedades')) { currentSection = 'sociedades'; sectionSociedades = []; continue; }
+        else if (firstCell.startsWith('catalogo contable')) { currentSection = 'contable'; sectionContable = []; continue; }
+        else if (firstCell.startsWith('clases de documento')) { currentSection = 'clases'; continue; }
+        else if (firstCell.startsWith('catalogo de ceco')) { currentSection = 'ceco'; sectionCeCo = []; continue; }
+        else if (firstCell.startsWith('catalogo de empleados')) { currentSection = 'empleados'; sectionEmpleados = []; continue; }
+        else if (firstCell === '*') { currentSection = null; continue; }
+        
+        if (row.every(c => !String(c).trim())) continue;
+        
+        if (currentSection === 'sociedades') sectionSociedades.push(row);
+        else if (currentSection === 'contable') sectionContable.push(row);
+        else if (currentSection === 'ceco') sectionCeCo.push(row);
+        else if (currentSection === 'empleados') sectionEmpleados.push(row);
+      }
+    } else {
+      sectionEmpleados = records;
     }
 
-    const headers = records[0].map((h) => String(h ?? "").trim().toLowerCase());
+    if (!sectionEmpleados || sectionEmpleados.length < 2) {
+      throw new Error("El CSV debe tener al menos una fila de encabezado de empleados y una de datos.");
+    }
 
-    /** canonicalKey → índice en el header */
+    const headers = sectionEmpleados[0].map((h) => String(h ?? "").trim().toLowerCase());
+
     const colIndex = {};
     for (const [canonical, variants] of Object.entries(COLUMN_ALIASES)) {
       for (const v of variants) {
@@ -114,26 +144,29 @@ export class CsvImportStrategy extends BaseImportStrategy {
       }
     }
 
-    for (const req of REQUIRED_COLUMNS) {
-      if (colIndex[req] === undefined) {
-        const aliases = COLUMN_ALIASES[req].join(" / ");
-        throw new Error(`Columna requerida no encontrada en el CSV: "${aliases}".`);
+    const hasStandardUserName = colIndex.username !== undefined;
+    const hasSapNoEmpleado = colIndex.noempleado !== undefined;
+    const hasSapNombre = colIndex.nombre !== undefined;
+    const isSapLike =
+      isMultiSection || (!hasStandardUserName && (hasSapNoEmpleado || hasSapNombre));
+
+    if (isSapLike) {
+      if (!hasSapNoEmpleado && !hasSapNombre) {
+        throw new Error(
+          'Formato SAP: se requiere al menos una columna "no_empleado" o "nombre" en el encabezado.',
+        );
+      }
+    } else {
+      for (const req of REQUIRED_COLUMNS) {
+        if (colIndex[req] === undefined) {
+          const aliases = COLUMN_ALIASES[req].join(" / ");
+          throw new Error(`Columna requerida no encontrada en el CSV: "${aliases}".`);
+        }
       }
     }
 
     const get = (cols, key) =>
       colIndex[key] !== undefined ? String(cols[colIndex[key]] ?? "").trim() : "";
-
-    const hasStandardUserName = colIndex.username !== undefined;
-    const hasSapNoEmpleado = colIndex.noempleado !== undefined;
-    const hasSapNombre = colIndex.nombre !== undefined;
-
-    /**
-     * Heurística:
-     * - si existe username -> formato estándar
-     * - si no existe username pero sí no_empleado/nombre -> formato SAP
-     */
-    const isSapLike = !hasStandardUserName && (hasSapNoEmpleado || hasSapNombre);
 
     const toUserNameFromSap = (noEmpleado, fallbackName) => {
       const base = String(noEmpleado || fallbackName || "")
@@ -152,7 +185,7 @@ export class CsvImportStrategy extends BaseImportStrategy {
       return { firstName: parts.slice(0, -1).join(" "), lastName: parts.at(-1) || "" };
     };
 
-    const rows = records.slice(1).map((cols, i) => {
+    const rows = sectionEmpleados.slice(1).map((cols, i) => {
       if (!isSapLike) {
         const mgr = get(cols, "managerusername");
         return {
@@ -178,7 +211,6 @@ export class CsvImportStrategy extends BaseImportStrategy {
       const { firstName, lastName } = splitName(nombre);
       let email = get(cols, "email").toLowerCase();
 
-      // SAP puede venir sin email; generamos uno sintético estable para permitir onboarding.
       if (!email) {
         const providerTag = proveedor ? String(proveedor).replace(/\D+/g, "") : "sap";
         email = `${userName}.${providerTag}@sap.local`;
@@ -201,6 +233,30 @@ export class CsvImportStrategy extends BaseImportStrategy {
       };
     });
 
-    return { rows, embeddedRoleMappings: {}, organizationSpec: null };
+    const societies = [];
+    if (sectionSociedades && sectionSociedades.length > 1) {
+      for (let i = 1; i < sectionSociedades.length; i++) {
+        const row = sectionSociedades[i];
+        const code = String(row[0] || '').trim();
+        const name = String(row[1] || '').trim();
+        if (code && name) {
+          societies.push({ code, name });
+        }
+      }
+    }
+
+    const departments = [];
+    if (sectionCeCo && sectionCeCo.length > 1) {
+      for (let i = 1; i < sectionCeCo.length; i++) {
+        const row = sectionCeCo[i];
+        const costsCenter = String(row[0] || '').trim();
+        const departmentName = String(row[1] || '').trim();
+        if (costsCenter && departmentName) {
+          departments.push({ costsCenter, departmentName });
+        }
+      }
+    }
+
+    return { rows, societies, departments, embeddedRoleMappings: {}, organizationSpec: null };
   }
 }

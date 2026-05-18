@@ -37,6 +37,11 @@ import { ensureTenantApplicantUserPermissions } from "../tenantApplicantUserGran
 
 const SALT_ROUNDS = 10;
 
+/** Contraseña temporal para admin bootstrap (solo se devuelve una vez en la respuesta de apply). */
+function generateBootstrapAdminPassword() {
+  return crypto.randomBytes(16).toString("base64url");
+}
+
 const previewCache = new Map();
 const PREVIEW_TTL_MS = 10 * 60 * 1000;
 
@@ -323,6 +328,8 @@ export async function previewImport(
   const rows = parsed.rows;
   const embeddedRoleMappings = parsed.embeddedRoleMappings ?? {};
   const organizationSpec = parsed.organizationSpec ?? null;
+  const societies = parsed.societies ?? [];
+  const departments = parsed.departments ?? [];
 
   /** @type {{ roleName: string, roleId: number }[]} */
   let orgRoles;
@@ -407,6 +414,8 @@ export async function previewImport(
   const previewToken = generatePreviewToken();
   previewCache.set(previewToken, {
     rows: applyable,
+    societies,
+    departments,
     organizationId: orgIdBig,
     actingUserId: actingUserIdBig,
     orgRoles,
@@ -496,6 +505,8 @@ export async function previewImport(
     rolesCatalog,
     errors,
     conflicts,
+    societies,
+    departments,
     organizationFromFile,
     newOrganizationApplyAvailable:
       strategy.label === "JSON" &&
@@ -636,6 +647,58 @@ export async function applyImport(
     }
   }
 
+  const createdSocieties = [];
+  const catalogErrors = [];
+  if (entry.societies && entry.societies.length > 0) {
+    for (const soc of entry.societies) {
+      try {
+        const dbSoc = await prisma.accountingSociety.upsert({
+          where: { organizationId_code: { organizationId: orgIdBig, code: soc.code } },
+          create: { organizationId: orgIdBig, code: soc.code, name: soc.name },
+          update: { name: soc.name },
+        });
+        createdSocieties.push(dbSoc);
+      } catch (e) {
+        catalogErrors.push(
+          `Sociedad "${soc.code}": ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+    if (catalogErrors.length > 0) {
+      throw new Error(
+        `No se pudo importar el catálogo de sociedades: ${catalogErrors.join("; ")}`,
+      );
+    }
+  }
+
+  const defaultSocietyId = createdSocieties.length === 1 ? createdSocieties[0].societyId : undefined;
+
+  const createdDepartments = [];
+  if (entry.departments && entry.departments.length > 0) {
+    for (const dep of entry.departments) {
+      try {
+        const dbDep = await prisma.department.upsert({
+          where: { organizationId_departmentName: { organizationId: orgIdBig, departmentName: dep.departmentName } },
+          create: { organizationId: orgIdBig, departmentName: dep.departmentName, costsCenter: dep.costsCenter, societyId: defaultSocietyId },
+          update: { costsCenter: dep.costsCenter, societyId: defaultSocietyId },
+        });
+        createdDepartments.push(dbDep);
+      } catch (e) {
+        catalogErrors.push(
+          `Departamento "${dep.departmentName}": ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+    if (catalogErrors.length > 0) {
+      throw new Error(
+        `No se pudo importar el catálogo de departamentos/CeCo: ${catalogErrors.join("; ")}`,
+      );
+    }
+  }
+
+  const departmentByCeco = new Map(createdDepartments.filter(d => d.costsCenter).map(d => [d.costsCenter, d.departmentId]));
+  const departmentByName = new Map(createdDepartments.map(d => [d.departmentName.toLowerCase(), d.departmentId]));
+
   const created = [];
   const managerLinks = [];
   let skipped = 0;
@@ -687,6 +750,11 @@ export async function applyImport(
 
     const passwordHash = await bcrypt.hash(plain, SALT_ROUNDS);
 
+    let departmentId = undefined;
+    if (row.department) {
+       departmentId = departmentByCeco.get(row.department) || departmentByName.get(row.department.toLowerCase());
+    }
+
     let user;
     try {
       user = await prisma.user.create({
@@ -697,6 +765,7 @@ export async function applyImport(
           password: passwordHash,
           email: row.email,
           workstation: row.department ?? "importado",
+          departmentId,
           active: true,
         },
         select: { userId: true, userName: true, email: true },
@@ -743,6 +812,8 @@ export async function applyImport(
           jefeInmediato: row.managerNoEmpleado ? String(row.managerNoEmpleado).slice(0, 10) : null,
           proveedor,
           ceco,
+          departmentId,
+          societyId: defaultSocietyId,
           status,
           fechaAlta: new Date(),
           usuarioUltimaModificacion: actor,
@@ -753,6 +824,8 @@ export async function applyImport(
           jefeInmediato: row.managerNoEmpleado ? String(row.managerNoEmpleado).slice(0, 10) : null,
           proveedor,
           ceco,
+          departmentId,
+          societyId: defaultSocietyId,
           status,
           usuarioUltimaModificacion: actor,
         },
@@ -857,6 +930,38 @@ export async function applyImport(
     }
   }
 
+  /** @type {{ userName: string, email: string, temporaryPassword: string } | undefined} */
+  let bootstrapAdmin = undefined;
+  if (entry.createNewOrganization && created.length > 0) {
+    const adminRole = await prisma.role.findFirst({ where: { organizationId: orgIdBig, roleName: 'Administrador' }});
+    if (adminRole) {
+      const hasAdmin = await prisma.user.findFirst({ where: { organizationId: orgIdBig, roleId: adminRole.roleId } });
+      if (!hasAdmin) {
+         const plain = generateBootstrapAdminPassword();
+         const passwordHash = await bcrypt.hash(plain, SALT_ROUNDS);
+         const orgNameSafe = String(entry.newOrgSpec?.nombre ?? "empresa").replace(/\s+/g, "").toLowerCase();
+         const adminUserName = `admin@${orgNameSafe}.com`;
+         const newAdmin = await prisma.user.create({
+           data: {
+             organizationId: orgIdBig,
+             roleId: adminRole.roleId,
+             userName: adminUserName,
+             email: adminUserName,
+             password: passwordHash,
+             workstation: "Sistemas",
+             active: true,
+           }
+         });
+         created.push(newAdmin);
+         bootstrapAdmin = {
+           userName: adminUserName,
+           email: adminUserName,
+           temporaryPassword: plain,
+         };
+      }
+    }
+  }
+
   const createdOrganization = entry.createNewOrganization
     ? {
         id: orgIdBig.toString(),
@@ -871,5 +976,12 @@ export async function applyImport(
     appliedBy: actingUserId,
     failures,
     createdOrganization,
+    ...(bootstrapAdmin
+      ? {
+          bootstrapAdmin,
+          bootstrapAdminNotice:
+            "Contraseña temporal del administrador inicial. Guárdala ahora; no se volverá a mostrar.",
+        }
+      : {}),
   };
 }

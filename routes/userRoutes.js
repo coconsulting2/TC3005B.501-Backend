@@ -1,7 +1,7 @@
 import express from "express";
 const router = express.Router();
 import * as userController from "../controllers/userController.js";
-import { validateId, validateInputs, validateDeptStatus } from "../middleware/validation.js";
+import { validateId, validateInputs, validateDeptStatus, validateApproverStatus } from "../middleware/validation.js";
 import { authenticateToken } from "../middleware/authMiddleware.js";
 import { loadPermissions, requireAnyPermission, requirePermission } from "../middleware/permissionMiddleware.js";
 import { loginRateLimiter, generalRateLimiter } from "../middleware/rateLimiters.js";
@@ -27,6 +27,11 @@ router.route("/get-travel-request/:request_id")
       userController.getTravelRequestById
     );
 
+/**
+ * @deprecated Filtra por departamento del solicitante. Usar
+ * `/get-approver-requests/:status_id/:n?` que filtra por aprobador esperado
+ * (snapshot/jerarquía). Se conserva por compatibilidad de consumidores.
+ */
 router.route("/get-travel-requests/:dept_id/:status_id/:n?")
     .get(
       generalRateLimiter,
@@ -34,6 +39,15 @@ router.route("/get-travel-requests/:dept_id/:status_id/:n?")
       validateDeptStatus,
       validateInputs,
       userController.getTravelRequestsByDeptStatus
+    );
+
+router.route("/get-approver-requests/:status_id/:n?")
+    .get(
+      generalRateLimiter,
+      ...requireAnyPermission("travel_request:view_any", "travel_agent:attend"),
+      validateApproverStatus,
+      validateInputs,
+      userController.getTravelRequestsForApprover
     );
 
 router.route("/get-user-wallet/:user_id?")
