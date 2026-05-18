@@ -1,33 +1,42 @@
 /**
- * Proveedor de hospedaje: Duffel Stays (sandbox) o mock solo si HOTEL_PROVIDER=mock.
- * Por defecto hereda FLIGHT_PROVIDER: si vuelos usan Duffel, hoteles usan el mismo token/sandbox.
+ * Proveedor de hospedaje: Duffel Stays (sandbox) o mock.
+ * - HOTEL_PROVIDER=mock | duffel (explícito)
+ * - Si no se define: mock por defecto (vuelos pueden usar Duffel sin Stays habilitado).
+ * - HOTEL_PROVIDER=duffel o herencia con FLIGHT_PROVIDER=duffel: intenta Duffel y cae a mock si Stays no está en la cuenta.
  */
 import { MockHotelProvider } from "./mockHotelProvider.js";
-import { DuffelStaysProvider } from "./duffelStaysProvider.js";
+import { ResilientHotelProvider } from "./resilientHotelProvider.js";
 
 /**
- * @returns {{ searchOffers: (p: { ciudad: string, fechaEntrada: string, fechaSalida: string, huespedes: number }) => Promise<unknown[]> }}
+ * @returns {ResilientHotelProvider | MockHotelProvider}
  */
 export function getHotelProvider() {
-  const hotelExplicit = process.env.HOTEL_PROVIDER ? String(process.env.HOTEL_PROVIDER).toLowerCase() : "";
+  const hotelExplicit = process.env.HOTEL_PROVIDER
+    ? String(process.env.HOTEL_PROVIDER).toLowerCase()
+    : "";
+
   if (hotelExplicit === "mock") {
     return new MockHotelProvider();
   }
-  if (hotelExplicit === "duffel") {
-    return new DuffelStaysProvider();
+
+  const useDuffel =
+    hotelExplicit === "duffel" ||
+    (!hotelExplicit && String(process.env.FLIGHT_PROVIDER || "mock").toLowerCase() === "duffel");
+
+  if (useDuffel) {
+    return new ResilientHotelProvider();
   }
-  const flightMode = String(process.env.FLIGHT_PROVIDER || "mock").toLowerCase();
-  if (flightMode === "duffel") {
-    return new DuffelStaysProvider();
-  }
+
   return new MockHotelProvider();
 }
 
 /**
+ * @param {ResilientHotelProvider | MockHotelProvider} provider
  * @returns {string}
  */
-export function getActiveHotelProviderLabel() {
-  const hotelExplicit = process.env.HOTEL_PROVIDER ? String(process.env.HOTEL_PROVIDER).toLowerCase() : "";
-  if (hotelExplicit === "mock" || hotelExplicit === "duffel") return hotelExplicit;
-  return String(process.env.FLIGHT_PROVIDER || "mock").toLowerCase() === "duffel" ? "duffel" : "mock";
+export function getActiveHotelProviderLabel(provider) {
+  if (provider instanceof ResilientHotelProvider) {
+    return provider.lastProviderUsed === "mock_fallback" ? "mock_fallback" : "duffel";
+  }
+  return "mock";
 }

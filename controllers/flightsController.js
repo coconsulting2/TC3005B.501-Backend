@@ -10,6 +10,9 @@ export const validateFlightSearch = [
   body("origen").isLength({ min: 3, max: 3 }).isAlpha().toUpperCase(),
   body("destino").isLength({ min: 3, max: 3 }).isAlpha().toUpperCase(),
   body("fecha").matches(/^\d{4}-\d{2}-\d{2}$/),
+  body("fecha_regreso")
+    .optional({ values: "null" })
+    .matches(/^\d{4}-\d{2}-\d{2}$/),
   body("pasajeros").isInt({ min: 1, max: 9 }).toInt(),
 ];
 
@@ -23,6 +26,7 @@ export async function postFlightSearch(req, res) {
     origin: req.body.origen,
     destination: req.body.destino,
     departureDate: req.body.fecha,
+    returnDate: req.body.fecha_regreso || undefined,
     passengers: req.body.pasajeros,
   };
   try {

@@ -96,7 +96,7 @@ function maxLevelFromImporteBands(amount, importeRules) {
  * @returns {{ maxLevel: number, minTier: number, skipApplied: boolean }}
  */
 function computeLevelsFromRules(rules, ctx, ruleType) {
-  const scoped = rules.filter((r) => r.ruleType === ruleType && r.active);
+  const scoped = rules.filter((r) => r.ruleType === ruleType && r.active && (!r.departmentId || r.departmentId === ctx.departmentId));
 
   const importeRules = scoped.filter((r) => r.paramType === "importe");
   let maxLevel = maxLevelFromImporteBands(ctx.amount, importeRules);
@@ -108,7 +108,18 @@ function computeLevelsFromRules(rules, ctx, ruleType) {
     }
   }
 
-  maxLevel = Math.min(2, Math.max(1, maxLevel));
+  let maxManagerSteps = 0;
+  for (const r of scoped) {
+    if (r.managerSteps) {
+      maxManagerSteps = Math.max(maxManagerSteps, r.managerSteps);
+    }
+  }
+
+  if (maxManagerSteps > 0) {
+    maxLevel = Math.max(maxLevel, maxManagerSteps);
+  } else {
+    maxLevel = Math.min(2, Math.max(1, maxLevel));
+  }
 
   let minTier = 1;
   let skipApplied = false;
@@ -124,30 +135,37 @@ function computeLevelsFromRules(rules, ctx, ruleType) {
   const levels = [];
   for (let L = minTier; L <= maxLevel; L++) levels.push(L);
 
-  return { maxLevel, minTier, skipApplied, levels };
+  let targetRole = null;
+  for (const r of scoped) {
+    if (r.targetRole) targetRole = r.targetRole;
+  }
+
+  return { maxLevel, minTier, skipApplied, levels, targetRole };
 }
 
 /**
  * @param {WorkflowRuleRow[]} rules
  * @param {EvaluationContext} ctx
  * @param {RuleType} ruleType
- * @param {{ n1UserId: number | null, n2UserId: number | null }} approvers
+ * @param {{ n1UserId: number | null, n2UserId: number | null, approverIds: (number|null)[] }} approvers
  * @returns {WorkflowSnapshot}
  */
 export function buildSnapshot(rules, ctx, ruleType, approvers) {
-  const { maxLevel, minTier, skipApplied, levels } = computeLevelsFromRules(rules, ctx, ruleType);
+  const { maxLevel, minTier, skipApplied, levels, targetRole } = computeLevelsFromRules(rules, ctx, ruleType);
   const currency = (ctx.currency || "MXN").trim().toUpperCase();
 
   return {
     ruleType,
     levels,
-    n1UserId: levels.includes(1) ? approvers.n1UserId : null,
-    n2UserId: levels.includes(2) ? approvers.n2UserId : null,
+    approvers: levels.map(l => (approvers.approverIds && approvers.approverIds[l - 1]) || null),
+    n1UserId: levels.includes(1) ? (approvers.n1UserId || (approvers.approverIds && approvers.approverIds[0]) || null) : null,
+    n2UserId: levels.includes(2) ? (approvers.n2UserId || (approvers.approverIds && approvers.approverIds[1]) || null) : null,
     skipApplied,
     amountEvaluated: ctx.amount,
     currencyEvaluated: currency,
     maxApprovalLevel: maxLevel,
     minApprovalLevel: minTier,
+    targetRole,
   };
 }
 

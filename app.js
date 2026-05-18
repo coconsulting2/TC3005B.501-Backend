@@ -32,6 +32,7 @@ import fxRoutes from "./routes/fxRoutes.js";
 import flightsRoutes from "./routes/flightsRoutes.js";
 import hotelsRoutes from "./routes/hotelsRoutes.js";
 import requestCommentRoutes from "./routes/requestCommentRoutes.js";
+import workflowRuleRoutes from "./routes/workflowRuleRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
@@ -78,10 +79,19 @@ if (process.env.NODE_ENV !== "test") {
         if (req.method === "POST" && pathOnly === "/api/user/login") {
             return next();
         }
+        // GET csrf-token must bypass global CSRF validation so it can issue a
+        // fresh _csrf cookie even when the previous one expired — otherwise the
+        // client enters a deadlock where it cannot obtain a new token because
+        // the middleware rejects the request that generates it.
+        if (req.method === "GET" && pathOnly === "/api/user/csrf-token") {
+            return next();
+        }
         return csrfProtection(req, res, next);
     });
-    // Ruta explícita y temprana (otros POST/PUT siguen necesitando header csrf-token).
-    app.get("/api/user/csrf-token", (req, res) => {
+    // Apply csrfProtection directly on this route so it sets the _csrf cookie
+    // and generates a token, but without requiring a valid _csrf cookie first
+    // (the global middleware already skips it above).
+    app.get("/api/user/csrf-token", csrfProtection, (req, res) => {
         res.json({ csrfToken: req.csrfToken() });
     });
 }
@@ -123,6 +133,8 @@ app.use("/api/export", exportRoutes);
 app.use("/api/reports", reportRoutes);
 // TF-009 — Política de viáticos: topes de hotel y comida por organización.
 app.use("/api/viaticos-policy", viaticasPolicyRoutes);
+// Workflow rules CRUD — solo Administrador de org (workflow:manage)
+app.use("/api/workflow-rules", workflowRuleRoutes);
 
 const swaggerOptions = {
     explorer: true,
@@ -134,6 +146,19 @@ const swaggerOptions = {
     }
 };
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(null, swaggerOptions));
+
+// CSRF error handler — must be BEFORE handleAuthError so csurf rejections
+// get proper JSON + CORS headers instead of Express's default HTML error page.
+app.use((err, req, res, next) => {
+    if (err.code === "EBADCSRFTOKEN") {
+        return res.status(403).json({
+            statusCode: 403,
+            message: "Invalid or missing CSRF token",
+            error: "EBADCSRFTOKEN",
+        });
+    }
+    next(err);
+});
 
 // Centralized auth error handler — must be registered after all routes
 app.use(handleAuthError);

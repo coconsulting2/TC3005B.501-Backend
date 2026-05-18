@@ -1,8 +1,18 @@
 paths:
   /get-travel-requests/{dept_id}/{status_id}/{n}:
     get:
-      summary: Get travel requests filtered by department and status
-      description: Returns a list of travel requests filtered by department and request status. Can also limit the number of results shown.
+      summary: Get travel requests filtered by department and status (deprecated for N1/N2 inbox)
+      description: |
+        Returns travel requests filtered by department and request status.
+
+        Para la bandeja de aprobación N1/N2 esta ruta queda deprecada: prefiere
+        `/get-approver-requests/{status_id}/{n}` que filtra por aprobador
+        esperado en `workflow_pre_snapshot` (snapshot del motor de reglas) en
+        vez de por el departamento del solicitante.
+
+        Se mantiene activa para flujos por departamento (atenciones,
+        cotizaciones, comprobaciones).
+      deprecated: true
       tags:
         - Travel Requests
       operationId: getTravelRequestsByDeptStatus
@@ -86,3 +96,90 @@ paths:
                     type: string
               example:
                 error: "Internal server error"
+
+  /get-approver-requests/{status_id}/{n}:
+    get:
+      summary: Bandeja de aprobador (filtro por snapshot/jerarquía)
+      description: |
+        Devuelve las solicitudes pendientes para el aprobador autenticado
+        (`req.user.user_id`) según el snapshot del workflow:
+          - `status_id=2` → filtra por `workflow_pre_snapshot.n1UserId`.
+          - `status_id=3` → filtra por `workflow_pre_snapshot.n2UserId`.
+
+        Cuando la variable de entorno `WORKFLOW_APPROVAL_MODE=hierarchy`
+        está activa, además incluye solicitudes sin snapshot cuyo
+        solicitante esté en la profundidad correcta de la cadena
+        `managerUserId`.
+
+        Misma forma de respuesta que el endpoint legacy por departamento.
+      tags:
+        - Travel Requests
+      operationId: getTravelRequestsForApprover
+      security:
+        - TokenAuth: []
+      parameters:
+        - name: status_id
+          in: path
+          required: true
+          description: 2 (Primera Revisión) o 3 (Segunda Revisión).
+          schema:
+            type: integer
+            enum: [2, 3]
+        - name: n
+          in: path
+          required: false
+          description: Límite opcional de resultados.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Lista filtrada; si no hay coincidencias devuelve `[]`.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    request_id:
+                      type: integer
+                    user_id:
+                      type: integer
+                    destination_country:
+                      type: string
+                    beginning_date:
+                      type: string
+                      format: date
+                    ending_date:
+                      type: string
+                      format: date
+                    request_status:
+                      type: string
+        "400":
+          description: status_id inválido.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string

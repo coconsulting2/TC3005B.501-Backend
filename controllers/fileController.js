@@ -58,7 +58,7 @@ export const uploadReceiptFilesController = async (req, res) => {
 
     const result = await uploadReceiptFiles(receiptId, pdfFile, xmlFile);
 
-    res.status(201).json({
+    const responseBody = {
       message: "Files uploaded successfully",
       pdf: {
         fileId: result.pdf.fileId,
@@ -79,7 +79,20 @@ export const uploadReceiptFilesController = async (req, res) => {
         taxes: result.cfdi.taxes,
       },
       registro_sugerido: result.registroSugerido,
-    });
+    };
+
+    // Structured audit log for receipt uploads (searchable in server logs)
+    console.log(JSON.stringify({
+      event: "RECEIPT_UPLOAD_OK",
+      receiptId,
+      uuid: result.cfdi.uuid,
+      rfcEmisor: result.cfdi.rfcEmisor,
+      total: result.cfdi.total,
+      iva: result.cfdi.taxes?.totalTrasladados ?? null,
+      timestamp: new Date().toISOString(),
+    }));
+
+    res.status(201).json(responseBody);
   } catch (error) {
     if (error instanceof CfdiParseError) {
       return res.status(422).json({

@@ -185,17 +185,33 @@ const AccountsPayable = {
       request_status_id: requestStatusId,
       request_status_name: requestStatusName,
       status: expense_status,
-      Expenses: rows.map((row) => ({
-        receipt_id: row.receiptId,
-        receipt_type_name: row.receiptType?.receiptTypeName,
-        amount: row.amount,
-        validation: row.validation,
-        sat_estado: row.cfdiComprobante?.satEstado ?? null,
-        pdf_id: row.pdfFileId,
-        pdf_name: row.pdfFileName,
-        xml_id: row.xmlFileId,
-        xml_name: row.xmlFileName,
-      })),
+      Expenses: rows.map((row) => {
+        const c = row.cfdiComprobante;
+        return {
+          receipt_id: row.receiptId,
+          receipt_type_name: row.receiptType?.receiptTypeName,
+          amount: row.amount,
+          validation: row.validation,
+          sat_estado: c?.satEstado ?? null,
+          pdf_id: row.pdfFileId,
+          pdf_name: row.pdfFileName,
+          xml_id: row.xmlFileId,
+          xml_name: row.xmlFileName,
+          // Detalle fiscal esencial (solo lo que el usuario necesita ver)
+          cfdi: c ? {
+            nombreEmisor: c.nombreEmisor,
+            rfcEmisor: c.rfcEmisor,
+            fechaEmision: c.fechaEmision,
+            subtotal: c.subtotal,
+            iva: c.iva,
+            total: c.total,
+            moneda: c.moneda,
+            uuid: c.uuid,
+            satEstado: c.satEstado,
+            tipoComprobante: c.tipoComprobante,
+          } : null,
+        };
+      }),
     };
   },
 };

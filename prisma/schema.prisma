@@ -105,13 +105,17 @@ model Role {
 }
 
 model Department {
-  departmentId   Int          @id @default(autoincrement()) @map("department_id")
-  organizationId BigInt       @map("organization_id")
-  departmentName String       @map("department_name") @db.VarChar(60)
-  costsCenter    String?      @map("costs_center") @db.VarChar(20)
-  active         Boolean      @default(true)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departmentId   Int                @id @default(autoincrement()) @map("department_id")
+  organizationId BigInt             @map("organization_id")
+  departmentName String             @map("department_name") @db.VarChar(60)
+  costsCenter    String?            @map("costs_center") @db.VarChar(20)
+  active         Boolean            @default(true)
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   users          User[]
+  empleados      Empleado[]
+  workflowRules  WorkflowRule[]
+  societyId      BigInt?            @map("society_id")
+  society        AccountingSociety? @relation(fields: [societyId], references: [societyId])
 
   @@unique([organizationId, departmentName])
   @@index([organizationId, active])
@@ -120,20 +124,24 @@ model Department {
 
 /// Catálogo de empleados sincronizado desde RH/SAP (adjacency list por no_empleado).
 model Empleado {
-  empleadoId                Int          @id @default(autoincrement()) @map("empleado_id")
-  organizationId            BigInt       @map("organization_id")
-  noEmpleado                String       @map("no_empleado") @db.VarChar(10)
-  nombre                    String       @db.VarChar(100)
-  email                     String?      @db.VarChar(100)
-  jefeInmediato             String?      @map("jefe_inmediato") @db.VarChar(10)
-  proveedor                 String       @db.VarChar(11)
-  ceco                      String       @db.VarChar(10)
-  status                    String       @default("A") @db.VarChar(1)
-  fechaAlta                 DateTime     @map("fecha_alta") @db.Date
-  fechaUltimaModificacion   DateTime     @default(now()) @updatedAt @map("fecha_ultima_modificacion")
-  usuarioUltimaModificacion String       @map("usuario_ultima_modificacion") @db.VarChar(30)
-  organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  empleadoId                Int                @id @default(autoincrement()) @map("empleado_id")
+  organizationId            BigInt             @map("organization_id")
+  noEmpleado                String             @map("no_empleado") @db.VarChar(10)
+  nombre                    String             @db.VarChar(100)
+  email                     String?            @db.VarChar(100)
+  jefeInmediato             String?            @map("jefe_inmediato") @db.VarChar(10)
+  proveedor                 String             @db.VarChar(11)
+  ceco                      String             @db.VarChar(10)
+  status                    String             @default("A") @db.VarChar(1)
+  fechaAlta                 DateTime           @map("fecha_alta") @db.Date
+  fechaUltimaModificacion   DateTime           @default(now()) @updatedAt @map("fecha_ultima_modificacion")
+  usuarioUltimaModificacion String             @map("usuario_ultima_modificacion") @db.VarChar(30)
+  organization              Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   users                     User[]
+  societyId                 BigInt?            @map("society_id")
+  departmentId              Int?               @map("department_id")
+  society                   AccountingSociety? @relation(fields: [societyId], references: [societyId])
+  department                Department?        @relation(fields: [departmentId], references: [departmentId])
 
   @@unique([organizationId, noEmpleado])
   @@index([organizationId, status])
@@ -709,6 +717,10 @@ model WorkflowRule {
   active         Boolean      @default(true)
   createdAt      DateTime     @default(now()) @map("created_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departmentId   Int?         @map("department_id")
+  managerSteps   Int?         @map("manager_steps")
+  targetRole     String?      @map("target_role") @db.VarChar(40)
+  department     Department?  @relation(fields: [departmentId], references: [departmentId], onDelete: Cascade)
 
   @@index([organizationId, ruleType, active])
   @@map("workflow_rules")
@@ -902,6 +914,8 @@ model AccountingSociety {
   name           String       @db.VarChar(120)
   isSystem       Boolean      @default(false) @map("is_system")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departments    Department[]
+  empleados      Empleado[]
 
   @@unique([organizationId, code])
   @@map("accounting_societies")
