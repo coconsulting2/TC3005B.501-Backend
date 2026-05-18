@@ -23,10 +23,28 @@
  */
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import {
   bootstrapOrganizationCatalogs,
 } from "./seedHelpers/bootstrapOrganization.js";
+import { buildRequestWorkflowSnapshots } from "../services/buildRequestWorkflowSnapshots.js";
+import { connectMongo, disconnectMongo, uploadFile } from "../services/fileStorage.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const FIXTURE_DIR = path.join(__dirname, "..", "tests");
+const FIXTURE_XML_RESTAURANT = path.join(
+  FIXTURE_DIR,
+  "services/CDFI/tax_invoices(CFDIs)/CFDI-v40-restaurant.xml",
+);
+const FIXTURE_XML_HOTEL = path.join(
+  FIXTURE_DIR,
+  "services/CDFI/tax_invoices(CFDIs)/CFDI-v33-hotel.xml",
+);
+const FIXTURE_PDF = path.join(FIXTURE_DIR, "fixtures/storage/valid.pdf");
 
 dotenv.config();
 const prisma = new PrismaClient();
@@ -88,6 +106,45 @@ const MANAGER_MAP = {
   "emiliano.deyta":      "leonardo.rodriguez",
 };
 
+/** Fechas YYYY-MM-DD relativas al día del seed (evita plazos vencidos tras semanas). */
+function buildUsabilityDates() {
+  const base = new Date();
+  const add = (days) => {
+    const d = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate()));
+    d.setUTCDate(d.getUTCDate() + days);
+    return d.toISOString().slice(0, 10);
+  };
+  return {
+    /** R1 — N1 aprueba (viaje próxima semana) */
+    r1Begin: add(7),
+    r1End: add(10),
+    /** R2 — N1 rechaza Cancún */
+    r2Begin: add(28),
+    r2End: add(33),
+    /** R3 — Agencia cotiza (CDMX, guión agencia) */
+    r3Begin: add(10),
+    r3End: add(13),
+    /** R4 — Cancelada (pasado) */
+    r4Begin: add(-25),
+    r4End: add(-22),
+    /** R5 — Solicitante sube comprobantes (viaje recién terminado) */
+    r5Begin: add(-12),
+    r5End: add(-8),
+    r5TripEnd: add(-8),
+    /** R6 — CxP valida comprobantes (fin de viaje hace pocos días) */
+    r6Begin: add(-18),
+    r6End: add(-15),
+    r6TripEnd: add(-15),
+    /** R7/R8 — Historial finalizado */
+    r7Begin: add(-45),
+    r7End: add(-43),
+    r7TripEnd: add(-43),
+    r8Begin: add(-70),
+    r8End: add(-68),
+    r8TripEnd: add(-68),
+  };
+}
+
 async function countryId(name) {
   const r = await prisma.country.findUnique({ where: { countryName: name } });
   return r?.countryId ?? null;
@@ -143,11 +200,93 @@ async function createRequest(orgId, userId, statusId, opts) {
   return req;
 }
 
+/**
+ * Snapshots pre/post para bandeja N1/N2 (workflow_pre_snapshot).
+ */
+async function attachWorkflowSnapshots(orgId, requestId, userId, departmentId, requestedFee, destCountryId) {
+  const { pre, post } = await buildRequestWorkflowSnapshots(prisma, {
+    userId,
+    organizationId: orgId,
+    departmentId,
+    requestedFee,
+    destinationCountryIds: destCountryId ? [destCountryId] : [],
+    currency: "MXN",
+  });
+  await prisma.request.update({
+    where: { requestId },
+    data: {
+      workflowPreSnapshot: pre ?? undefined,
+      workflowPostSnapshot: post ?? undefined,
+    },
+  });
+}
+
+/**
+ * Sube XML/PDF de fixtures a GridFS para que CxP pueda abrir archivos en la UI.
+ */
+async function attachGridFsToReceipt(orgId, receiptId, { xmlPath, pdfPath, baseName }) {
+  if (!fs.existsSync(xmlPath) || !fs.existsSync(pdfPath)) {
+    console.warn(`  ⚠ Fixtures no encontrados para receipt ${receiptId}; omitiendo archivos.`);
+    return;
+  }
+  try {
+    await connectMongo();
+    const xmlBuf = fs.readFileSync(xmlPath);
+    const pdfBuf = fs.readFileSync(pdfPath);
+    const xmlName = `${baseName}.xml`;
+    const pdfName = `${baseName}.pdf`;
+    const xml = await uploadFile(xmlBuf, xmlName, "application/xml", {
+      organizationId: String(orgId),
+      receiptId,
+    });
+    const pdf = await uploadFile(pdfBuf, pdfName, "application/pdf", {
+      organizationId: String(orgId),
+      receiptId,
+    });
+    await prisma.receipt.update({
+      where: { receiptId },
+      data: {
+        xmlFileId: xml.fileId,
+        xmlFileName: xmlName,
+        pdfFileId: pdf.fileId,
+        pdfFileName: pdfName,
+      },
+    });
+  } catch (err) {
+    console.warn(`  ⚠ GridFS no disponible (¿Mongo en docker?): ${err?.message || err}`);
+  } finally {
+    await disconnectMongo().catch(() => {});
+  }
+}
+
+async function resetOrgTravelData(orgId) {
+  const requests = await prisma.request.findMany({
+    where: { organizationId: orgId },
+    select: { requestId: true },
+  });
+  const requestIds = requests.map((r) => r.requestId);
+  if (!requestIds.length) return;
+
+  const links = await prisma.routeRequest.findMany({
+    where: { organizationId: orgId },
+    select: { routeId: true },
+  });
+  const routeIds = [...new Set(links.map((l) => l.routeId))];
+
+  await prisma.receipt.deleteMany({ where: { requestId: { in: requestIds } } });
+  await prisma.routeRequest.deleteMany({ where: { organizationId: orgId } });
+  await prisma.request.deleteMany({ where: { organizationId: orgId } });
+  if (routeIds.length) {
+    await prisma.route.deleteMany({ where: { routeId: { in: routeIds } } });
+  }
+}
+
 async function createReceiptWithCfdi(orgId, requestId, receiptTypeId, opts) {
   const {
     amount = 2500, validation = "Pendiente", refund = true,
     satEstado = "Vigente", moneda = "MXN", tipoCambio = 1.0,
     emisorRfc = "AAA010101AAA", emisorNombre = "Hotel Prueba SA",
+    gridFs = null,
   } = opts;
 
   const uuid = crypto.randomUUID();
@@ -206,6 +345,10 @@ async function createReceiptWithCfdi(orgId, requestId, receiptTypeId, opts) {
       satValidacionEfos: "200",
     },
   });
+
+  if (gridFs) {
+    await attachGridFsToReceipt(orgId, receipt.receiptId, gridFs);
+  }
 
   return receipt;
 }
@@ -325,84 +468,114 @@ async function main() {
   });
   console.log("  ✓ Workflow rules (N1 ≤ $50k, N2 > $50k)");
 
+  await prisma.reimbursementTimeLimit.upsert({
+    where: { organizationId: orgId },
+    create: {
+      organizationId: orgId,
+      daysAfterTrip: 90,
+      graceDays: 30,
+      blockOnExpiry: true,
+      active: true,
+    },
+    update: { daysAfterTrip: 90, graceDays: 30, active: true },
+  });
+  console.log("  ✓ Plazo comprobación UAT: 90 días + 30 gracia");
+
+  const D = buildUsabilityDates();
+  console.log(`  ✓ Fechas relativas (hoy=${new Date().toISOString().slice(0, 10)})`);
+
+  await resetOrgTravelData(orgId);
+  console.log("  ✓ Solicitudes anteriores de CocoUAT eliminadas (re-seed idempotente)");
+
   const receiptTypes = await prisma.receiptType.findMany({ where: { organizationId: orgId } });
   const rtMap = {};
   for (const rt of receiptTypes) rtMap[rt.receiptTypeName] = rt.receiptTypeId;
 
   const solicitanteId = userMap["angel.montemayor"];
+  const solicitanteDept = deptMap["Operaciones"];
+  const mexicoId = await countryId("México");
   await prisma.user.update({ where: { userId: solicitanteId }, data: { wallet: 5000 } });
   console.log("  ✓ Wallet solicitante = $5,000");
 
   const r1 = await createRequest(orgId, solicitanteId, 2, {
-    notes: "Viaje de negocios a Monterrey — reuniones con cliente Cemex",
+    notes: "Viaje de negocios a Monterrey — reuniones con cliente (guión: Ángel / Ana)",
     requestedFee: 15000, imposedFee: 0, requestDays: 3,
-    destCity: "Monterrey", beginDate: "2026-05-26", endDate: "2026-05-29",
+    destCity: "Monterrey", beginDate: D.r1Begin, endDate: D.r1End,
   });
-  console.log(`  ✓ R1 (id=${r1.requestId}) status=2 → N1 aprueba`);
+  await attachWorkflowSnapshots(orgId, r1.requestId, solicitanteId, solicitanteDept, 15000, mexicoId);
+  console.log(`  ✓ R1 (id=${r1.requestId}) status=2 → N1 aprueba (${D.r1Begin}–${D.r1End})`);
 
   const r2User = userMap["emiliano.delgadillo"];
+  const r2Dept = deptMap["Operaciones"];
   const r2 = await createRequest(orgId, r2User, 2, {
-    notes: "Viaje recreativo a Cancún — team building equipo marketing",
+    notes: "Viaje a Cancún — Carlos López (guión: N1 rechaza)",
     requestedFee: 45000, imposedFee: 0, requestDays: 5,
-    destCity: "Cancún", beginDate: "2026-06-15", endDate: "2026-06-20",
+    destCity: "Cancún", beginDate: D.r2Begin, endDate: D.r2End,
   });
+  await attachWorkflowSnapshots(orgId, r2.requestId, r2User, r2Dept, 45000, mexicoId);
   console.log(`  ✓ R2 (id=${r2.requestId}) status=2 → N1 rechaza`);
 
-  const r3User = userMap["emiliano.deyta"];
+  const r3User = userMap["emiliano.delgadillo"];
   const r3 = await createRequest(orgId, r3User, 5, {
-    notes: "Viaje a Guadalajara — conferencia de tecnología",
-    requestedFee: 22000, imposedFee: 22000, requestDays: 4,
-    destCity: "Guadalajara", beginDate: "2026-06-01", endDate: "2026-06-05",
+    notes: "Viaje a CDMX — Luis Ramírez (guión agencia: vuelo + hotel)",
+    requestedFee: 22000, imposedFee: 22000, requestDays: 3,
+    destCity: "CDMX", beginDate: D.r3Begin, endDate: D.r3End,
     planeNeeded: true, hotelNeeded: true,
   });
-  console.log(`  ✓ R3 (id=${r3.requestId}) status=5 → Agencia reserva`);
+  await attachWorkflowSnapshots(orgId, r3.requestId, r3User, r2Dept, 22000, mexicoId);
+  console.log(`  ✓ R3 (id=${r3.requestId}) status=5 → Agencia reserva (${D.r3Begin}–${D.r3End})`);
 
   const r4 = await createRequest(orgId, r2User, 9, {
     notes: "CANCELADO — Viaje a Mérida cancelado por presupuesto",
     requestedFee: 18000, imposedFee: 0, requestDays: 3,
-    destCity: "Mérida", beginDate: "2026-05-10", endDate: "2026-05-13",
+    destCity: "Mérida", beginDate: D.r4Begin, endDate: D.r4End,
   });
   console.log(`  ✓ R4 (id=${r4.requestId}) status=9 → Agencia ve cancelada`);
 
   const r5 = await createRequest(orgId, solicitanteId, 6, {
-    notes: "Viaje a Guadalajara completado — pendiente de comprobación",
+    notes: "Viaje a Guadalajara — subir comprobantes (restaurante + taxi)",
     requestedFee: 20000, imposedFee: 20000, requestDays: 4,
-    destCity: "Guadalajara", beginDate: "2026-04-28", endDate: "2026-05-02",
-    tripEndDate: "2026-05-02",
+    destCity: "Guadalajara", beginDate: D.r5Begin, endDate: D.r5End,
+    tripEndDate: D.r5TripEnd,
   });
   console.log(`  ✓ R5 (id=${r5.requestId}) status=6 → Solicitante sube comprobantes`);
 
   const r6 = await createRequest(orgId, solicitanteId, 7, {
-    notes: "Viaje a Monterrey — comprobantes listos para validación fiscal",
+    notes: "Viaje a Monterrey — liquidación CxP (guión: Ana Martínez / Ángel)",
     requestedFee: 25000, imposedFee: 25000, requestDays: 3,
-    destCity: "Monterrey", beginDate: "2026-04-20", endDate: "2026-04-23",
-    tripEndDate: "2026-04-23",
+    destCity: "Monterrey", beginDate: D.r6Begin, endDate: D.r6End,
+    tripEndDate: D.r6TripEnd,
   });
 
   await createReceiptWithCfdi(orgId, r6.requestId, rtMap["Hospedaje"], {
     amount: 8500, satEstado: "Vigente", emisorNombre: "Hotel Fiesta Americana MTY",
+    gridFs: { xmlPath: FIXTURE_XML_HOTEL, pdfPath: FIXTURE_PDF, baseName: "uat-hotel-mty" },
   });
   await createReceiptWithCfdi(orgId, r6.requestId, rtMap["Comida"], {
-    amount: 2800, satEstado: "Vigente", emisorNombre: "Restaurante La Nacional",
+    amount: 2800, satEstado: "Cancelado", emisorNombre: "Restaurante La Nacional",
+    gridFs: { xmlPath: FIXTURE_XML_RESTAURANT, pdfPath: FIXTURE_PDF, baseName: "uat-rest-cancelado-sat" },
   });
   await createReceiptWithCfdi(orgId, r6.requestId, rtMap["Transporte"], {
     amount: 1200, satEstado: "Vigente", emisorNombre: "Uber Transporte MX",
+    gridFs: { xmlPath: FIXTURE_XML_RESTAURANT, pdfPath: FIXTURE_PDF, baseName: "uat-uber-mty" },
   });
   await createReceiptWithCfdi(orgId, r6.requestId, rtMap["Vuelo"], {
-    amount: 6500, satEstado: "Cancelado", emisorNombre: "Volaris SAB de CV",
+    amount: 6500, satEstado: "Vigente", emisorNombre: "Volaris SAB de CV",
+    gridFs: { xmlPath: FIXTURE_XML_HOTEL, pdfPath: FIXTURE_PDF, baseName: "uat-vuelo-mty" },
   });
   await createReceiptWithCfdi(orgId, r6.requestId, rtMap["Comida"], {
     amount: 45, satEstado: "Vigente", moneda: "USD", tipoCambio: 17.25,
     emisorRfc: "XEXX010101000", emisorNombre: "Airport Lounge Services Inc",
+    gridFs: { xmlPath: FIXTURE_XML_RESTAURANT, pdfPath: FIXTURE_PDF, baseName: "uat-lounge-usd" },
   });
-  console.log(`  ✓ R6 (id=${r6.requestId}) status=7 + 5 receipts (1 cancelado SAT, 1 USD)`);
+  console.log(`  ✓ R6 (id=${r6.requestId}) status=7 + 5 receipts (XML/PDF fixtures si Mongo OK)`);
 
   const r7 = await createRequest(orgId, solicitanteId, 8, {
     notes: "Viaje a CDMX — finalizado y liquidado",
     requestedFee: 12000, imposedFee: 11500, requestDays: 2,
     originCity: "Monterrey", destCity: "CDMX",
-    beginDate: "2026-03-15", endDate: "2026-03-17",
-    tripEndDate: "2026-03-17", isExported: false,
+    beginDate: D.r7Begin, endDate: D.r7End,
+    tripEndDate: D.r7TripEnd, isExported: false,
   });
   await createReceiptWithCfdi(orgId, r7.requestId, rtMap["Hospedaje"], {
     amount: 4200, validation: "Aprobado", satEstado: "Vigente",
@@ -421,8 +594,8 @@ async function main() {
   const r8 = await createRequest(orgId, r2User, 8, {
     notes: "Viaje a Querétaro — evento de capacitación",
     requestedFee: 8000, imposedFee: 7500, requestDays: 2,
-    destCity: "CDMX", beginDate: "2026-02-10", endDate: "2026-02-12",
-    tripEndDate: "2026-02-12", isExported: false,
+    destCity: "CDMX", beginDate: D.r8Begin, endDate: D.r8End,
+    tripEndDate: D.r8TripEnd, isExported: false,
   });
   await createReceiptWithCfdi(orgId, r8.requestId, rtMap["Hospedaje"], {
     amount: 3500, validation: "Aprobado", satEstado: "Vigente",
@@ -452,6 +625,11 @@ async function main() {
   console.log(`║  R1=${r1.requestId} (2)  R2=${r2.requestId} (2)  R3=${r3.requestId} (5)  R4=${r4.requestId} (9)`);
   console.log(`║  R5=${r5.requestId} (6)  R6=${r6.requestId} (7)  R7=${r7.requestId} (8)  R8=${r8.requestId} (8)`);
   console.log("╠────────────────────────────────────────────────────────────  ╣");
+  console.log("║  CxP: R6 tiene XML/PDF en GridFS (restaurante cancelado SAT)   ║");
+  console.log("║  Subir comprobantes manual: tests/.../CFDI-v40-restaurant.xml   ║");
+  console.log("║                        + tests/fixtures/storage/valid.pdf      ║");
+  console.log("╠────────────────────────────────────────────────────────────  ╣");
+  console.log("║  Re-ejecutar: node prisma/seed-usability.js (fechas = hoy+N)    ║");
   console.log("║  Import E2E (otra org): cocoPruebas-team.csv / .json          ║");
   console.log("╚══════════════════════════════════════════════════════════════╝");
 }
