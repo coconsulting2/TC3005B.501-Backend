@@ -10,6 +10,7 @@ import { DuffelFlightProvider } from "./duffelFlightProvider.js";
  * @property {string} origin - IATA
  * @property {string} destination - IATA
  * @property {string} departureDate - YYYY-MM-DD
+ * @property {string} [returnDate] - YYYY-MM-DD (vuelta; opcional)
  * @property {number} passengers
  */
 

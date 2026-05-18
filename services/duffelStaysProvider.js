@@ -2,7 +2,10 @@
  * Búsqueda de hospedaje vía Duffel Stays (sandbox con DUFFEL_ACCESS_TOKEN).
  * @see https://duffel.com/docs/api/stays/search
  */
-import { createDuffelClient } from "./duffel.js";
+import { staysFetchAllRates, staysSearch } from "./duffelStaysApi.js";
+
+/** Radio por defecto en km (Duffel: 1–100; 5–10 suele ir bien por ciudad). */
+const DEFAULT_RADIUS_KM = Number(process.env.STAYS_SEARCH_RADIUS_KM) || 10;
 
 /** @type {Array<{ keys: string[]; latitude: number; longitude: number }>} */
 const CITY_HINTS = [
@@ -42,7 +45,7 @@ export function resolveCityToCoordinates(ciudad) {
 /**
  * @param {any} data
  */
-function mapStaysResults(data) {
+export function mapStaysResults(data) {
   const results = data?.results ?? [];
   return results.slice(0, 20).map((result) => {
     const acc = result.accommodation;
@@ -59,6 +62,8 @@ function mapStaysResults(data) {
     return {
       id: result.id,
       rawOfferId: result.id,
+      searchResultId: result.id,
+      accommodationId: acc?.id ?? null,
       hotelName: acc?.name ?? "Hospedaje",
       addressHint: hint,
       checkIn,
@@ -73,6 +78,43 @@ function mapStaysResults(data) {
 }
 
 /**
+ * @param {any} searchResult
+ * @param {import("./duffelStaysProvider.js").ReturnType<typeof mapStaysResults>[number]} baseOffer
+ */
+export function enrichOfferFromFetchAllRates(searchResult, baseOffer) {
+  const acc = searchResult?.accommodation ?? {};
+  const rooms = acc?.rooms ?? [];
+  const rates = rooms.flatMap((room) =>
+    (room?.rates ?? []).map((rate) => ({
+      rateId: rate.id,
+      roomName: room.name,
+      rateName: rate.name,
+      totalAmount: parseFloat(String(rate.total_amount ?? "0")),
+      totalCurrency: rate.total_currency || baseOffer.totalCurrency,
+      boardType: rate.board_type,
+    })),
+  );
+
+  const cheapest = rates.length
+    ? rates.reduce((a, b) => (a.totalAmount <= b.totalAmount ? a : b))
+    : null;
+
+  return {
+    ...baseOffer,
+    hotelName: acc?.name ?? baseOffer.hotelName,
+    addressHint:
+      [acc?.location?.address?.line_one, acc?.location?.address?.city_name]
+        .filter(Boolean)
+        .join(" · ") || baseOffer.addressHint,
+    totalAmount: cheapest?.totalAmount ?? baseOffer.totalAmount,
+    totalCurrency: cheapest?.totalCurrency ?? baseOffer.totalCurrency,
+    stars: typeof acc?.rating === "number" ? acc.rating : baseOffer.stars,
+    rates,
+    ratesFetched: true,
+  };
+}
+
+/**
  * @typedef {Object} HotelSearchParams
  * @property {string} ciudad
  * @property {string} fechaEntrada - YYYY-MM-DD
@@ -83,25 +125,34 @@ function mapStaysResults(data) {
 export class DuffelStaysProvider {
   /**
    * @param {HotelSearchParams} params
-   * @returns {Promise<Array<ReturnType<typeof mapStaysResults>[number]>>}
    */
   async searchOffers(params) {
-    const duffel = createDuffelClient();
     const { latitude, longitude } = resolveCityToCoordinates(params.ciudad);
     const adults = Math.max(1, Math.min(9, Number(params.huespedes) || 1));
+    const guests = Array.from({ length: adults }, () => ({ type: "adult" }));
 
-    const response = await duffel.stays.search({
-      check_in_date: params.fechaEntrada,
-      check_out_date: params.fechaSalida,
+    const response = await staysSearch({
+      coordinates: { latitude, longitude },
+      radiusKm: DEFAULT_RADIUS_KM,
+      checkInDate: params.fechaEntrada,
+      checkOutDate: params.fechaSalida,
       rooms: 1,
-      guests: Array.from({ length: adults }, () => ({ type: "adult" })),
-      location: {
-        radius: 20000,
-        geographic_coordinates: { latitude, longitude },
-      },
+      guests,
     });
 
-    const { data } = response;
-    return mapStaysResults(data);
+    return mapStaysResults(response?.data);
+  }
+
+  /**
+   * @param {string} searchResultId
+   * @param {ReturnType<typeof mapStaysResults>[number]} [baseOffer]
+   */
+  async fetchAllRates(searchResultId, baseOffer = null) {
+    const response = await staysFetchAllRates(searchResultId);
+    const result = response?.data;
+    if (baseOffer) {
+      return enrichOfferFromFetchAllRates(result, baseOffer);
+    }
+    return result;
   }
 }

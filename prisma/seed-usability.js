@@ -9,6 +9,14 @@
  * (`angel.montemayor`, …) con correo `@uat.cocoscheme.local` para no colisionar
  * en el índice único global de `email`.
  *
+ * Nota de visibilidad de bandeja N1/N2:
+ *   La bandeja de aprobación se resuelve por el snapshot del workflow
+ *   (`workflow_pre_snapshot.n1UserId` / `n2UserId`) que produce el motor de
+ *   reglas a partir de `MANAGER_MAP` + reglas activas. El `dept` aquí es
+ *   un atributo organizacional/reportes y se usa para reglas scoped por
+ *   `departmentId`; no determina por sí mismo a quién le aparece la
+ *   solicitud en la bandeja.
+ *
  * Prerequisito: `node prisma/seed.js dev` (catálogo global).
  *
  * Usage:  node prisma/seed-usability.js
@@ -63,8 +71,19 @@ const USERS = [
   { user: "erick.morales",         role: "Agencia de viajes", dept: "Operaciones",  first: "Erick",     last: "Morales" },
 ].map((u) => ({ ...u, email: emailUat(u.user) }));
 
+/**
+ * Cadena jerárquica de aprobación (funcional, NO basada en departamento):
+ *   angel.montemayor    → santino.im → kevin.esquivel  (cluster Operaciones+Dirección)
+ *   emiliano.delgadillo → santino.im → kevin.esquivel  (mismo cluster)
+ *   emiliano.deyta      → leonardo.rodriguez            (cluster Finanzas)
+ *
+ * El motor de workflow (`services/workflowRulesEngine.js`) usa esto al
+ * resolver `n1UserId` / `n2UserId` del snapshot — por eso Kevin puede
+ * aprobar solicitudes de Operaciones aunque pertenezca a Dirección.
+ */
 const MANAGER_MAP = {
   "angel.montemayor":    "santino.im",
+  "santino.im":          "kevin.esquivel",
   "emiliano.delgadillo": "santino.im",
   "emiliano.deyta":      "leonardo.rodriguez",
 };

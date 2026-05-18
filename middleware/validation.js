@@ -88,6 +88,21 @@ export const validateDeptStatus = [
 ];
 
 /*
+ * Validates :status_id (2 o 3) y opcional :n para bandeja por aprobador.
+ */
+export const validateApproverStatus = [
+  param("status_id")
+    .isInt({ min: 2, max: 3 })
+    .toInt()
+    .withMessage("status_id debe ser 2 o 3."),
+  param("n")
+    .optional()
+    .isInt({ min: 1 })
+    .toInt()
+    .withMessage("N must be a valid positive integer"),
+];
+
+/*
  * This will validate the fields in the Travel Request
  * (Sosa)
  */

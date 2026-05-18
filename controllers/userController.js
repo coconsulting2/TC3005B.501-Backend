@@ -47,41 +47,36 @@ export const login = async (req, res) => {
     const permissions = await loadEffectivePermissions(result.user_id);
     const deptCookie =
       result.department_id != null ? String(result.department_id) : "";
+    const cookieSecure = process.env.NODE_ENV === "production";
+    const sessionCookie = {
+      httpOnly: true,
+      secure: cookieSecure,
+      sameSite: "Strict",
+      path: "/",
+    };
     res
       .cookie("token", result.token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
+        ...sessionCookie,
         maxAge: 1000 * 60 * 60, // 1 hour
       })
       .cookie("role", result.role, {
-        sameSite: "Strict",
-        httpOnly: true,
-        secure: true,
+        ...sessionCookie,
         maxAge: 1000 * 60 * 60 * 24,
       })
       .cookie("username", result.username, {
-        sameSite: "Strict",
-        httpOnly: true,
-        secure: true,
+        ...sessionCookie,
         maxAge: 1000 * 60 * 60,
       })
       .cookie("id", result.user_id.toString(), {
-        sameSite: "Strict",
-        httpOnly: true,
-        secure: true,
+        ...sessionCookie,
         maxAge: 1000 * 60 * 60,
       })
       .cookie("department_id", deptCookie, {
-        sameSite: "Strict",
-        httpOnly: true,
-        secure: true,
+        ...sessionCookie,
         maxAge: 1000 * 60 * 60,
       })
       .cookie("no_empleado", result.no_empleado || "", {
-        sameSite: "Strict",
-        httpOnly: true,
-        secure: true,
+        ...sessionCookie,
         maxAge: 1000 * 60 * 60,
       })
       .json({ ...result, permissions });
@@ -119,6 +114,11 @@ export const getMyPermissions = async (req, res) => {
 
 /**
  * Lists travel requests filtered by department and status.
+ *
+ * @deprecated Mantener compatibilidad con consumidores legados; prefiere
+ * `getTravelRequestsForApprover` que filtra por aprobador esperado
+ * (snapshot/jerarquía) en vez de por departamento del solicitante.
+ *
  * @param {import('express').Request} req - Express request (params: dept_id, status_id, n?)
  * @param {import('express').Response} res - Express response
  * @returns {void} JSON array of formatted travel requests
@@ -147,6 +147,60 @@ export const getTravelRequestsByDeptStatus = async (req, res) => {
     return res.status(200).json(formatted);
   } catch (error) {
     console.error("Error in getTravelRequestsByDeptStatus controller:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * Lists travel requests pending for the authenticated approver based on the
+ * persisted workflow snapshot (and optional hierarchy fallback when
+ * `WORKFLOW_APPROVAL_MODE=hierarchy`).
+ *
+ * El motor de reglas (`services/workflowRulesEngine.js`) sigue produciendo
+ * los snapshots — aquí sólo se filtra el inbox por aprobador esperado.
+ *
+ * @param {import('express').Request} req - Express request (params: status_id, n?)
+ * @param {import('express').Response} res - Express response
+ * @returns {void} JSON array con el mismo shape que `getTravelRequestsByDeptStatus`.
+ */
+export const getTravelRequestsForApprover = async (req, res) => {
+  const actorUserId = Number(req.user?.user_id);
+  const statusId = Number(req.params.status_id);
+  const n = req.params.n ? Number(req.params.n) : null;
+  const organizationId = req.user?.organization_id ?? null;
+
+  if (!Number.isFinite(actorUserId) || actorUserId < 1) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  if (statusId !== 2 && statusId !== 3) {
+    return res
+      .status(400)
+      .json({ error: "status_id debe ser 2 (Primera Revisión) o 3 (Segunda Revisión)." });
+  }
+
+  try {
+    const travelRequests = await User.getTravelRequestsForApprover(actorUserId, statusId, {
+      organizationId,
+      n,
+    });
+
+    if (!travelRequests || travelRequests.length === 0) {
+      return res.json([]);
+    }
+
+    const formatted = travelRequests.map((r) => ({
+      request_id: r.request_id,
+      user_id: r.user_id,
+      destination_country: r.destination_country,
+      beginning_date: formatDate(r.beginning_date),
+      ending_date: formatDate(r.ending_date),
+      request_status: r.request_status,
+    }));
+
+    return res.status(200).json(formatted);
+  } catch (error) {
+    console.error("Error in getTravelRequestsForApprover controller:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
