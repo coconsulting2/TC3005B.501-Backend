@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "@jest/globals";
 import { clampStaysSearchRadiusKm, isStaysAccessDeniedError } from "../../services/duffelStaysApi.js";
 import { resolveCityToCoordinates } from "../../services/duffelStaysProvider.js";
 

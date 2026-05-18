@@ -144,21 +144,29 @@ export class CsvImportStrategy extends BaseImportStrategy {
       }
     }
 
-    for (const req of REQUIRED_COLUMNS) {
-      if (colIndex[req] === undefined && !isMultiSection) {
-        const aliases = COLUMN_ALIASES[req].join(" / ");
-        throw new Error(`Columna requerida no encontrada en el CSV: "${aliases}".`);
+    const hasStandardUserName = colIndex.username !== undefined;
+    const hasSapNoEmpleado = colIndex.noempleado !== undefined;
+    const hasSapNombre = colIndex.nombre !== undefined;
+    const isSapLike =
+      isMultiSection || (!hasStandardUserName && (hasSapNoEmpleado || hasSapNombre));
+
+    if (isSapLike) {
+      if (!hasSapNoEmpleado && !hasSapNombre) {
+        throw new Error(
+          'Formato SAP: se requiere al menos una columna "no_empleado" o "nombre" en el encabezado.',
+        );
+      }
+    } else {
+      for (const req of REQUIRED_COLUMNS) {
+        if (colIndex[req] === undefined) {
+          const aliases = COLUMN_ALIASES[req].join(" / ");
+          throw new Error(`Columna requerida no encontrada en el CSV: "${aliases}".`);
+        }
       }
     }
 
     const get = (cols, key) =>
       colIndex[key] !== undefined ? String(cols[colIndex[key]] ?? "").trim() : "";
-
-    const hasStandardUserName = colIndex.username !== undefined;
-    const hasSapNoEmpleado = colIndex.noempleado !== undefined;
-    const hasSapNombre = colIndex.nombre !== undefined;
-
-    const isSapLike = isMultiSection || (!hasStandardUserName && (hasSapNoEmpleado || hasSapNombre));
 
     const toUserNameFromSap = (noEmpleado, fallbackName) => {
       const base = String(noEmpleado || fallbackName || "")

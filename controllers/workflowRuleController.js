@@ -116,6 +116,16 @@ export async function createRule(req, res) {
       return res.status(400).json({ error: "ruleType y paramType son obligatorios." });
     }
 
+    // Validar que departmentId pertenece a esta organización
+    if (departmentId != null) {
+      const dept = await prisma.department.findFirst({
+        where: { departmentId: Number(departmentId), organizationId: orgId },
+      });
+      if (!dept) {
+        return res.status(400).json({ error: "El departamento no pertenece a esta organización." });
+      }
+    }
+
     const rule = await prisma.workflowRule.create({
       data: {
         organizationId: orgId,
@@ -182,6 +192,16 @@ export async function updateRule(req, res) {
       managerSteps,
       targetRole,
     } = req.body;
+
+    // Validar que departmentId pertenece a esta organización
+    if (departmentId != null) {
+      const dept = await prisma.department.findFirst({
+        where: { departmentId: Number(departmentId), organizationId: orgId },
+      });
+      if (!dept) {
+        return res.status(400).json({ error: "El departamento no pertenece a esta organización." });
+      }
+    }
 
     const updated = await prisma.workflowRule.update({
       where: { id: ruleId },
