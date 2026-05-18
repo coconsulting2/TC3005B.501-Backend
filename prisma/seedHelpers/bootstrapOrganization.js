@@ -77,6 +77,7 @@ const PERMISSION_GROUPS_DEFAULTS = [
       "notification_template:read", "notification_template:write",
       "integration:read", "integration:write",
       "organization:read", "organization:update",
+      "workflow:manage",
       "user:view_self",
     ],
   },

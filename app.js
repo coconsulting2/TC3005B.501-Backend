@@ -32,6 +32,7 @@ import fxRoutes from "./routes/fxRoutes.js";
 import flightsRoutes from "./routes/flightsRoutes.js";
 import hotelsRoutes from "./routes/hotelsRoutes.js";
 import requestCommentRoutes from "./routes/requestCommentRoutes.js";
+import workflowRuleRoutes from "./routes/workflowRuleRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
@@ -123,6 +124,8 @@ app.use("/api/export", exportRoutes);
 app.use("/api/reports", reportRoutes);
 // TF-009 — Política de viáticos: topes de hotel y comida por organización.
 app.use("/api/viaticos-policy", viaticasPolicyRoutes);
+// Workflow rules CRUD — solo Administrador de org (workflow:manage)
+app.use("/api/workflow-rules", workflowRuleRoutes);
 
 const swaggerOptions = {
     explorer: true,
