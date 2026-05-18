@@ -111,6 +111,10 @@ model Department {
   active         Boolean      @default(true)
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   users          User[]
+  empleados      Empleado[]
+  workflowRules  WorkflowRule[]
+  societyId      BigInt?      @map("society_id")
+  society        AccountingSociety? @relation(fields: [societyId], references: [societyId])
 
   @@unique([organizationId, departmentName])
   @@index([organizationId, active])
@@ -133,6 +137,10 @@ model Empleado {
   usuarioUltimaModificacion String       @map("usuario_ultima_modificacion") @db.VarChar(30)
   organization              Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   users                     User[]
+  societyId                 BigInt?      @map("society_id")
+  departmentId              Int?         @map("department_id")
+  society                   AccountingSociety? @relation(fields: [societyId], references: [societyId])
+  department                Department?  @relation(fields: [departmentId], references: [departmentId])
 
   @@unique([organizationId, noEmpleado])
   @@index([organizationId, status])
@@ -708,6 +716,10 @@ model WorkflowRule {
   active         Boolean      @default(true)
   createdAt      DateTime     @default(now()) @map("created_at")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departmentId   Int?         @map("department_id")
+  managerSteps   Int?         @map("manager_steps")
+  targetRole     String?      @map("target_role") @db.VarChar(40)
+  department     Department?  @relation(fields: [departmentId], references: [departmentId], onDelete: Cascade)
 
   @@index([organizationId, ruleType, active])
   @@map("workflow_rules")
@@ -901,6 +913,8 @@ model AccountingSociety {
   name           String       @db.VarChar(120)
   isSystem       Boolean      @default(false) @map("is_system")
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  departments    Department[]
+  empleados      Empleado[]
 
   @@unique([organizationId, code])
   @@map("accounting_societies")

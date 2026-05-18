@@ -104,6 +104,9 @@ const PERMISSION_CATALOG = [
 
   // Onboarding import (M3-007)
   { code: "onboarding:import", resource: "onboarding", action: "import" },
+
+  // Workflow rules management (org admin only)
+  { code: "workflow:manage", resource: "workflow", action: "manage" },
 ];
 
 async function seedGlobalPermissions() {
