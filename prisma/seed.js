@@ -198,12 +198,12 @@ async function bootstrapDitta() {
 async function seedLogsLevel() {
   await prisma.logLevel.createMany({
     data: [
-      { id: 10, level: 'TRACE' },
-      { id: 20, level: 'DEBUG' },
-      { id: 30, level: 'INFO' },
-      { id: 40, level: 'WARN' },
-      { id: 50, level: 'ERROR' },
-      { id: 60, level: 'FATAL' },
+      { id: 10, level: "TRACE" },
+      { id: 20, level: "DEBUG" },
+      { id: 30, level: "INFO" },
+      { id: 40, level: "WARN" },
+      { id: 50, level: "ERROR" },
+      { id: 60, level: "FATAL" },
     ],
     skipDuplicates: true,
   });
