@@ -419,11 +419,17 @@ const Applicant = {
 
     if (!request) return [];
 
+    const offerFields = {
+      selected_flight_offer: request.selectedFlightOffer ?? null,
+      selected_hotel_offer: request.selectedHotelOffer ?? null,
+    };
+
     if (request.routeRequests.length === 0) {
       return [{
         request_id: request.requestId,
         request_status_id: request.requestStatusId,
         request_status: request.requestStatus.status,
+        ...offerFields,
         notes: request.notes,
         requested_fee: request.requestedFee,
         imposed_fee: request.imposedFee,
@@ -453,6 +459,7 @@ const Applicant = {
         request_id: request.requestId,
         request_status_id: request.requestStatusId,
         request_status: request.requestStatus.status,
+        ...offerFields,
         notes: request.notes,
         requested_fee: request.requestedFee,
         imposed_fee: request.imposedFee,
