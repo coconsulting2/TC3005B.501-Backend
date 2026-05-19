@@ -139,8 +139,11 @@ export const getReceiptFileController = async (req, res) => {
       return res.status(404).json({ error: "File not found" });
     }
 
-    res.set("Content-Type", sanitize(file.contentType));
-    const isInline = file.contentType === "application/pdf" || file.contentType.startsWith("image/");
+    const contentType =
+      typeof file.contentType === "string" ? file.contentType : "";
+    res.set("Content-Type", sanitize(contentType || "application/octet-stream"));
+    const isInline =
+      contentType === "application/pdf" || contentType.startsWith("image/");
     const disposition = isInline ? "inline" : "attachment";
     res.set("Content-Disposition", `${disposition}; filename="${sanitize(file.filename)}"`);
 

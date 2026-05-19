@@ -73,29 +73,6 @@ function getComprobanteRoot(parsed) {
 }
 
 /**
- * Suma importes de traslado IVA (impuesto 002) en el nodo Impuestos del comprobante.
- * @param {Object|undefined} impuestos
- * @returns {number}
- */
-function sumIvaTrasladosFromImpuestos(impuestos) {
-  if (!impuestos?.Traslados?.Traslado) {
-    return 0;
-  }
-  const raw = impuestos.Traslados.Traslado;
-  const list = Array.isArray(raw) ? raw : [raw];
-  let sum = 0;
-  for (const t of list) {
-    if (String(t["@_Impuesto"] ?? "") === "002") {
-      const imp = parseFloat(t["@_Importe"]);
-      if (!Number.isNaN(imp)) {
-        sum += imp;
-      }
-    }
-  }
-  return sum;
-}
-
-/**
  * Parses a CFDI XML string and returns extracted fiscal data.
  *
  * @param {string} xmlString - Raw XML content of the CFDI
