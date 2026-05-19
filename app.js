@@ -63,7 +63,7 @@ const allowedCORS = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
     : ["https://localhost:4321", "http://localhost:4321"];
 
-app.use(cors({
+const CORS = cors({
     origin: (origin, callback) => {
         if (!origin) {
             return callback(null, true);
@@ -78,7 +78,10 @@ app.use(cors({
     },
     credentials: true,
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-}));
+});
+
+app.options("*", CORS); // preflight
+app.use(CORS);
 
 app.use(express.json());
 app.use(cookieParser());
