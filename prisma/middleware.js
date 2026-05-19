@@ -11,6 +11,7 @@
  * to the `$extends` Client Extensions API.
  */
 import { Prisma } from "@prisma/client";
+import { findAlertMessageIdForRequestStatus } from "../services/alertMessageResolver.js";
 
 export const triggerExtension = Prisma.defineExtension((client) =>
   client.$extends({
@@ -47,10 +48,17 @@ export const triggerExtension = Prisma.defineExtension((client) =>
                 where: { requestId: result.requestId },
               });
             } else if (oldRequest.requestStatusId !== newStatusId) {
-              await client.alert.updateMany({
-                where: { requestId: result.requestId },
-                data: { messageId: newStatusId },
-              });
+              const messageId = await findAlertMessageIdForRequestStatus(
+                client,
+                result.organizationId,
+                newStatusId,
+              );
+              if (messageId) {
+                await client.alert.updateMany({
+                  where: { requestId: result.requestId },
+                  data: { messageId },
+                });
+              }
             }
 
             // --- Trigger 4: DeductFromWalletOnFeeImposed (AFTER UPDATE) ---
