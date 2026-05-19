@@ -25,10 +25,16 @@ import { GL_ACCOUNTS } from "../config/accountingCatalogs.js";
 /** Centavos: alineado con validación SAT al timbrar. */
 export const AMOUNT_EPSILON = 0.01;
 
-/** Importes monetarios MXN (2 decimales). */
+/**
+ * Importes monetarios MXN (2 decimales).
+ * @param n
+ */
 export const roundMoney = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
-/** Tasas / cuotas (6 decimales, p. ej. 0.160000). */
+/**
+ * Tasas / cuotas (6 decimales, p. ej. 0.160000).
+ * @param n
+ */
 export const roundRate = (n) => Math.round((Number(n) || 0) * 1000000) / 1000000;
 
 /** UsoCFDI donde el IVA trasladado no es acreditable en gastos de viaje. */
