@@ -25,6 +25,9 @@ export const GL_ACCOUNTS = {
     CUENTA_POR_PAGAR_EMPLEADO: "1001",
     GASTO_DE_VIAJE: "1002",
     IVA_ACREDITABLE: "1003",
+    RETENCION_ISR: "1004",
+    RETENCION_IVA: "1005",
+    IEPS: "1006",
 };
 
 export const GL_ACCOUNT_DESCRIPTIONS = {
@@ -32,6 +35,9 @@ export const GL_ACCOUNT_DESCRIPTIONS = {
     "1001": "Cuenta x pagar Empleado",
     "1002": "Gasto de Viaje",
     "1003": "Iva Acreditable",
+    "1004": "Retencion ISR por pagar",
+    "1005": "Retencion IVA por pagar",
+    "1006": "IEPS / impuesto especial",
 };
 
 /**
@@ -86,6 +92,9 @@ export const ACCOUNTING_CATALOG_DEFAULTS = {
         { code: "1001", name: GL_ACCOUNT_DESCRIPTIONS["1001"], type: "CxpEmpleado" },
         { code: "1002", name: GL_ACCOUNT_DESCRIPTIONS["1002"], type: "GastoViaje" },
         { code: "1003", name: GL_ACCOUNT_DESCRIPTIONS["1003"], type: "Iva" },
+        { code: "1004", name: GL_ACCOUNT_DESCRIPTIONS["1004"], type: "RetencionIsr" },
+        { code: "1005", name: GL_ACCOUNT_DESCRIPTIONS["1005"], type: "RetencionIva" },
+        { code: "1006", name: GL_ACCOUNT_DESCRIPTIONS["1006"], type: "Ieps" },
     ],
     docTypes: Object.entries(DOC_TYPES).map(([key, code]) => ({
         code,
