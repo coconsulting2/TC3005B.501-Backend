@@ -4,20 +4,28 @@
  * si no la fila Request no es visible y falla Alert_request_id_fkey.
  *
  * @param {*} db - Cliente Prisma o `tx` de `$transaction`
- * @param {{ requestId: number, requestStatusId: number }} request
+ * @param {{ requestId: number, requestStatusId: number, organizationId: bigint|number }} request
  */
+import { findAlertMessageIdForRequestStatus } from "./alertMessageResolver.js";
+
 export async function createRequestInsertAlert(db, request) {
   const statusId = request.requestStatusId;
-  const alertMessage = await db.alertMessage.findUnique({
-    where: { messageId: statusId },
-  });
-  if (!alertMessage) {
+  const messageId = await findAlertMessageIdForRequestStatus(
+    db,
+    request.organizationId,
+    statusId,
+  );
+  if (!messageId) {
+    console.warn(
+      `[createRequestInsertAlert] Sin AlertMessage para org=${request.organizationId} status=${statusId}`,
+    );
     return;
   }
   await db.alert.create({
     data: {
       requestId: request.requestId,
-      messageId: statusId,
+      messageId,
+      organizationId: BigInt(request.organizationId),
     },
   });
 }
