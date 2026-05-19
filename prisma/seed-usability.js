@@ -338,6 +338,41 @@ async function seedR6Receipts(orgId, requestId, rtMap) {
   console.log("  ✓ R6 comprobantes: 4 sintéticos (tests/fixtures)");
 }
 
+/**
+ * R6b — dos comprobantes iguales (mismo monto / emisor) para escenario CxP “¿está duplicado?”.
+ * Usa CFDI sintéticos (UUID distintos); no reutiliza XML de usability-cfdi.
+ */
+async function seedR6bDuplicateReceipts(orgId, requestId, rtMap) {
+  const dupAmount = 1850;
+  const emisor = "Restaurante El Porvenir MTY";
+  const comidaType = rtMap["Comida"];
+  if (!comidaType) return;
+
+  await createReceiptWithCfdi(orgId, requestId, comidaType, {
+    amount: dupAmount,
+    validation: "Pendiente",
+    satEstado: "Vigente",
+    emisorNombre: emisor,
+    gridFs: {
+      xmlPath: FIXTURE_XML_RESTAURANT,
+      pdfPath: FIXTURE_PDF,
+      baseName: "uat-dup-comida-1",
+    },
+  });
+  await createReceiptWithCfdi(orgId, requestId, comidaType, {
+    amount: dupAmount,
+    validation: "Pendiente",
+    satEstado: "Vigente",
+    emisorNombre: emisor,
+    gridFs: {
+      xmlPath: FIXTURE_XML_RESTAURANT,
+      pdfPath: FIXTURE_PDF,
+      baseName: "uat-dup-comida-2",
+    },
+  });
+  console.log("  ✓ R6b comprobantes: 2× Comida $1,850 (posible duplicado)");
+}
+
 function mapRegistroToCfdiCreate(reg, orgId, receiptId, satEstado) {
   const vigente = satEstado === "Vigente";
   return {
@@ -777,12 +812,32 @@ async function main() {
   await attachWorkflowSnapshots(orgId, r3.requestId, r3User, r2Dept, 22000, mexicoId);
   console.log(`  ✓ R3 (id=${r3.requestId}) status=5 → Agencia reserva (${D.r3Begin}–${D.r3End})`);
 
-  const r4 = await createRequest(orgId, r2User, 9, {
-    notes: "CANCELADO — Viaje a Mérida cancelado por presupuesto",
-    requestedFee: 18000, imposedFee: 0, requestDays: 3,
+  /** R4 — Emiliano: agencia cotizó vuelo+hotel y luego el empleado canceló (guión esc. 2 agencia). */
+  const r4 = await createRequest(orgId, r2User, 5, {
+    notes: "UAT Agencia — Emiliano Delgadillo · Mérida (reserva hecha, después cancelada)",
+    requestedFee: 18000, imposedFee: 18000, requestDays: 3,
     destCity: "Mérida", beginDate: D.r4Begin, endDate: D.r4End,
+    planeNeeded: true, hotelNeeded: true,
   });
-  console.log(`  ✓ R4 (id=${r4.requestId}) status=9 → Agencia ve cancelada`);
+  await attachWorkflowSnapshots(orgId, r4.requestId, r2User, r2Dept, 18000, mexicoId);
+  await prisma.request.update({
+    where: { requestId: r4.requestId },
+    data: {
+      selectedFlightOffer: {
+        label: "Volaris Y4 712 — MTY ↔ MID",
+        summary: "Reserva confirmada antes de la cancelación del viaje",
+        status: "cancelled_with_trip",
+      },
+      selectedHotelOffer: {
+        label: "Hotel Fiesta Inn Mérida",
+        summary: "2 noches — cancelado con la solicitud",
+        status: "cancelled_with_trip",
+      },
+      requestStatusId: 9,
+      active: false,
+    },
+  });
+  console.log(`  ✓ R4 (id=${r4.requestId}) status=9 — Emiliano / Mérida (reserva previa + cancelada)`);
 
   const r5 = await createRequest(orgId, solicitanteId, 6, {
     notes: "Viaje a Guadalajara — subir comprobantes (restaurante + taxi)",
@@ -793,14 +848,28 @@ async function main() {
   console.log(`  ✓ R5 (id=${r5.requestId}) status=6 → Solicitante sube comprobantes`);
 
   const r6 = await createRequest(orgId, solicitanteId, 7, {
-    notes: "Viaje a Monterrey — liquidación CxP (guión: Ana Martínez / Ángel)",
+    notes: "UAT CxP — Ángel MTY: revisar comprobantes (SAT cancelado) + liquidar + Terminar",
     requestedFee: 25000, imposedFee: 25000, requestDays: 3,
     destCity: "Monterrey", beginDate: D.r6Begin, endDate: D.r6End,
     tripEndDate: D.r6TripEnd,
   });
-
+  await attachWorkflowSnapshots(
+    orgId, r6.requestId, solicitanteId, solicitanteDept, 25000, mexicoId,
+  );
   await seedR6Receipts(orgId, r6.requestId, rtMap);
-  console.log(`  ✓ R6 (id=${r6.requestId}) status=7 — validación CxP`);
+  console.log(`  ✓ R6 (id=${r6.requestId}) status=7 — CxP liquidación (4 comprobantes)`);
+
+  const r6b = await createRequest(orgId, solicitanteId, 7, {
+    notes: "UAT CxP — Ángel: posible comida duplicada (guión: comentar antes de rechazar)",
+    requestedFee: 12000, imposedFee: 12000, requestDays: 2,
+    destCity: "Monterrey", beginDate: D.r6Begin, endDate: D.r6End,
+    tripEndDate: D.r6TripEnd,
+  });
+  await attachWorkflowSnapshots(
+    orgId, r6b.requestId, solicitanteId, solicitanteDept, 12000, mexicoId,
+  );
+  await seedR6bDuplicateReceipts(orgId, r6b.requestId, rtMap);
+  console.log(`  ✓ R6b (id=${r6b.requestId}) status=7 — CxP aclaración (2 comprobantes iguales)`);
 
   const r7 = await createRequest(orgId, solicitanteId, 8, {
     notes: "Viaje a CDMX — finalizado y liquidado",
@@ -862,10 +931,11 @@ async function main() {
   console.log(`║  Agencia:       erick.morales       id=${userMap["erick.morales"]}`);
   console.log("╠────────────────────────────────────────────────────────────  ╣");
   console.log(`║  R1=${r1.requestId} (2)  R2=${r2.requestId} (2)  R3=${r3.requestId} (5)  R4=${r4.requestId} (9)`);
-  console.log(`║  R5=${r5.requestId} (6)  R6=${r6.requestId} (7)  R7=${r7.requestId} (8)  R8=${r8.requestId} (8)`);
+  console.log(`║  R5=${r5.requestId} (6)  R6=${r6.requestId} (7)  R6b=${r6b.requestId} (7)`);
+  console.log(`║  R7=${r7.requestId} (8)  R8=${r8.requestId} (8)`);
   console.log("╠────────────────────────────────────────────────────────────  ╣");
-  console.log("║  CxP R6: XML locales en prisma/fixtures/usability-cfdi/ (gitignored) ║");
-  console.log("║  Sin esos archivos: seed usa XML/PDF de tests/ (mismo guión UAT)   ║");
+  console.log("║  CxP eder.cantero: R6b=comentario duplicado · R6=liquidar+Terminar ║");
+  console.log("║  R6 XML locales: prisma/fixtures/usability-cfdi/ (gitignored)      ║");
   console.log("╠────────────────────────────────────────────────────────────  ╣");
   console.log("║  Re-ejecutar: node prisma/seed-usability.js (fechas = hoy+N)    ║");
   console.log("║  Import E2E (otra org): cocoPruebas-team.csv / .json          ║");

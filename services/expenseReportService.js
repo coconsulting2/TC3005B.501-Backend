@@ -2,9 +2,20 @@
  * @file services/expenseReportService.js
  * @description Agrega comprobantes (Receipt) por centro de costo y periodo para el
  *   dashboard M3-009. Usa el departamento del solicitante de la solicitud como CC.
+ *
+ *   Alcance:
+ *   - `organization`: CxP / admin (`travel_request:view_any`, `policy:manage`).
+ *   - `team`: N1/N2 con `expense:view` — solo subordinados (árbol `manager_user_id`).
  */
 
+import { getSubordinatesRecursive } from "./employeeHierarchyService.js";
+
 /** @typedef {import('@prisma/client').PrismaClient} PrismaClient */
+
+/**
+ * @typedef {'organization'|'team'} ReportScope
+ * @typedef {{ scope?: ReportScope, actorUserId?: number }} ReportScopeOpts
+ */
 
 /** IDs de estatus de solicitud (seed global `Request_status`). */
 const REQUEST_STATUS_FINALIZADO = 8;
@@ -89,8 +100,14 @@ function queryAsIntList(q) {
  * @param {object} query - req.query
  * @param {bigint} organizationId
  * @param {PrismaClient} prisma
+ * @param {ReportScopeOpts} [scopeOpts]
  */
-export async function buildExpensesByCostCenterReport(prisma, query, organizationId) {
+export async function buildExpensesByCostCenterReport(
+  prisma,
+  query,
+  organizationId,
+  scopeOpts = {},
+) {
   const period = query.period === "quarterly" ? "quarterly" : "monthly";
   const fromStr = typeof query.from === "string" ? query.from : "";
   const toStr = typeof query.to === "string" ? query.to : "";
@@ -102,6 +119,18 @@ export async function buildExpensesByCostCenterReport(prisma, query, organizatio
   const filterCcIds = queryAsIntList(query.costCenterId);
 
   const orgId = organizationId;
+  const scope = scopeOpts.scope === "team" ? "team" : "organization";
+
+  /** @type {number[]|null} */
+  let teamUserIds = null;
+  if (scope === "team" && scopeOpts.actorUserId != null) {
+    const actor = Number(scopeOpts.actorUserId);
+    if (Number.isFinite(actor) && actor > 0) {
+      teamUserIds = await getSubordinatesRecursive(actor);
+    } else {
+      teamUserIds = [];
+    }
+  }
 
   const dateFilter =
     fromDate && toDate && !Number.isNaN(fromDate.getTime()) && !Number.isNaN(toDate.getTime())
@@ -112,6 +141,9 @@ export async function buildExpensesByCostCenterReport(prisma, query, organizatio
     where: {
       organizationId: orgId,
       requestId: { not: null },
+      ...(teamUserIds
+        ? { request: { userId: { in: teamUserIds } } }
+        : {}),
       ...(dateFilter ? { submissionDate: dateFilter } : {}),
     },
     include: {
@@ -188,6 +220,8 @@ export async function buildExpensesByCostCenterReport(prisma, query, organizatio
 
   return {
     generated_at: new Date().toISOString(),
+    scope,
+    team_member_count: scope === "team" ? teamUserIds?.length ?? 0 : null,
     rows,
     budgets,
   };
