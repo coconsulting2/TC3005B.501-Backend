@@ -5,6 +5,7 @@
 import authorizerServices from "../services/authorizerService.js";
 import { Mail } from "../services/email/mail.cjs";
 import mailData from "../services/email/mailData.js";
+import prisma from "../database/config/prisma.js";
 
 /**
  *
@@ -103,6 +104,63 @@ export const reassignSolicitud = async (req, res) => {
       return res.status(error.status).json({ error: error.message });
     }
     console.error("reassignSolicitud:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * GET /api/solicitudes/:id/historial
+ * @param req
+ * @param res
+ */
+export const getSolicitudHistorial = async (req, res) => {
+  const request_id = Number(req.params.id);
+  const user_id = Number(req.user.user_id);
+  const org_id = BigInt(req.tenant?.organizationId ?? req.user.organization_id);
+
+  try {
+    const request = await prisma.request.findUnique({
+      where: { requestId: request_id },
+      select: { userId: true, organizationId: true },
+    });
+
+    if (!request) {
+      return res.status(404).json({ error: "Solicitud no encontrada" });
+    }
+
+    if (request.organizationId !== org_id) {
+      return res.status(403).json({ error: "Acceso denegado" });
+    }
+
+    const historial = await prisma.solicitudHistorial.findMany({
+      where: { requestId: request_id },
+      include: {
+        user: {
+          select: {
+            userName: true,
+            firstName: true,
+            lastName: true,
+            role: { select: { roleName: true } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    const mapped = historial.map(h => {
+      const name = `${h.user.firstName || ''} ${h.user.lastName || ''}`.trim() || h.user.userName;
+      return {
+        action: h.accion,
+        user: name,
+        role: h.user.role?.roleName || "",
+        timestamp: h.createdAt.toISOString(),
+        comment: h.comentario || null
+      };
+    });
+
+    return res.status(200).json(mapped);
+  } catch (error) {
+    console.error("getSolicitudHistorial:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };
