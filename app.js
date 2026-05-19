@@ -43,11 +43,15 @@ import csrf from "csurf";
 import path from "path";
 import { fileURLToPath } from "url";
 import swaggerUi from "swagger-ui-express";
+import { close, logger } from "./utils/log/logger.js";
+import { httpLogger } from "./utils/log/logger.http.js";
 
 // JSON serialization patch for Prisma BigInt fields (M2-006: orgId, etc.).
 // Express's res.json uses JSON.stringify which throws on BigInt by default.
 
-BigInt.prototype.toJSON = function () { return this.toString(); };
+BigInt.prototype.toJSON = function () {
+    return this.toString();
+};
 
 const app = express();
 const __filename = fileURLToPath(import.meta.url);
@@ -55,21 +59,39 @@ const __dirname = path.dirname(__filename);
 // Serve openapi directory statically for Swagger UI to fetch YAMLs
 app.use("/openapi", express.static(path.join(__dirname, "openapi")));
 
-const corsOrigins = process.env.CORS_ORIGIN
+const allowedCORS = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(",").map((s) => s.trim())
     : ["https://localhost:4321", "http://localhost:4321"];
 
-app.use(cors({
-    origin: corsOrigins,
+const CORS = cors({
+    origin: (origin, callback) => {
+        logger.trace(`CORS origin received: ${JSON.stringify(origin)}`);
+        if (!origin) {
+            return callback(null, true);
+        }
+
+        if (origin && allowedCORS.includes(origin)) {
+            return callback(null, true);
+        }
+
+        logger.warn(`CORS rejected: ${origin}`);
+        return callback(new Error(`CORS policy blocked: ${origin}`));
+    },
     credentials: true,
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-}));
+});
+
+app.options("*", CORS); // preflight
+app.use(CORS);
 
 app.use(express.json());
 app.use(cookieParser());
+app.use(httpLogger);
 
 if (process.env.NODE_ENV !== "test") {
-    const csrfProtection = csrf({ cookie: true });
+    const csrfProtection = csrf({ cookie: {
+        maxAge: 60 * 60 * 24
+        }});
     /**
      * CSRF en JSON + SPA: el login no puede enviar token antes de existir sesión.
      * Excluimos solo POST /api/user/login; el resto de mutaciones siguen protegidas.
@@ -160,8 +182,6 @@ app.use((err, req, res, next) => {
     next(err);
 });
 
-// Centralized auth error handler — must be registered after all routes
-app.use(handleAuthError);
 
 app.get("/", (req, res) => {
     res.json({
@@ -172,5 +192,39 @@ app.get("/", (req, res) => {
 app.get("/health", (req, res) => {
     res.status(200).send("Server running OK");
 });
+
+app.use(handleAuthError);
+app.use((err, req, res, next) => {
+    if (err.code === "EBADCSRFTOKEN") {
+        CORS(req, res, () => {
+            return res.status(403).json({
+                statusCode: 403,
+                message: "Invalid or missing CSRF token",
+                error: "EBADCSRFTOKEN",
+            });
+        });
+        return;
+    }
+    next(err);
+});
+
+/**
+ *
+ */
+async function deallocate_resources() {
+    await close();
+    console.log("Pino prisma clean ups done.");
+}
+
+process.on("SIGTERM", async () => {
+    await deallocate_resources();
+    process.exit(0);
+});
+
+process.on("SIGINT", async () => {
+    await deallocate_resources();
+    process.exit(0);
+});
+
 
 export default app;

@@ -933,7 +933,7 @@ export async function applyImport(
   /** @type {{ userName: string, email: string, temporaryPassword: string } | undefined} */
   let bootstrapAdmin = undefined;
   if (entry.createNewOrganization && created.length > 0) {
-    const adminRole = await prisma.role.findFirst({ where: { organizationId: orgIdBig, roleName: 'Administrador' }});
+    const adminRole = await prisma.role.findFirst({ where: { organizationId: orgIdBig, roleName: "Administrador" }});
     if (adminRole) {
       const hasAdmin = await prisma.user.findFirst({ where: { organizationId: orgIdBig, roleId: adminRole.roleId } });
       if (!hasAdmin) {
