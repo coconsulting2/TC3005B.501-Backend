@@ -5,6 +5,11 @@
  * Validates document structure before extraction.
  */
 import { XMLParser } from "fast-xml-parser";
+import {
+  buildImpuestosFromTaxesBreakdown,
+  sumIvaTrasladadoFromImpuestos,
+  sumRetencionesFromImpuestos,
+} from "./cfdiImpuestos.js";
 
 const SUPPORTED_VERSIONS = ["3.3", "4.0"];
 
@@ -250,7 +255,7 @@ export function parseCFDI(xmlString) {
  * @param {Object|undefined} impuestos - Parsed cfdi:Impuestos node
  * @returns {{ totalTrasladados: number|null, totalRetenidos: number|null, traslados: Array, retenciones: Array }}
  */
-function extractTaxes(impuestos) {
+export function extractTaxes(impuestos) {
   if (!impuestos) {
     return { totalTrasladados: null, totalRetenidos: null, traslados: [], retenciones: [] };
   }
@@ -272,11 +277,22 @@ function extractTaxes(impuestos) {
     importe: parseFloat(t["@_Importe"]),
   }));
 
-  const retenciones = (impuestos.Retenciones?.Retencion ?? []).map((r) => ({
-    impuesto: r["@_Impuesto"],
-    impuestoNombre: IMPUESTO_NOMBRES[r["@_Impuesto"]] ?? r["@_Impuesto"],
-    importe: parseFloat(r["@_Importe"]),
-  }));
+  const retRaw = impuestos.Retenciones?.Retencion ?? [];
+  const retList = Array.isArray(retRaw) ? retRaw : [retRaw];
+  const retenciones = retList.map((r) => {
+    const row = {
+      impuesto: r["@_Impuesto"],
+      impuestoNombre: IMPUESTO_NOMBRES[r["@_Impuesto"]] ?? r["@_Impuesto"],
+      importe: parseFloat(r["@_Importe"]),
+    };
+    if (r["@_Base"] !== undefined && r["@_Base"] !== "") {
+      row.base = parseFloat(r["@_Base"]);
+    }
+    if (r["@_TasaOCuota"] !== undefined && r["@_TasaOCuota"] !== "") {
+      row.tasaOCuota = parseFloat(r["@_TasaOCuota"]);
+    }
+    return row;
+  });
 
   return { totalTrasladados, totalRetenidos, traslados, retenciones };
 }
@@ -383,8 +399,6 @@ export function buildComprobanteRegistroBodyFromXml(xmlString) {
       ? parseFloat(tipoCambioRaw)
       : 1.0;
 
-  const iva = sumIvaTrasladosFromImpuestos(comprobante.Impuestos);
-
   const nombreEmisor = String(emisor["@_Nombre"] || "").trim();
   const nombreReceptor = String(receptor["@_Nombre"] || "").trim();
   if (!nombreEmisor || !nombreReceptor) {
@@ -406,6 +420,14 @@ export function buildComprobanteRegistroBodyFromXml(xmlString) {
   if (usoCfdi.length < 2 || usoCfdi.length > 4) {
     throw new CfdiParseError("UsoCFDI inválido", "INVALID_USO_CFDI");
   }
+
+  const taxes = extractTaxes(comprobante.Impuestos);
+  const impuestos = buildImpuestosFromTaxesBreakdown(taxes, { usoCfdi });
+  const iva = sumIvaTrasladadoFromImpuestos(impuestos);
+  const totalRetenidos =
+    taxes.totalRetenidos != null && !Number.isNaN(taxes.totalRetenidos)
+      ? taxes.totalRetenidos
+      : sumRetencionesFromImpuestos(impuestos);
 
   const selloRaw = comprobante["@_Sello"] ?? null;
   const selloEmisor =
@@ -450,6 +472,8 @@ export function buildComprobanteRegistroBodyFromXml(xmlString) {
     subtotal,
     descuento: Number.isNaN(descuento) ? 0 : descuento,
     iva,
+    impuestos,
+    total_retenidos: totalRetenidos,
     total,
     rfc_emisor: String(emisor["@_Rfc"]).toUpperCase().trim(),
     nombre_emisor: nombreEmisor,

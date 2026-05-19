@@ -20,11 +20,16 @@ import {
     SHKZG,
     proveedorFromUserId,
 } from "../config/accountingCatalogs.js";
+import { resolveGlCatalog, resolveCompCode, costCenterRequiredAccountsFor } from "./polizaCatalogService.js";
 import {
-    resolveGlCatalog,
-    resolveCompCode,
-    costCenterRequiredAccountsFor,
-} from "./polizaCatalogService.js";
+    resolveExtendedGlCatalog,
+    resolveImpuestosFromComprobante,
+    resolveGastoBaseFromComprobante,
+    glAccountForImpuesto,
+    normalizeImpuestoCodigo,
+    impuestosNeedManualReview,
+    roundMoney,
+} from "./cfdiImpuestos.js";
 import { fetchBanxicoUsdMxnFixing } from "./banxicoService.js";
 
 const MXN = "MXN";
@@ -294,7 +299,7 @@ const buildComprobacionPoliza = async (request, hasAnticipo) => {
     const receipts = (request.receipts || []).filter((r) => r.cfdiComprobante);
     if (receipts.length === 0) return null;
 
-    const gl = resolveGlCatalog(request);
+    const gl = resolveExtendedGlCatalog(request);
     const comp = resolveCompCode(request);
     const { vendorNo, costCenter } = resolveVendorAndCostCenter(request);
 
@@ -325,9 +330,14 @@ const buildComprobacionPoliza = async (request, hasAnticipo) => {
 
     for (const r of receipts) {
         const c = r.cfdiComprobante;
-        const subtotal = round4(c.subtotal);
-        const iva = round4(c.iva);
-        const total = round4(c.total);
+        const impuestos = resolveImpuestosFromComprobante(c);
+        if (impuestosNeedManualReview(impuestos)) {
+            throw new ValidationError(
+                `Receipt ${r.receiptId}: retenciones sin desglose ISR/IVA. Vuelva a registrar el XML del CFDI.`,
+            );
+        }
+        const gastoBase = resolveGastoBaseFromComprobante(c);
+        const total = roundMoney(c.total);
         const text = (r.receiptType?.receiptTypeName
             ? `Comprobacion ${r.receiptType.receiptTypeName}`
             : `Comprobacion Receipt ${r.receiptId}`).slice(0, 50);
@@ -335,26 +345,66 @@ const buildComprobacionPoliza = async (request, hasAnticipo) => {
         const gastoGl =
             (r.receiptType?.gastoGlAccountCode && String(r.receiptType.gastoGlAccountCode).trim().slice(0, 10)) ||
             gl.gasto;
-        const ivaGl =
-            (r.receiptType?.ivaGlAccountCode && String(r.receiptType.ivaGlAccountCode).trim().slice(0, 10)) ||
-            gl.iva;
+        const ivaGlOverride =
+            r.receiptType?.ivaGlAccountCode && String(r.receiptType.ivaGlAccountCode).trim().slice(0, 10);
 
-        detalle.push({
-            ITEMNO_ACC: itemNo++,
-            SHKZG: SHKZG.DEBE,
-            GL_ACCOUNT: gastoGl,
-            COSTCENTER: costCenter,
-            ITEM_TEXT: text,
-            AMT_DOCCUR: subtotal,
-        });
-
-        if (iva > 0) {
+        if (gastoBase > 0) {
             detalle.push({
                 ITEMNO_ACC: itemNo++,
                 SHKZG: SHKZG.DEBE,
-                GL_ACCOUNT: ivaGl,
+                GL_ACCOUNT: gastoGl,
+                COSTCENTER: costCenter,
                 ITEM_TEXT: text,
-                AMT_DOCCUR: iva,
+                AMT_DOCCUR: gastoBase,
+            });
+        }
+
+        for (const imp of impuestos) {
+            if (imp.tipo !== "traslado" || imp.importe <= 0) continue;
+            let glAccount;
+            try {
+                glAccount = glAccountForImpuesto(imp, gl);
+            } catch (err) {
+                throw new ValidationError(
+                    err?.message || `Impuesto no soportado en receipt ${r.receiptId}`,
+                );
+            }
+            if (normalizeImpuestoCodigo(imp.codigo) === "002" && ivaGlOverride && imp.acreditable !== false) {
+                glAccount = ivaGlOverride;
+            }
+            const line = {
+                ITEMNO_ACC: itemNo++,
+                SHKZG: SHKZG.DEBE,
+                GL_ACCOUNT: glAccount,
+                ITEM_TEXT: text,
+                AMT_DOCCUR: roundMoney(imp.importe),
+            };
+            if (glAccount === gastoGl) line.COSTCENTER = costCenter;
+            detalle.push(line);
+        }
+
+        for (const imp of impuestos) {
+            if (imp.tipo !== "retencion" || imp.importe <= 0) continue;
+            let glAccount;
+            try {
+                glAccount = glAccountForImpuesto(imp, gl);
+            } catch (err) {
+                throw new ValidationError(
+                    err?.message || `Retención no soportada en receipt ${r.receiptId}`,
+                );
+            }
+            const retLabel =
+                normalizeImpuestoCodigo(imp.codigo) === "001"
+                    ? "Ret ISR"
+                    : normalizeImpuestoCodigo(imp.codigo) === "002"
+                      ? "Ret IVA"
+                      : "Retencion";
+            detalle.push({
+                ITEMNO_ACC: itemNo++,
+                SHKZG: SHKZG.HABER,
+                GL_ACCOUNT: glAccount,
+                ITEM_TEXT: `${retLabel} ${text}`.slice(0, 50),
+                AMT_DOCCUR: roundMoney(imp.importe),
             });
         }
 

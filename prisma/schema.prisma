@@ -509,6 +509,9 @@ model CfdiComprobante {
   subtotal        Float
   descuento       Float    @default(0.0)
   iva             Float    @default(0.0)
+  /// Desglose SAT: traslados y retenciones (001 ISR, 002 IVA, 003 IEPS). Ver `cfdiImpuestos.js`.
+  impuestos       Json?
+  totalRetenidos  Float    @default(0.0) @map("total_retenidos")
   total           Float
 
   rfcEmisor           String @map("rfc_emisor") @db.VarChar(13)

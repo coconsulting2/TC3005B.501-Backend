@@ -295,6 +295,38 @@ describe("AccountingExportService.getPolizasForRequest", () => {
         });
     });
 
+    test("GV con retenciones ISR+IVA (freelancer) cuadra Debe/Haber", async () => {
+        AccountingExport.getRequestForExport.mockResolvedValue(
+            makeRequest({
+                requestId: 9,
+                imposedFee: 30000,
+                receipts: [
+                    makeReceipt({
+                        receiptId: 12,
+                        cfdiComprobante: {
+                            subtotal: 9367.5,
+                            iva: 1498.8,
+                            total: 9750.07,
+                            moneda: "MXN",
+                            tipoCambio: 1,
+                            impuestos: [
+                                { codigo: "002", tipo: "traslado", importe: 1498.8 },
+                                { codigo: "002", tipo: "retencion", importe: 999.14 },
+                                { codigo: "001", tipo: "retencion", importe: 117.09 },
+                            ],
+                        },
+                    }),
+                ],
+            }),
+        );
+        const polizas = await AccountingExportService.getPolizasForRequest(9);
+        const gv = polizas.find((p) => p.header.DOC_TYPE === "GV");
+        expect(gv).toBeDefined();
+        expect(sumDebe(gv)).toBeCloseTo(sumHaber(gv), 4);
+        const retLines = gv.detalle.filter((d) => d.GL_ACCOUNT === "1004" || d.GL_ACCOUNT === "1005");
+        expect(retLines.length).toBeGreaterThanOrEqual(2);
+    });
+
     test("lanza ValidationError cuando la poliza queda descuadrada", async () => {
         AccountingExport.getRequestForExport.mockResolvedValue(
             makeRequest({
