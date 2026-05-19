@@ -7,8 +7,9 @@ import {
   approveSolicitud,
   rejectSolicitud,
   reassignSolicitud,
+  getSolicitudHistorial,
 } from "../controllers/solicitudWorkflowController.js";
-import { requirePermission } from "../middleware/permissionMiddleware.js";
+import { requirePermission, requireAnyPermission } from "../middleware/permissionMiddleware.js";
 import { generalRateLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
@@ -91,6 +92,20 @@ router.post(
   validateSolicitudId,
   validateReasignarBody,
   reassignSolicitud,
+);
+
+router.get(
+  "/:id/historial",
+  generalRateLimiter,
+  ...requireAnyPermission(
+    "travel_request:view_own",
+    "travel_request:view_any",
+    "travel_request:authorize",
+    "travel_agent:attend",
+    "accounts_payable:attend" // added cxp just in case they need to view timelines
+  ),
+  validateSolicitudId,
+  getSolicitudHistorial,
 );
 
 export default router;

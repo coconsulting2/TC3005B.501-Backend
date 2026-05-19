@@ -140,7 +140,9 @@ export const getReceiptFileController = async (req, res) => {
     }
 
     res.set("Content-Type", sanitize(file.contentType));
-    res.set("Content-Disposition", `attachment; filename="${sanitize(file.filename)}"`);
+    const isInline = file.contentType === "application/pdf" || file.contentType.startsWith("image/");
+    const disposition = isInline ? "inline" : "attachment";
+    res.set("Content-Disposition", `${disposition}; filename="${sanitize(file.filename)}"`);
 
     const downloadStream = await getReceiptFile(fileId);
     downloadStream.pipe(res);

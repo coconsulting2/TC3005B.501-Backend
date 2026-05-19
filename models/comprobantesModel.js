@@ -96,6 +96,8 @@ const ComprobantesModel = {
           subtotal:                data.subtotal,
           descuento:               data.descuento ?? 0.0,
           iva:                     data.iva ?? 0.0,
+          impuestos:               data.impuestos ?? undefined,
+          totalRetenidos:          data.total_retenidos ?? 0.0,
           total:                   data.total,
           // --- Emisor ---
           rfcEmisor:               data.rfc_emisor,
