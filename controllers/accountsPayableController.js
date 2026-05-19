@@ -10,6 +10,7 @@ import { consultarCfdiWithRetries, acuseToCfdiRow } from "../services/satConsult
 import mailData from "../services/email/mailData.js";
 import { Mail } from "../services/email/mail.cjs";
 import { isWithinDeadline } from "../services/reimbursementTimeService.js";
+import prisma from "../database/config/prisma.js";
 
 const EFOS_EMISOR_BLACKLIST_APPROVAL = ["100", "101", "104"];
 
@@ -241,9 +242,73 @@ const getExpenseValidations = async (req, res) => {
     }
 };
 
+/**
+ * Retrieves all travel requests for the user's organization.
+ * @param {import('express').Request} req - Express request
+ * @param {import('express').Response} res - Express response
+ */
+const getAllRequests = async (req, res) => {
+    const org_id = BigInt(req.tenant?.organizationId ?? req.user.organization_id);
+
+    try {
+        const requests = await prisma.request.findMany({
+            where: {
+                organizationId: org_id,
+                active: true
+            },
+            select: {
+                requestId: true,
+                requestStatus: { select: { status: true } },
+                routeRequests: {
+                    select: {
+                        route: {
+                            select: {
+                                destinationCountry: { select: { countryName: true } },
+                                beginningDate: true,
+                                endingDate: true
+                            }
+                        }
+                    },
+                    orderBy: { route: { routerIndex: 'asc' } }
+                },
+                user: { select: { userName: true, firstName: true, lastName: true } }
+            },
+            orderBy: { creationDate: 'desc' }
+        });
+
+        const formatted = requests.map(r => {
+            const firstRoute = r.routeRequests?.[0]?.route;
+            const lastRoute = r.routeRequests?.[r.routeRequests.length - 1]?.route;
+            
+            const formatDate = (date) => {
+                if (!date) return "—";
+                const d = new Date(date);
+                return isNaN(d.getTime()) ? "—" : d.toISOString().split("T")[0];
+            };
+
+            const userName = `${r.user?.firstName || ''} ${r.user?.lastName || ''}`.trim() || r.user?.userName || "Usuario Desconocido";
+
+            return {
+                request_id: r.requestId,
+                request_status: r.requestStatus?.status || "Desconocido",
+                destination_country: firstRoute?.destinationCountry?.countryName || "—",
+                beginning_date: formatDate(firstRoute?.beginningDate),
+                ending_date: formatDate(lastRoute?.endingDate),
+                requester_name: userName // optional extra info
+            };
+        });
+
+        return res.status(200).json(formatted);
+    } catch (error) {
+        console.error("Error in getAllRequests controller:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+};
+
 export default {
     attendTravelRequest,
     validateReceiptsHandler,
     validateReceipt,
     getExpenseValidations,
+    getAllRequests,
 };

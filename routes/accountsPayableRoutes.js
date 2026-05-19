@@ -41,6 +41,9 @@ router.route("/polizas/:request_id/generar")
 router.route("/attend-travel-request/:request_id")
     .put(generalRateLimiter, ...requirePermission("accounts_payable:attend"), validateId, validateInputs, AccountsPayableController.attendTravelRequest);
 
+router.route("/requests")
+    .get(generalRateLimiter, ...requirePermission("accounts_payable:attend"), AccountsPayableController.getAllRequests);
+
 router.route("/validate-receipts/:request_id")
     .put(generalRateLimiter, ...requirePermission("receipt:validate"), validateId, validateInputs, AccountsPayableController.validateReceiptsHandler);
 
