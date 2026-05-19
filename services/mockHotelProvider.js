@@ -23,6 +23,9 @@
  * @property {number} stars
  */
 
+/**
+ *
+ */
 export class MockHotelProvider {
   /**
    * @param {HotelSearchParams} params

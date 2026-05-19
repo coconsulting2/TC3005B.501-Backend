@@ -107,7 +107,7 @@ export async function readComments(req, res) {
       return res.status(403).json({ error: "Cannot read other user comments" });
     }
 
-    const comments = await requestCommentService.readComments(requestId, userId, limit, cursor);
+    const comments = await requestCommentService.readComments(requestId, userId, limit, {cursor});
 
     if (!comments.success) {
       return res.status(404).json({ error: comments.error });
@@ -177,7 +177,7 @@ export async function streamComments(req, res) {
     const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
     // Send initial batch of comments
-    const comments = await requestCommentService.readComments(requestId, userId, limit);
+    const comments = await requestCommentService.readComments(requestId, userId, limit, {suscribe: true});
 
     if (!comments.success) {
       return res.status(404).json({ error: comments.error });
@@ -188,7 +188,7 @@ export async function streamComments(req, res) {
     // Poll for new comments at regular interval
     const interval = setInterval(async () => {
       try {
-        const latestComments = await requestCommentService.readComments(requestId, userId, limit);
+        const latestComments = await requestCommentService.readComments(requestId, userId, limit, {suscribe: true});
         if (latestComments.success) {
           send(latestComments);
         }

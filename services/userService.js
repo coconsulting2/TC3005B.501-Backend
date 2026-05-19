@@ -52,7 +52,7 @@ export async function authenticateUser(username, password, req) {
   try {
     const orgHint =
       req.body?.organization_id ?? req.body?.organizationId ?? undefined;
-    const user = await userModel.getUserUsername(username, orgHint);
+    const user = await userModel.getUserUsername(String(username).toLowerCase(), orgHint);
 
     if (!user) {
       throw new Error("Invalid username or password");

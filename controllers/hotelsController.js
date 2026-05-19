@@ -56,6 +56,8 @@ export const validateHotelFetchRates = [
 /**
  * POST /api/hotels/search-results/:search_result_id/rates
  * Fetch all rates (cuartos/tarifas) para un resultado de búsqueda Duffel.
+ * @param req
+ * @param res
  */
 export async function postHotelFetchRates(req, res) {
   const searchResultId = req.params.search_result_id;

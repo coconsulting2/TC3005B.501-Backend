@@ -162,20 +162,17 @@ export const getSolicitudHistorial = async (req, res) => {
         user: {
           select: {
             userName: true,
-            firstName: true,
-            lastName: true,
             role: { select: { roleName: true } }
           }
         }
       },
-      orderBy: { createdAt: 'asc' }
+      orderBy: { createdAt: "asc" }
     });
 
     const mapped = historial.map(h => {
-      const name = `${h.user.firstName || ''} ${h.user.lastName || ''}`.trim() || h.user.userName;
       return {
         action: h.accion,
-        user: name,
+        user: h.user.userName,
         role: h.user.role?.roleName || "",
         timestamp: h.createdAt.toISOString(),
         comment: h.comentario || null
