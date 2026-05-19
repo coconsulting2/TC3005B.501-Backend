@@ -6,6 +6,7 @@ import authorizerServices from "../services/authorizerService.js";
 import { Mail } from "../services/email/mail.cjs";
 import mailData from "../services/email/mailData.js";
 import prisma from "../database/config/prisma.js";
+import { buildSolicitudJourney } from "../services/solicitudJourneyService.js";
 
 /** Permisos que permiten ver historial de solicitudes ajenas en el mismo tenant. */
 const HISTORIAL_BROAD_VIEW_PERMISSIONS = [
@@ -138,7 +139,19 @@ export const getSolicitudHistorial = async (req, res) => {
   try {
     const request = await prisma.request.findUnique({
       where: { requestId: request_id },
-      select: { userId: true, organizationId: true },
+      select: {
+        userId: true,
+        organizationId: true,
+        requestStatusId: true,
+        creationDate: true,
+        workflowPreSnapshot: true,
+        requestStatus: { select: { status: true } },
+        routeRequests: {
+          include: {
+            route: { select: { hotelNeeded: true, planeNeeded: true } },
+          },
+        },
+      },
     });
 
     if (!request) {
@@ -162,27 +175,23 @@ export const getSolicitudHistorial = async (req, res) => {
         user: {
           select: {
             userName: true,
-            firstName: true,
-            lastName: true,
-            role: { select: { roleName: true } }
-          }
-        }
+            role: { select: { roleName: true } },
+          },
+        },
       },
-      orderBy: { createdAt: 'asc' }
+      orderBy: { createdAt: "asc" },
     });
 
-    const mapped = historial.map(h => {
-      const name = `${h.user.firstName || ''} ${h.user.lastName || ''}`.trim() || h.user.userName;
-      return {
-        action: h.accion,
-        user: name,
-        role: h.user.role?.roleName || "",
-        timestamp: h.createdAt.toISOString(),
-        comment: h.comentario || null
-      };
+    const journey = buildSolicitudJourney({
+      currentStatusId: request.requestStatusId,
+      currentStatusLabel: request.requestStatus?.status ?? "",
+      workflowPreSnapshot: request.workflowPreSnapshot,
+      routeRequests: request.routeRequests,
+      creationDate: request.creationDate,
+      historial,
     });
 
-    return res.status(200).json(mapped);
+    return res.status(200).json(journey);
   } catch (error) {
     console.error("getSolicitudHistorial:", error);
     return res.status(500).json({ error: "Internal server error" });
