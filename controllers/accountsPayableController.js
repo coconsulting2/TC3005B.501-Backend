@@ -271,7 +271,7 @@ const getAllRequests = async (req, res) => {
                     },
                     orderBy: { route: { routerIndex: 'asc' } }
                 },
-                user: { select: { userName: true, firstName: true, lastName: true } }
+                user: { select: { userName: true } }
             },
             orderBy: { creationDate: 'desc' }
         });
@@ -286,7 +286,7 @@ const getAllRequests = async (req, res) => {
                 return isNaN(d.getTime()) ? "—" : d.toISOString().split("T")[0];
             };
 
-            const userName = `${r.user?.firstName || ''} ${r.user?.lastName || ''}`.trim() || r.user?.userName || "Usuario Desconocido";
+            const userName = r.user?.userName || "Usuario Desconocido";
 
             return {
                 request_id: r.requestId,
