@@ -150,6 +150,10 @@ dist
 # prisma cache
 /generated/prisma
 
+# CFDI/PDF reales para seed UAT (solo local; ver prisma/seed-usability.js)
+prisma/fixtures/usability-cfdi/*
+!prisma/fixtures/usability-cfdi/.gitkeep
+
 # IDEs stuff
 .idea/
 *.local/
