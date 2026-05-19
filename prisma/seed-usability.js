@@ -273,6 +273,44 @@ async function resetOrgTravelData(orgId) {
   });
   const routeIds = [...new Set(links.map((l) => l.routeId))];
 
+  const receipts = await prisma.receipt.findMany({
+    where: { requestId: { in: requestIds } },
+    select: { receiptId: true },
+  });
+  const receiptIds = receipts.map((r) => r.receiptId);
+
+  if (receiptIds.length) {
+    await prisma.cfdiComprobante.deleteMany({
+      where: { receiptId: { in: receiptIds } },
+    });
+    await prisma.gastoTramo.deleteMany({
+      where: { receiptId: { in: receiptIds } },
+    });
+    await prisma.policyException.updateMany({
+      where: { receiptId: { in: receiptIds } },
+      data: { receiptId: null },
+    });
+  }
+
+  await prisma.anticipoPolizaSnapshot.deleteMany({
+    where: { requestId: { in: requestIds } },
+  });
+  await prisma.accountingPoliza.deleteMany({
+    where: { requestId: { in: requestIds } },
+  });
+  await prisma.solicitudHistorial.deleteMany({
+    where: { requestId: { in: requestIds } },
+  });
+  await prisma.alert.deleteMany({
+    where: { requestId: { in: requestIds } },
+  });
+  await prisma.requestComment.deleteMany({
+    where: { requestId: { in: requestIds } },
+  });
+  await prisma.policyException.deleteMany({
+    where: { requestId: { in: requestIds } },
+  });
+
   await prisma.receipt.deleteMany({ where: { requestId: { in: requestIds } } });
   await prisma.routeRequest.deleteMany({ where: { organizationId: orgId } });
   await prisma.request.deleteMany({ where: { organizationId: orgId } });
