@@ -43,7 +43,7 @@ import csrf from "csurf";
 import path from "path";
 import { fileURLToPath } from "url";
 import swaggerUi from "swagger-ui-express";
-import { close } from "./utils/log/logger.js";
+import { close, logger } from "./utils/log/logger.js";
 import { httpLogger } from "./utils/log/logger.http.js";
 
 // JSON serialization patch for Prisma BigInt fields (M2-006: orgId, etc.).
@@ -65,6 +65,7 @@ const allowedCORS = process.env.CORS_ORIGIN
 
 const CORS = cors({
     origin: (origin, callback) => {
+        logger.trace(`CORS origin received: ${JSON.stringify(origin)}`);
         if (!origin) {
             return callback(null, true);
         }
@@ -73,7 +74,7 @@ const CORS = cors({
             return callback(null, true);
         }
 
-        console.warn(`CORS rejected: ${origin}`);
+        logger.warn(`CORS rejected: ${origin}`);
         return callback(new Error(`CORS policy blocked: ${origin}`));
     },
     credentials: true,
@@ -88,7 +89,9 @@ app.use(cookieParser());
 app.use(httpLogger);
 
 if (process.env.NODE_ENV !== "test") {
-    const csrfProtection = csrf({ cookie: true });
+    const csrfProtection = csrf({ cookie: {
+        maxAge: 60 * 60 * 24
+        }});
     /**
      * CSRF en JSON + SPA: el login no puede enviar token antes de existir sesión.
      * Excluimos solo POST /api/user/login; el resto de mutaciones siguen protegidas.
@@ -179,8 +182,6 @@ app.use((err, req, res, next) => {
     next(err);
 });
 
-// Centralized auth error handler — must be registered after all routes
-app.use(handleAuthError);
 
 app.get("/", (req, res) => {
     res.json({
@@ -190,6 +191,21 @@ app.get("/", (req, res) => {
 
 app.get("/health", (req, res) => {
     res.status(200).send("Server running OK");
+});
+
+app.use(handleAuthError);
+app.use((err, req, res, next) => {
+    if (err.code === "EBADCSRFTOKEN") {
+        CORS(req, res, () => {
+            return res.status(403).json({
+                statusCode: 403,
+                message: "Invalid or missing CSRF token",
+                error: "EBADCSRFTOKEN",
+            });
+        });
+        return;
+    }
+    next(err);
 });
 
 async function deallocate_resources() {
