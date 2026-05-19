@@ -311,17 +311,17 @@ const getAllRequests = async (req, res) => {
                             }
                         }
                     },
-                    orderBy: { route: { routerIndex: 'asc' } }
+                    orderBy: { route: { routerIndex: "asc" } }
                 },
                 user: { select: { userName: true } }
             },
-            orderBy: { creationDate: 'desc' }
+            orderBy: { creationDate: "desc" }
         });
 
         const formatted = requests.map(r => {
             const firstRoute = r.routeRequests?.[0]?.route;
             const lastRoute = r.routeRequests?.[r.routeRequests.length - 1]?.route;
-            
+
             const formatDate = (date) => {
                 if (!date) return "—";
                 const d = new Date(date);
