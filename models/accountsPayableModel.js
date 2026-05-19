@@ -107,13 +107,17 @@ const AccountsPayable = {
   async findReceiptForValidation(receiptId) {
     const receipt = await prisma.receipt.findUnique({
       where: { receiptId: Number(receiptId) },
-      include: { cfdiComprobante: true },
+      include: {
+        cfdiComprobante: true,
+        receiptType: { select: { receiptTypeName: true } },
+      },
     });
     if (!receipt) return undefined;
     return {
       receipt_id: receipt.receiptId,
       request_id: receipt.requestId,
       validation: receipt.validation,
+      receipt_type_name: receipt.receiptType?.receiptTypeName ?? null,
       cfdiComprobante: receipt.cfdiComprobante,
     };
   },

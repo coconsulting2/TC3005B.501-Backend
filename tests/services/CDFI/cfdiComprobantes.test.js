@@ -82,6 +82,10 @@ await jest.unstable_mockModule("../../../services/permissionService.js", () => (
   loadEffectivePermissionsForRole: jest.fn().mockResolvedValue([]),
 }));
 
+await jest.unstable_mockModule("../../../services/requestCommentService.js", () => ({
+  createComment: jest.fn().mockResolvedValue({ success: true }),
+}));
+
 /** Política de carga de comprobantes (insertarCfdi) consulta estado de solicitud vía Prisma; se simula aquí. */
 await jest.unstable_mockModule("../../../models/applicantModel.js", () => ({
   default: {
@@ -512,9 +516,10 @@ describe("PUT /api/accounts-payable/validate-receipt/:receipt_id (SAT)", () => {
     expect(AccountsPayableService.validateReceiptsAndUpdateStatus).toHaveBeenCalledWith(501);
   });
 
-  test("rechazar no llama al SAT", async () => {
+  test("400 al rechazar sin comentario", async () => {
     AccountsPayable.findReceiptForValidation.mockResolvedValue({
       receipt_id: 14,
+      request_id: 501,
       validation: "Pendiente",
       cfdiComprobante: mockCfdiApprove,
     });
@@ -522,7 +527,25 @@ describe("PUT /api/accounts-payable/validate-receipt/:receipt_id (SAT)", () => {
       .put("/api/accounts-payable/validate-receipt/14")
       .set(CPP_AUTH_HEADERS)
       .send({ approval: 0 });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/comentario/i);
+    expect(AccountsPayable.validateReceipt).not.toHaveBeenCalled();
+  });
+
+  test("rechazar con comentario no llama al SAT", async () => {
+    AccountsPayable.findReceiptForValidation.mockResolvedValue({
+      receipt_id: 14,
+      request_id: 501,
+      receipt_type_name: "Comida",
+      validation: "Pendiente",
+      cfdiComprobante: mockCfdiApprove,
+    });
+    const res = await request(app)
+      .put("/api/accounts-payable/validate-receipt/14")
+      .set(CPP_AUTH_HEADERS)
+      .send({ approval: 0, comentario: "CFDI cancelado en el SAT" });
     expect(res.status).toBe(200);
     expect(consultarCfdiWithRetries).not.toHaveBeenCalled();
+    expect(AccountsPayable.validateReceipt).toHaveBeenCalledWith(14, 3);
   });
 });
