@@ -14,6 +14,7 @@ router.get(
   generalRateLimiter,
   ...requireAnyPermission(
     "travel_request:view_any",
+    "travel_request:authorize",
     "expense:view",
     "policy:manage"
   ),

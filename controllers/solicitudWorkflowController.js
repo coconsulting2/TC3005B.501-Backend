@@ -175,11 +175,11 @@ export const getSolicitudHistorial = async (req, res) => {
         user: {
           select: {
             userName: true,
-            role: { select: { roleName: true } }
-          }
-        }
+            role: { select: { roleName: true } },
+          },
+        },
       },
-      orderBy: { createdAt: "asc" }
+      orderBy: { createdAt: "asc" },
     });
 
     const journey = buildSolicitudJourney({
