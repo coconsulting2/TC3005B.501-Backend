@@ -208,6 +208,9 @@ app.use((err, req, res, next) => {
     next(err);
 });
 
+/**
+ *
+ */
 async function deallocate_resources() {
     await close();
     console.log("Pino prisma clean ups done.");

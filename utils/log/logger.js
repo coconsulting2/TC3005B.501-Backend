@@ -1,26 +1,26 @@
-import pino from 'pino';
-import { URL } from 'url';
+import pino from "pino";
+import { URL } from "url";
 
 
 const transport = pino.transport({
     targets: [
         ...(process.env.NODE_ENV !== "production" ?
-                [{ target: 'pino-pretty', level: 'debug', options: { colorize: true } }] : []
+                [{ target: "pino-pretty", level: "debug", options: { colorize: true } }] : []
         ),
         {
-            target: new URL('./pino-prisma-transport.js', import.meta.url).href,
-            level: 'info',
+            target: new URL("./pino-prisma-transport.js", import.meta.url).href,
+            level: "info",
         }
     ]
 });
 
 const logger = pino({
-    base: { service: 'coco-api' }
+    base: { service: "coco-api" }
 }, transport);
 
 const close = async () => {
     const timeout = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Transport close timeout.')), 5000);
+        setTimeout(() => reject(new Error("Transport close timeout.")), 5000);
     });
 
     await Promise.race([
@@ -29,6 +29,10 @@ const close = async () => {
     ]);
 };
 
+/**
+ *
+ * @param service
+ */
 function Logger(service) {
     return pino({ base: { service: service } }, transport);
 }

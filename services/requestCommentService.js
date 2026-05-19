@@ -122,7 +122,7 @@ export async function createComment(userId, requestId, content) {
  * @returns {Promise<{success: boolean, data?: Object, next?: string, error?: string}>}
  */
 export async function readComments(requestId, userId, limit, {cursor, suscribe = false}) {
-    logger[(suscribe? 'trace' : 'info')]({ requestId, userId, limit, hasCursor: !!cursor },
+    logger[(suscribe? "trace" : "info")]({ requestId, userId, limit, hasCursor: !!cursor },
         "[requestCommentService] readComments"
     );
 
@@ -210,7 +210,7 @@ export async function readComments(requestId, userId, limit, {cursor, suscribe =
         };
     });
 
-    logger[(suscribe? 'trace' : 'info')]({ messagesLength: messages.length, requestId, next: !!result.next },
+    logger[(suscribe? "trace" : "info")]({ messagesLength: messages.length, requestId, next: !!result.next },
         "[requestCommentService] readComments"
     );
 

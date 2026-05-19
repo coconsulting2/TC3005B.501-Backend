@@ -166,7 +166,7 @@ export const getSolicitudHistorial = async (req, res) => {
           }
         }
       },
-      orderBy: { createdAt: 'asc' }
+      orderBy: { createdAt: "asc" }
     });
 
     const mapped = historial.map(h => {

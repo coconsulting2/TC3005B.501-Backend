@@ -1,7 +1,10 @@
-import build from 'pino-abstract-transport';
-import prisma from '../../database/config/prisma.js';
+import build from "pino-abstract-transport";
+import prisma from "../../database/config/prisma.js";
 
 
+/**
+ *
+ */
 export default async function () {
     console.log("Pino prisma transport building...");
 
@@ -27,9 +30,9 @@ export default async function () {
             } catch (err) {
                 if (buffer.length + toInsert.length < BUFFER_M.MAX_SIZE) {
                     buffer = [...toInsert, ...buffer];
-                    process.stderr.write(JSON.stringify({ msg: 'Batch insert failed (re queueing)', err }) + '\n');
+                    process.stderr.write(JSON.stringify({ msg: "Batch insert failed (re queueing)", err }) + "\n");
                 } else {
-                    process.stderr.write('Log buffer overflow, dropping log queue: ' + JSON.stringify(buffer) + '\n');
+                    process.stderr.write("Log buffer overflow, dropping log queue: " + JSON.stringify(buffer) + "\n");
                     buffer = [];
                 }
             } finally {
@@ -72,7 +75,7 @@ export default async function () {
         await flush();
     }, {
         async close() {
-            await cleanUp()
+            await cleanUp();
         }
     });
 };
