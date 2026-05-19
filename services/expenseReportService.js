@@ -3,19 +3,22 @@
  * @description Agrega comprobantes (Receipt) por centro de costo y periodo para el
  *   dashboard M3-009. Usa el departamento del solicitante de la solicitud como CC.
  *
- *   Alcance:
- *   - `organization`: CxP / admin (`travel_request:view_any`, `policy:manage`).
- *   - `team`: N1/N2 con `expense:view` — solo subordinados (árbol `manager_user_id`).
+ *   Alcance por rol:
+ *   - CxP / admin (`travel_request:view_any`, `expense:view`, `policy:manage`): toda la org.
+ *   - N1 / N2 (`travel_request:authorize`): solo subordinados transitivos (cadena hacia abajo).
+ *   - Resto: solo comprobantes propios.
  */
 
 import { getSubordinatesRecursive } from "./employeeHierarchyService.js";
 
 /** @typedef {import('@prisma/client').PrismaClient} PrismaClient */
 
-/**
- * @typedef {'organization'|'team'} ReportScope
- * @typedef {{ scope?: ReportScope, actorUserId?: number }} ReportScopeOpts
- */
+/** Permisos que ven gasto de toda la organización en el reporte. */
+const ORG_WIDE_REPORT_PERMISSIONS = [
+  "travel_request:view_any",
+  "expense:view",
+  "policy:manage",
+];
 
 /** IDs de estatus de solicitud (seed global `Request_status`). */
 const REQUEST_STATUS_FINALIZADO = 8;
@@ -97,17 +100,47 @@ function queryAsIntList(q) {
 }
 
 /**
+ * @param {Set<string>|undefined} permissionSet
+ * @returns {boolean}
+ */
+export function canViewOrganizationExpenseReport(permissionSet) {
+  if (!(permissionSet instanceof Set)) return false;
+  return ORG_WIDE_REPORT_PERMISSIONS.some((code) => permissionSet.has(code));
+}
+
+/**
+ * Usuarios cuyos comprobantes puede ver el actor en el reporte.
+ * `null` = sin filtro (toda la organización).
+ *
+ * @param {number} actorUserId
+ * @param {Set<string>|undefined} permissionSet
+ * @returns {Promise<number[]|null>}
+ */
+export async function resolveExpenseReportVisibleUserIds(actorUserId, permissionSet) {
+  if (canViewOrganizationExpenseReport(permissionSet)) {
+    return null;
+  }
+
+  const uid = Number(actorUserId);
+  if (!Number.isFinite(uid) || uid < 1) {
+    return [];
+  }
+
+  if (permissionSet instanceof Set && permissionSet.has("travel_request:authorize")) {
+    return getSubordinatesRecursive(uid);
+  }
+
+  return [uid];
+}
+
+/**
  * @param {object} query - req.query
  * @param {bigint} organizationId
  * @param {PrismaClient} prisma
- * @param {ReportScopeOpts} [scopeOpts]
+ * @param {{ visibleUserIds?: number[]|null }} [options]
  */
-export async function buildExpensesByCostCenterReport(
-  prisma,
-  query,
-  organizationId,
-  scopeOpts = {},
-) {
+export async function buildExpensesByCostCenterReport(prisma, query, organizationId, options = {}) {
+  const { visibleUserIds = null } = options;
   const period = query.period === "quarterly" ? "quarterly" : "monthly";
   const fromStr = typeof query.from === "string" ? query.from : "";
   const toStr = typeof query.to === "string" ? query.to : "";
@@ -119,18 +152,6 @@ export async function buildExpensesByCostCenterReport(
   const filterCcIds = queryAsIntList(query.costCenterId);
 
   const orgId = organizationId;
-  const scope = scopeOpts.scope === "team" ? "team" : "organization";
-
-  /** @type {number[]|null} */
-  let teamUserIds = null;
-  if (scope === "team" && scopeOpts.actorUserId != null) {
-    const actor = Number(scopeOpts.actorUserId);
-    if (Number.isFinite(actor) && actor > 0) {
-      teamUserIds = await getSubordinatesRecursive(actor);
-    } else {
-      teamUserIds = [];
-    }
-  }
 
   const dateFilter =
     fromDate && toDate && !Number.isNaN(fromDate.getTime()) && !Number.isNaN(toDate.getTime())
@@ -141,9 +162,6 @@ export async function buildExpensesByCostCenterReport(
     where: {
       organizationId: orgId,
       requestId: { not: null },
-      ...(teamUserIds
-        ? { request: { userId: { in: teamUserIds } } }
-        : {}),
       ...(dateFilter ? { submissionDate: dateFilter } : {}),
     },
     include: {
@@ -183,6 +201,16 @@ export async function buildExpensesByCostCenterReport(
     const req = r.request;
     if (!req) continue;
 
+    if (visibleUserIds !== null) {
+      const applicantId = req.userId;
+      if (
+        applicantId == null ||
+        !visibleUserIds.includes(Number(applicantId))
+      ) {
+        continue;
+      }
+    }
+
     const dept = req.user?.department;
     let cost_center_id;
     let cost_center_code;
@@ -218,11 +246,18 @@ export async function buildExpensesByCostCenterReport(
     });
   }
 
+  const ccIdsInRows = new Set(rows.map((row) => row.cost_center_id));
+  const scopedBudgets =
+    visibleUserIds === null
+      ? budgets
+      : budgets.filter((b) => ccIdsInRows.has(b.cost_center_id));
+
   return {
     generated_at: new Date().toISOString(),
-    scope,
-    team_member_count: scope === "team" ? teamUserIds?.length ?? 0 : null,
+    scope: visibleUserIds === null ? "organization" : "team",
+    team_member_count:
+      visibleUserIds === null ? null : visibleUserIds.length,
     rows,
-    budgets,
+    budgets: scopedBudgets,
   };
 }
