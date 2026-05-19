@@ -11,8 +11,16 @@ import mailData from "../services/email/mailData.js";
 import { Mail } from "../services/email/mail.cjs";
 import { isWithinDeadline } from "../services/reimbursementTimeService.js";
 import prisma from "../database/config/prisma.js";
+import { createComment } from "../services/requestCommentService.js";
 
 const EFOS_EMISOR_BLACKLIST_APPROVAL = ["100", "101", "104"];
+
+/**
+ * Estados visibles en GET /accounts-payable/requests (historial CxP).
+ * 7 = Validación de comprobantes · 8 = Finalizado
+ * (catálogo global Request_status, ver seed.js).
+ */
+const CXP_HISTORIAL_STATUS_IDS = [7, 8];
 
 /**
  * Lista "0, 1, 0" del modelo → true si algún tramo requiere hotel o avión.
@@ -110,7 +118,8 @@ const validateReceiptsHandler = async (req, res) => {
 /**
  * Approves or rejects a single receipt.
  * Maps approval (1=approved→validation 2, 0=rejected→validation 3).
- * @param {import('express').Request} req - Express request (params: receipt_id, body: { approval: 0|1 })
+ * Al rechazar, `comentario` (o `comment`) es obligatorio y se publica en el chat de la solicitud.
+ * @param {import('express').Request} req - Express request (params: receipt_id, body: { approval: 0|1, comentario? })
  * @param {import('express').Response} res - Express response
  * @returns {void} JSON with receipt status update result
  */
@@ -122,6 +131,16 @@ const validateReceipt = async (req, res) => {
         return res.status(400).json({
             error: "Invalid input (only values 0 or 1 accepted for approval)"
         });
+    }
+
+    let rejectComment = null;
+    if (approval === 0) {
+        rejectComment = String(req.body?.comentario ?? req.body?.comment ?? "").trim();
+        if (!rejectComment) {
+            return res.status(400).json({
+                error: "El comentario es obligatorio al rechazar un comprobante.",
+            });
+        }
     }
 
     try {
@@ -181,6 +200,28 @@ const validateReceipt = async (req, res) => {
 
         if (!updated) {
             return res.status(400).json({ error: "Failed to update travel request status" });
+        }
+
+        if (
+            approval === 0 &&
+            rejectComment &&
+            Number.isFinite(Number(receipt.request_id))
+        ) {
+            const typeLabel = receipt.receipt_type_name
+                ? `«${receipt.receipt_type_name}»`
+                : `#${receiptId}`;
+            const commentBody = `Comprobante ${typeLabel} rechazado: ${rejectComment}`;
+            const commentResult = await createComment(
+                Number(req.user.user_id),
+                Number(receipt.request_id),
+                commentBody,
+            );
+            if (!commentResult.success) {
+                console.warn(
+                    "[validateReceipt] Comprobante rechazado; comentario no guardado:",
+                    commentResult.error,
+                );
+            }
         }
 
         if (approval === 1 && Number.isFinite(Number(receipt.request_id))) {
@@ -243,7 +284,7 @@ const getExpenseValidations = async (req, res) => {
 };
 
 /**
- * Retrieves all travel requests for the user's organization.
+ * Historial de solicitudes para CxP: solo validación de comprobantes y finalizadas.
  * @param {import('express').Request} req - Express request
  * @param {import('express').Response} res - Express response
  */
@@ -254,7 +295,8 @@ const getAllRequests = async (req, res) => {
         const requests = await prisma.request.findMany({
             where: {
                 organizationId: org_id,
-                active: true
+                active: true,
+                requestStatusId: { in: CXP_HISTORIAL_STATUS_IDS },
             },
             select: {
                 requestId: true,

@@ -3,7 +3,10 @@
  * @description Handler GET expenses-by-cc (reporte por centro de costo).
  */
 import prisma from "../database/config/prisma.js";
-import { buildExpensesByCostCenterReport } from "../services/expenseReportService.js";
+import {
+  buildExpensesByCostCenterReport,
+  resolveExpenseReportVisibleUserIds,
+} from "../services/expenseReportService.js";
 
 /**
  * GET /api/reports/expenses-by-cc
@@ -17,7 +20,14 @@ export async function getExpensesByCostCenter(req, res, next) {
         error: "No hay organización en contexto. Inicia sesión de nuevo o elige una organización (impersonación).",
       });
     }
-    const data = await buildExpensesByCostCenterReport(prisma, req.query, orgId);
+    const visibleUserIds = await resolveExpenseReportVisibleUserIds(
+      Number(req.user.user_id),
+      req.user.permissionSet,
+    );
+
+    const data = await buildExpensesByCostCenterReport(prisma, req.query, orgId, {
+      visibleUserIds,
+    });
     return res.json(data);
   } catch (err) {
     next(err);
