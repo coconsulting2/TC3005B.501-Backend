@@ -264,7 +264,7 @@ export function glAccountForImpuesto(imp, gl) {
         if (codigo === "002") return gl.retencionIva;
         if (codigo === "003") {
             const err = new Error(
-                "Retención IEPS (003) no está soportada en exportación contable. Configure cuenta RetencionIeps o re-clasifique el CFDI.",
+                "Retención IEPS (003) no está soportada en exportación contable por este módulo. Re-clasifique o corrija el CFDI antes de exportarlo.",
             );
             err.code = "UNSUPPORTED_RETENCION_IEPS";
             throw err;
