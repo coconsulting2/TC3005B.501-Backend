@@ -372,6 +372,9 @@ const buildComprobacionPoliza = async (request, hasAnticipo) => {
             if (normalizeImpuestoCodigo(imp.codigo) === "002" && ivaGlOverride && imp.acreditable !== false) {
                 glAccount = ivaGlOverride;
             }
+            if (glAccount === gl.gasto) {
+                glAccount = gastoGl;
+            }
             const line = {
                 ITEMNO_ACC: itemNo++,
                 SHKZG: SHKZG.DEBE,

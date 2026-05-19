@@ -125,12 +125,9 @@ describe("resolveGastoBaseFromComprobante", () => {
 describe("glAccountForImpuesto", () => {
     test("retención IEPS lanza UNSUPPORTED_RETENCION_IEPS", () => {
         const gl = glDefaults();
-        try {
-            glAccountForImpuesto({ codigo: "003", tipo: "retencion", importe: 10 }, gl);
-            expect.unreachable();
-        } catch (err) {
-            expect(err.code).toBe("UNSUPPORTED_RETENCION_IEPS");
-        }
+        expect(() =>
+            glAccountForImpuesto({ codigo: "003", tipo: "retencion", importe: 10 }, gl),
+        ).toThrow(expect.objectContaining({ code: "UNSUPPORTED_RETENCION_IEPS" }));
     });
 
     test("IVA no acreditable va a gasto", () => {

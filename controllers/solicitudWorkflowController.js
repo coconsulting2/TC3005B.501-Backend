@@ -7,6 +7,23 @@ import { Mail } from "../services/email/mail.cjs";
 import mailData from "../services/email/mailData.js";
 import prisma from "../database/config/prisma.js";
 
+/** Permisos que permiten ver historial de solicitudes ajenas en el mismo tenant. */
+const HISTORIAL_BROAD_VIEW_PERMISSIONS = [
+  "travel_request:view_any",
+  "travel_request:authorize",
+  "travel_agent:attend",
+  "accounts_payable:attend",
+];
+
+/**
+ * @param {Set<string>|undefined} permissionSet
+ * @returns {boolean}
+ */
+function canViewAnyTravelRequestHistorial(permissionSet) {
+  if (!(permissionSet instanceof Set)) return false;
+  return HISTORIAL_BROAD_VIEW_PERMISSIONS.some((code) => permissionSet.has(code));
+}
+
 /**
  *
  * @param request_id
@@ -129,6 +146,13 @@ export const getSolicitudHistorial = async (req, res) => {
     }
 
     if (request.organizationId !== org_id) {
+      return res.status(403).json({ error: "Acceso denegado" });
+    }
+
+    if (
+      !canViewAnyTravelRequestHistorial(req.user.permissionSet) &&
+      request.userId !== user_id
+    ) {
       return res.status(403).json({ error: "Acceso denegado" });
     }
 
