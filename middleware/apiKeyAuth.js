@@ -7,7 +7,6 @@
 import * as apiKeyService from "../services/apiKeyService.js";
 import * as apiKeyModel from "../models/apiKeyModel.js";
 import { withTenantContext } from "./tenantContext.js";
-import { logger } from "../utils/log/logger.js";
 import {
   InvalidApiKeyError,
   InsufficientApiKeyScopeError,
@@ -117,10 +116,7 @@ export const apiKeyAuditLog = (req, res, next) => {
   const pathOnly = (req.originalUrl || req.url || "").split("?")[0];
   const endpoint = `${req.method} ${pathOnly}`;
   res.on("finish", () => {
-    logger.info(
-      { keyId: row.id, orgId: String(row.organizationId), endpoint, status: res.statusCode },
-      "api_key consumption",
-    );
+    // Auditoría en BD (api_key_logs). No loguear keyId/orgId en texto claro (CodeQL js/clear-text-logging).
     void apiKeyModel
       .createApiKeyLog({
         keyId: row.id,

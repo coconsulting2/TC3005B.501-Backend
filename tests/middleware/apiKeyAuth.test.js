@@ -4,10 +4,6 @@
  */
 import { jest } from "@jest/globals";
 
-await jest.unstable_mockModule("../../utils/log/logger.js", () => ({
-  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), trace: jest.fn() },
-}));
-
 const { extractApiKeyFromRequest } = await import("../../middleware/apiKeyAuth.js");
 const { InvalidApiKeyError } = await import("../../middleware/authErrors.js");
 
