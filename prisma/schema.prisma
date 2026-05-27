@@ -702,6 +702,7 @@ model ReimbursementTimeLimit {
 model ApiKey {
   id             Int       @id @default(autoincrement())
   organizationId BigInt    @map("org_id")
+  name           String    @db.VarChar(120)
   keyHash        String    @unique @map("key_hash") @db.VarChar(64)
   scope          Json
   expiresAt      DateTime  @map("expires_at")

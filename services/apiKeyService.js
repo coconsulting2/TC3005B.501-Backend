@@ -128,9 +128,23 @@ function parseExpiresAt(expiresAt) {
  * @param {number} input.createdBy - user_id del admin
  * @returns {Promise<{ record: object, plainKey: string }>}
  */
-export async function generateApiKeyForOrg({ orgId, scope, expiresAt, createdBy }) {
+/**
+ * @param {string} name
+ */
+function normalizeName(name) {
+  const trimmed = typeof name === "string" ? name.trim() : "";
+  if (trimmed.length < 1 || trimmed.length > 120) {
+    const err = new Error("name must be between 1 and 120 characters");
+    err.status = 400;
+    throw err;
+  }
+  return trimmed;
+}
+
+export async function generateApiKeyForOrg({ orgId, name, scope, expiresAt, createdBy }) {
   const normalizedScope = normalizeScope(scope);
   const exp = parseExpiresAt(expiresAt);
+  const keyName = normalizeName(name);
 
   // Reintenta ante choques improbables del índice único sobre key_hash.
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -141,7 +155,8 @@ export async function generateApiKeyForOrg({ orgId, scope, expiresAt, createdBy 
     }
     try {
       const record = await apiKeyModel.createApiKey({
-        orgId: BigInt(orgId),
+        organizationId: BigInt(orgId),
+        name: keyName,
         keyHash,
         scope: normalizedScope,
         expiresAt: exp,
@@ -168,7 +183,18 @@ export const revokeApiKey = (id) => apiKeyModel.revokeApiKeyById(id);
  * @param {bigint|string|number} orgId
  * @returns {Promise<object[]>}
  */
-export const listKeysForOrg = (orgId) => apiKeyModel.listApiKeysByOrgId(orgId);
+/**
+ * @param {bigint|string|number} orgId
+ * @returns {Promise<object[]>}
+ */
+export async function listKeysForOrg(orgId) {
+  const rows = await apiKeyModel.listApiKeysByOrgId(orgId);
+  const now = Date.now();
+  return rows.map((row) => ({
+    ...row,
+    active: !row.revokedAt && row.expiresAt.getTime() > now,
+  }));
+}
 
 /**
  * Lista entradas de auditoría (paginadas por cursor descendente sobre id).

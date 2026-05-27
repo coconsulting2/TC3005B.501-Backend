@@ -6,6 +6,8 @@
  */
 import * as apiKeyService from "../services/apiKeyService.js";
 import * as apiKeyModel from "../models/apiKeyModel.js";
+import { withTenantContext } from "./tenantContext.js";
+import { logger } from "../utils/log/logger.js";
 import {
   InvalidApiKeyError,
   InsufficientApiKeyScopeError,
@@ -58,6 +60,29 @@ export async function resolveActiveApiKey(plainKey) {
 }
 
 /**
+ * Establece tenant context + `req.tenant` a partir de la org de la API key.
+ * Debe ejecutarse después de `authenticateApiKey`.
+ *
+ * @type {import("express").RequestHandler}
+ */
+export const apiKeyTenantContext = (req, res, next) => {
+  const row = req.apiKey;
+  if (!row) {
+    return next();
+  }
+  const organizationId = BigInt(row.organizationId);
+  const ctx = {
+    organizationId,
+    jwtOrgId: organizationId,
+    userId: null,
+    isRoot: false,
+    bypassTenant: false,
+  };
+  req.tenant = ctx;
+  return withTenantContext(ctx, () => next());
+};
+
+/**
  * Middleware: exige cabecera con API key válida y adjunta `req.apiKey`.
  *
  * @type {import("express").RequestHandler}
@@ -92,6 +117,10 @@ export const apiKeyAuditLog = (req, res, next) => {
   const pathOnly = (req.originalUrl || req.url || "").split("?")[0];
   const endpoint = `${req.method} ${pathOnly}`;
   res.on("finish", () => {
+    logger.info(
+      { keyId: row.id, orgId: String(row.organizationId), endpoint, status: res.statusCode },
+      "api_key consumption",
+    );
     void apiKeyModel
       .createApiKeyLog({
         keyId: row.id,
