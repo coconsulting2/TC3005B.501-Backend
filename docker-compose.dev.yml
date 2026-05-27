@@ -105,10 +105,8 @@ services:
   #    EVERY `up` so that when a teammate adds a new permission to
   #    prisma/seed.js, their PR lands automatically on other devs' machines
   #    without a manual `docker:dev:clean`.
-  #  - Dummy data (Requests, Routes, Receipts via plain `create`) is NOT
-  #    idempotent. It is gated by a sentinel file inside the node_modules_dev
-  #    volume so it only runs on first boot. To force a full re-seed run
-  #    `bun run docker:dev:clean` which removes all volumes.
+  #  - CocoUAT (`prisma/seed-usability.js`) is idempotent (reset + R1–R8) and runs
+  #    on every `up` so N1/agencia/CxP no dependen del archivo `.seeded`.
   #
   # IMPORTANT: env vars below are HARDCODED dev defaults. Compose's
   # ${VAR:-default} substitution reads from the host .env file, which is
@@ -130,16 +128,10 @@ services:
       sh -c "bun install &&
              bunx prisma generate &&
              bunx prisma db push --accept-data-loss &&
-             if [ ! -f /app/node_modules/.seeded ]; then
-               echo '[migrate] First run — seeding reference data + dummy data...' &&
-               node prisma/seed.js dev &&
-               echo '[migrate] Running prisma/seed-usability.js (UAT seed)...' &&
-               node prisma/seed-usability.js &&
-               touch /app/node_modules/.seeded;
-             else
-               echo '[migrate] Re-applying reference seed (idempotent — permissions, roles, statuses)...' &&
-               node prisma/seed.js;
-             fi"
+             echo '[migrate] Reference seed (permissions, catálogo global)...' &&
+             node prisma/seed.js dev &&
+             echo '[migrate] CocoUAT usability seed (R1–R8, idempotente)...' &&
+             node prisma/seed-usability.js"
     depends_on:
       postgres:
         condition: service_healthy

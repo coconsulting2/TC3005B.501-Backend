@@ -792,6 +792,16 @@ async function main() {
   await attachWorkflowSnapshots(orgId, r1.requestId, solicitanteId, solicitanteDept, 15000, mexicoId);
   console.log(`  ✓ R1 (id=${r1.requestId}) status=2 → N1 aprueba (${D.r1Begin}–${D.r1End})`);
 
+  // R1b — Monto alto (>$50k) ya aprobada por N1 (Santino), pendiente N2 (Kevin).
+  // Garantiza que la bandeja de Kevin no aparezca vacía durante el guión.
+  const r1b = await createRequest(orgId, solicitanteId, 3, {
+    notes: "Viaje a Monterrey — proyecto estratégico (guión: N2 aprueba; ya pasó N1)",
+    requestedFee: 85000, imposedFee: 0, requestDays: 4,
+    destCity: "Monterrey", beginDate: D.r1Begin, endDate: D.r1End,
+  });
+  await attachWorkflowSnapshots(orgId, r1b.requestId, solicitanteId, solicitanteDept, 85000, mexicoId);
+  console.log(`  ✓ R1b (id=${r1b.requestId}) status=3 → N2 aprueba (monto alto, ya pasó N1)`);
+
   const r2User = userMap["emiliano.delgadillo"];
   const r2Dept = deptMap["Operaciones"];
   const r2 = await createRequest(orgId, r2User, 2, {
@@ -927,10 +937,11 @@ async function main() {
   console.log("╠────────────────────────────────────────────────────────────  ╣");
   console.log(`║  Solicitante:  angel.montemayor   id=${userMap["angel.montemayor"]}`);
   console.log(`║  N1 (Jefe):     santino.im          id=${userMap["santino.im"]}`);
+  console.log(`║  N2 (Director): kevin.esquivel      id=${userMap["kevin.esquivel"]}`);
   console.log(`║  CxP:           eder.cantero        id=${userMap["eder.cantero"]}`);
   console.log(`║  Agencia:       erick.morales       id=${userMap["erick.morales"]}`);
   console.log("╠────────────────────────────────────────────────────────────  ╣");
-  console.log(`║  R1=${r1.requestId} (2)  R2=${r2.requestId} (2)  R3=${r3.requestId} (5)  R4=${r4.requestId} (9)`);
+  console.log(`║  R1=${r1.requestId} (2)  R1b=${r1b.requestId} (3)  R2=${r2.requestId} (2)  R3=${r3.requestId} (5)  R4=${r4.requestId} (9)`);
   console.log(`║  R5=${r5.requestId} (6)  R6=${r6.requestId} (7)  R6b=${r6b.requestId} (7)`);
   console.log(`║  R7=${r7.requestId} (8)  R8=${r8.requestId} (8)`);
   console.log("╠────────────────────────────────────────────────────────────  ╣");

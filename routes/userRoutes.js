@@ -35,7 +35,11 @@ router.route("/get-travel-request/:request_id")
 router.route("/get-travel-requests/:dept_id/:status_id/:n?")
     .get(
       generalRateLimiter,
-      ...requireAnyPermission("travel_request:view_any", "travel_agent:attend"),
+      ...requireAnyPermission(
+        "travel_request:view_any",
+        "travel_agent:attend",
+        "travel_request:authorize",
+      ),
       validateDeptStatus,
       validateInputs,
       userController.getTravelRequestsByDeptStatus
@@ -44,7 +48,11 @@ router.route("/get-travel-requests/:dept_id/:status_id/:n?")
 router.route("/get-approver-requests/:status_id/:n?")
     .get(
       generalRateLimiter,
-      ...requireAnyPermission("travel_request:view_any", "travel_agent:attend"),
+      ...requireAnyPermission(
+        "travel_request:view_any",
+        "travel_agent:attend",
+        "travel_request:authorize",
+      ),
       validateApproverStatus,
       validateInputs,
       userController.getTravelRequestsForApprover
