@@ -28,6 +28,7 @@ const validateOrgIdParam = [
 ];
 
 const validateGenerate = [
+  body("name").isString().trim().isLength({ min: 1, max: 120 }).withMessage("name is required (1-120 chars)"),
   body("org_id").custom((v) => {
     try {
       const b = BigInt(v);
