@@ -9,8 +9,6 @@ import * as apiKeyModel from "../models/apiKeyModel.js";
 
 /**
  * Convierte BigInt a string recursivamente para serialización JSON segura.
- * Express ya parchea Number-style BigInt en `app.js`, pero este helper
- * mantiene la forma de los objetos anidados sin tocar Date/Array.
  *
  * @param {unknown} v
  * @returns {unknown}
@@ -33,17 +31,51 @@ const jsonSafe = (v) => {
 };
 
 /**
+ * @param {import("express").Request} req
+ * @param {bigint|string|number} targetOrgId
+ * @returns {boolean}
+ */
+function userMayManageOrg(req, targetOrgId) {
+  const perms = req.user?.permissionSet;
+  if (perms instanceof Set && perms.has("organization:list_all")) {
+    return true;
+  }
+  const jwtOrg = req.user?.organization_id;
+  if (jwtOrg == null) {
+    return false;
+  }
+  return BigInt(jwtOrg) === BigInt(targetOrgId);
+}
+
+/**
+ * @param {import("express").Request} req
+ * @param {bigint|string|number} targetOrgId
+ * @returns {{ ok: true } | { ok: false, status: number, message: string }}
+ */
+function assertOrgAccess(req, targetOrgId) {
+  if (!userMayManageOrg(req, targetOrgId)) {
+    return { ok: false, status: 403, message: "Cannot manage API keys for this organization" };
+  }
+  return { ok: true };
+}
+
+/**
  * POST /api/keys/generate
  * @param {import("express").Request} req
  * @param {import("express").Response} res
- * @returns {Promise<void>} 201 con `key` (única vez), o 400 si la entrada es inválida.
+ * @returns {Promise<void>}
  */
 export const generateApiKey = async (req, res) => {
   try {
-    const { org_id: orgId, scope, expires_at: expiresAt } = req.body;
+    const { org_id: orgId, name, scope, expires_at: expiresAt } = req.body;
+    const access = assertOrgAccess(req, orgId);
+    if (!access.ok) {
+      return res.status(access.status).json({ error: access.message });
+    }
     const createdBy = req.user.user_id;
     const { record, plainKey } = await apiKeyService.generateApiKeyForOrg({
       orgId,
+      name,
       scope,
       expiresAt,
       createdBy,
@@ -51,10 +83,12 @@ export const generateApiKey = async (req, res) => {
     res.status(201).json(
       jsonSafe({
         id: record.id,
-        org_id: record.orgId,
+        org_id: record.organizationId,
+        name: record.name,
         key: plainKey,
         scope: record.scope,
         expires_at: record.expiresAt,
+        active: true,
         created_at: record.createdAt,
         created_by: record.createdBy,
       }),
@@ -81,10 +115,16 @@ export const revokeApiKeyById = async (req, res) => {
     if (!existing) {
       return res.status(404).json({ error: "API key not found" });
     }
+    const access = assertOrgAccess(req, existing.organizationId);
+    if (!access.ok) {
+      return res.status(access.status).json({ error: access.message });
+    }
     const row = await apiKeyService.revokeApiKey(id);
     res.status(200).json(jsonSafe({
       id: row.id,
-      org_id: row.orgId,
+      org_id: row.organizationId,
+      name: row.name,
+      active: false,
       revoked_at: row.revokedAt,
     }));
   } catch (err) {
@@ -102,6 +142,10 @@ export const revokeApiKeyById = async (req, res) => {
 export const listApiKeysByOrg = async (req, res) => {
   try {
     const { orgId } = req.params;
+    const access = assertOrgAccess(req, orgId);
+    if (!access.ok) {
+      return res.status(access.status).json({ error: access.message });
+    }
     const rows = await apiKeyService.listKeysForOrg(orgId);
     res.status(200).json(jsonSafe(rows));
   } catch (err) {
@@ -122,6 +166,10 @@ export const listApiKeyLogs = async (req, res) => {
     const key = await apiKeyModel.findApiKeyById(keyId);
     if (!key) {
       return res.status(404).json({ error: "API key not found" });
+    }
+    const access = assertOrgAccess(req, key.organizationId);
+    if (!access.ok) {
+      return res.status(access.status).json({ error: access.message });
     }
     const rows = await apiKeyService.listAuditLogs(keyId, {
       limit: req.query.limit,

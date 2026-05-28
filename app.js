@@ -108,6 +108,10 @@ if (process.env.NODE_ENV !== "test") {
         if (req.method === "GET" && pathOnly === "/api/user/csrf-token") {
             return next();
         }
+        // Integraciones machine-to-machine (ERP) usan X-API-Key sin sesión CSRF.
+        if (pathOnly.startsWith("/api/external")) {
+            return next();
+        }
         return csrfProtection(req, res, next);
     });
     // Apply csrfProtection directly on this route so it sets the _csrf cookie

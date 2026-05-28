@@ -44,11 +44,12 @@ export const revokeApiKeyById = (id) =>
  */
 export const listApiKeysByOrgId = (orgId) =>
   prisma.apiKey.findMany({
-    where: { orgId: BigInt(orgId) },
+    where: { organizationId: BigInt(orgId) },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
-      orgId: true,
+      organizationId: true,
+      name: true,
       scope: true,
       expiresAt: true,
       revokedAt: true,
