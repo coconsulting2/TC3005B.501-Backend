@@ -63,7 +63,8 @@ export async function postPreviewImport(req, res) {
  *   permissionExtras?,    // userName → códigos de permiso adicionales (UserPermission)
  *   passwordGlobal?,
  *   passwordOverrides?,    // userName → password individual
- *   createNewOrganization?: boolean  // debe coincidir con la vista previa; crea org CLIENT + usuarios
+ *   createNewOrganization?: boolean,  // debe coincidir con la vista previa; crea org CLIENT + usuarios
+ *   customImportRoles?: Record<string, { templateRoleName, permissions, customRoleName? }>  // userName → rol nuevo a crear (clona tope del rol base; usa `customRoleName` como semilla si llega)
  * }
  * @param req
  * @param res
