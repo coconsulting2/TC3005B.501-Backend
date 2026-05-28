@@ -1,0 +1,802 @@
+{
+	"info": {
+		"_postman_id": "m3-integration-collection-2026-05-27",
+		"name": "M3-Integration",
+		"description": "Pruebas API Keys + export contable (M3-QA2).\n\nCubre:\n- API Keys lifecycle (/api/keys/*): generate, list por org, list logs, revoke, consumo external pre/post revocation.\n- Export contable (/api/export/contable y /api/external/export/contable) en formatos JSON y XML, gate de rol \"Cuentas por pagar\", re-export con status=Sincronizado, y autenticacion por X-API-Key.\n\nTokens:\n- {{admin_token}} para administracion de API keys (admin_ditta / DittaSuperAdmin)\n- {{cxp_token}} para export contable (eder.cantero / Cuentas por pagar)\n- {{api_key_secret}} y {{api_key_id}} se capturan tras Generate y se reutilizan en los requests subsiguientes.\n\nEl pre-request script a nivel coleccion logea ambos roles en la primera corrida y fetchea el CSRF token.\n\nTask: M3-QA2",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "https://localhost:3000",
+			"type": "string"
+		},
+		{
+			"key": "csrf_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "admin_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "cxp_token",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "admin_username",
+			"value": "admin_ditta",
+			"type": "string"
+		},
+		{
+			"key": "admin_password",
+			"value": "Ditta!Admin#2026",
+			"type": "string"
+		},
+		{
+			"key": "cxp_username",
+			"value": "eder.cantero",
+			"type": "string"
+		},
+		{
+			"key": "cxp_password",
+			"value": "Fuego2026!",
+			"type": "string"
+		},
+		{
+			"key": "target_org_id",
+			"value": "101",
+			"type": "string"
+		},
+		{
+			"key": "api_key_id",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "api_key_secret",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "key_expires_at",
+			"value": "2027-12-31T23:59:59Z",
+			"type": "string"
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					"// Skip auth bootstrapping for explicit login / csrf endpoints.",
+					"const url = pm.request.url.toString();",
+					"if (url.includes('/api/user/login') || url.includes('/api/user/csrf-token')) { return; }",
+					"",
+					"const baseUrl = pm.collectionVariables.get('base_url');",
+					"",
+					"const loginAs = (tokenVar, usernameVar, passwordVar, callback) => {",
+					"    const existing = pm.collectionVariables.get(tokenVar);",
+					"    if (existing) { return callback(); }",
+					"    const username = pm.collectionVariables.get(usernameVar);",
+					"    const password = pm.collectionVariables.get(passwordVar);",
+					"    if (!username || !password) {",
+					"        console.warn('Missing credentials for ' + tokenVar);",
+					"        return callback();",
+					"    }",
+					"    pm.sendRequest({",
+					"        url: baseUrl + '/api/user/login',",
+					"        method: 'POST',",
+					"        header: [{ key: 'Content-Type', value: 'application/json' }],",
+					"        body: { mode: 'raw', raw: JSON.stringify({ username, password }) }",
+					"    }, (err, res) => {",
+					"        if (err || res.code !== 200) {",
+					"            console.error('Login failed for ' + tokenVar + ':', err || res.code);",
+					"            return callback();",
+					"        }",
+					"        const data = res.json();",
+					"        pm.collectionVariables.set(tokenVar, data.token);",
+					"        callback();",
+					"    });",
+					"};",
+					"",
+					"const fetchCsrf = (callback) => {",
+					"    if (pm.collectionVariables.get('csrf_token')) { return callback(); }",
+					"    pm.sendRequest({",
+					"        url: baseUrl + '/api/user/csrf-token',",
+					"        method: 'GET'",
+					"    }, (err, res) => {",
+					"        if (!err && res && res.code === 200) {",
+					"            pm.collectionVariables.set('csrf_token', res.json().csrfToken);",
+					"        }",
+					"        callback();",
+					"    });",
+					"};",
+					"",
+					"loginAs('admin_token', 'admin_username', 'admin_password', () => {",
+					"    loginAs('cxp_token', 'cxp_username', 'cxp_password', () => {",
+					"        fetchCsrf(() => {});",
+					"    });",
+					"});"
+				]
+			}
+		}
+	],
+	"item": [
+		{
+			"name": "Auth",
+			"description": "Reference logins. Pre-request script invokes these automatically on first run.",
+			"item": [
+				{
+					"name": "Login as Admin Ditta",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"{{admin_username}}\",\n    \"password\": \"{{admin_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"user",
+								"login"
+							]
+						},
+						"description": "Logs in as Admin Ditta. Required for api_key:manage permission."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Stores admin_token', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('token');",
+									"    pm.collectionVariables.set('admin_token', json.token);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Login as Cuentas por pagar",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"{{cxp_username}}\",\n    \"password\": \"{{cxp_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/user/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"user",
+								"login"
+							]
+						},
+						"description": "Logs in as CxP. Required for /api/export/contable (gate requireAuth(['Cuentas por pagar']))."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Stores cxp_token', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('token');",
+									"    pm.collectionVariables.set('cxp_token', json.token);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Get CSRF token",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/user/csrf-token",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"user",
+								"csrf-token"
+							]
+						},
+						"description": "Fetches the CSRF token, required as x-csrf-token header on mutating requests."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Has csrfToken', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('csrfToken');",
+									"    pm.collectionVariables.set('csrf_token', json.csrfToken);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "API Keys lifecycle",
+			"description": "Generar -> consumir -> listar -> auditar logs -> revocar -> verificar 401. Prefijo real /api/keys (NO /api/api-keys).",
+			"item": [
+				{
+					"name": "Generate key",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "x-csrf-token",
+								"value": "{{csrf_token}}"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Organization-Id",
+								"value": "{{target_org_id}}"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"org_id\": \"{{target_org_id}}\",\n    \"name\": \"qa-m3-key-{{$timestamp}}\",\n    \"scope\": { \"permissions\": [\"accounting:export\"] },\n    \"expires_at\": \"{{key_expires_at}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/keys/generate",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"keys",
+								"generate"
+							]
+						},
+						"description": "Genera una API key con permiso accounting:export para la org 101. Captura id y secret en variables de coleccion."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 201', () => pm.response.to.have.status(201));",
+									"pm.test('Response has id and key (secret)', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('id');",
+									"    pm.expect(json).to.have.property('key');",
+									"    pm.expect(json.key).to.match(/^cck_[a-f0-9]+$/);",
+									"    pm.collectionVariables.set('api_key_id', String(json.id));",
+									"    pm.collectionVariables.set('api_key_secret', json.key);",
+									"});",
+									"pm.test('Active true and scope echoed', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json.active).to.eql(true);",
+									"    pm.expect(json.scope.permissions).to.include('accounting:export');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Consume external (key activa)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key_secret}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/external/accounting/preview",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"external",
+								"accounting",
+								"preview"
+							]
+						},
+						"description": "Smoke test del flow X-API-Key. Sin Authorization Bearer."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Response ok=true with org_id', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json.ok).to.eql(true);",
+									"    pm.expect(json).to.have.property('org_id');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "List keys por org",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "X-Organization-Id",
+								"value": "{{target_org_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/keys/org/{{target_org_id}}",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"keys",
+								"org",
+								"{{target_org_id}}"
+							]
+						},
+						"description": "Lista las API keys de la org. La key recien creada debe aparecer."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Returns array containing generated key id', () => {",
+									"    const arr = pm.response.json();",
+									"    pm.expect(arr).to.be.an('array');",
+									"    const targetId = String(pm.collectionVariables.get('api_key_id'));",
+									"    const ids = arr.map((k) => String(k.id));",
+									"    pm.expect(ids).to.include(targetId);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "List logs",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "X-Organization-Id",
+								"value": "{{target_org_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/keys/{{api_key_id}}/logs",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"keys",
+								"{{api_key_id}}",
+								"logs"
+							]
+						},
+						"description": "Devuelve los logs de auditoria; deberia haber >= 1 entrada del consume previo."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Logs is non-empty array', () => {",
+									"    const arr = pm.response.json();",
+									"    pm.expect(arr).to.be.an('array');",
+									"    pm.expect(arr.length).to.be.greaterThan(0);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Revoke key",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							},
+							{
+								"key": "x-csrf-token",
+								"value": "{{csrf_token}}"
+							},
+							{
+								"key": "X-Organization-Id",
+								"value": "{{target_org_id}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/keys/{{api_key_id}}/revoke",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"keys",
+								"{{api_key_id}}",
+								"revoke"
+							]
+						},
+						"description": "Revoca la key. Devuelve 200 con active=false y revoked_at."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200 or 204', () => pm.expect([200, 204]).to.include(pm.response.code));",
+									"pm.test('Body marks key inactive', () => {",
+									"    if (pm.response.code === 204) { return; }",
+									"    const json = pm.response.json();",
+									"    pm.expect(json.active).to.eql(false);",
+									"    pm.expect(json).to.have.property('revoked_at');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Consume external (key revocada)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key_secret}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/external/accounting/preview",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"external",
+								"accounting",
+								"preview"
+							]
+						},
+						"description": "Mismo endpoint, misma X-API-Key, pero la key ya esta revocada. Debe devolver 401."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 401', () => pm.response.to.have.status(401));",
+									"pm.test('Error code identifies invalid api key', () => {",
+									"    const body = pm.response.text();",
+									"    pm.expect(body.toLowerCase()).to.match(/invalid|revoked|api[_ -]?key/);",
+									"});"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Export contable",
+			"description": "GET /api/export/contable y /api/external/export/contable. Gate de rol Cuentas por pagar. Soporta format=json|xml (NO CSV).",
+			"item": [
+				{
+					"name": "Export JSON (CxP)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cxp_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/export/contable?date_from=2026-01-01&format=json",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"export",
+								"contable"
+							],
+							"query": [
+								{
+									"key": "date_from",
+									"value": "2026-01-01"
+								},
+								{
+									"key": "format",
+									"value": "json"
+								}
+							]
+						},
+						"description": "Export contable en JSON desde 2026-01-01. Requiere rol Cuentas por pagar."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Content-Type application/json', () => {",
+									"    pm.expect(pm.response.headers.get('Content-Type') || '').to.match(/application\\/json/);",
+									"});",
+									"pm.test('Body has polizas array', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('polizas');",
+									"    pm.expect(json.polizas).to.be.an('array');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Export XML (CxP)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cxp_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/export/contable?date_from=2026-01-01&format=xml",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"export",
+								"contable"
+							],
+							"query": [
+								{
+									"key": "date_from",
+									"value": "2026-01-01"
+								},
+								{
+									"key": "format",
+									"value": "xml"
+								}
+							]
+						},
+						"description": "Mismo rango, formato XML."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Content-Type application/xml o text/xml', () => {",
+									"    const ct = pm.response.headers.get('Content-Type') || '';",
+									"    pm.expect(ct).to.match(/(application|text)\\/xml/);",
+									"});",
+									"pm.test('Body starts with XML declaration or root tag', () => {",
+									"    const body = pm.response.text();",
+									"    pm.expect(body.trim()).to.match(/^(<\\?xml|<)/);",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Export sin permisos (admin)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{admin_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/export/contable?date_from=2026-01-01",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"export",
+								"contable"
+							],
+							"query": [
+								{
+									"key": "date_from",
+									"value": "2026-01-01"
+								}
+							]
+						},
+						"description": "Admin Ditta NO tiene rol 'Cuentas por pagar' => requireAuth gate retorna 403."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 403', () => pm.response.to.have.status(403));"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "Re-export (status=Sincronizado)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{cxp_token}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/export/contable?date_from=2026-01-01&status=Sincronizado&format=json",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"export",
+								"contable"
+							],
+							"query": [
+								{
+									"key": "date_from",
+									"value": "2026-01-01"
+								},
+								{
+									"key": "status",
+									"value": "Sincronizado"
+								},
+								{
+									"key": "format",
+									"value": "json"
+								}
+							]
+						},
+						"description": "Force mode: incluye registros ya marcados como exportados (re-export controlado)."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 200', () => pm.response.to.have.status(200));",
+									"pm.test('Polizas property present', () => {",
+									"    const json = pm.response.json();",
+									"    pm.expect(json).to.have.property('polizas');",
+									"    pm.expect(json.polizas).to.be.an('array');",
+									"});"
+								]
+							}
+						}
+					]
+				},
+				{
+					"name": "External export (X-API-Key)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "X-API-Key",
+								"value": "{{api_key_secret}}"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/external/export/contable?date_from=2026-01-01",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"external",
+								"export",
+								"contable"
+							],
+							"query": [
+								{
+									"key": "date_from",
+									"value": "2026-01-01"
+								}
+							]
+						},
+						"description": "External path. La key fue revocada en el folder anterior por lo que debe responder 401 (autenticacion previa al permission gate)."
+					},
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test('Status 401 (key revocada)', () => pm.response.to.have.status(401));"
+								]
+							}
+						}
+					]
+				}
+			]
+		}
+	]
+}
