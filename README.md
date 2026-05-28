@@ -122,7 +122,7 @@ You should see the ASCII banner and `🚀 Server running on port 3000 with HTTPS
     - `DELETE /api/keys/:id/revoke` → revoca; consumos posteriores devuelven `401`.
     - `GET /api/keys/org/:orgId` → lista metadatos (sin secreto ni hash).
     - `GET /api/keys/:id/logs` → log de auditoría (`limit`, `cursor` opcionales).
-- **Integración (cabecera `X-API-Key` o `Authorization: Bearer`)**: p. ej. `GET /api/external/accounting/preview` requiere `scope.permissions` con `accounting:export` o `accounts_payable:attend`. Cada respuesta deja traza en `api_key_logs`.
+- **Integración (cabecera `X-API-Key` o `Authorization: Bearer`)**: requiere `scope.permissions` con `accounting:export`. Endpoints: `GET /api/external/accounting/preview`, `GET /api/external/accounting-export/:request_id`, `GET /api/external/accounting-export?from=&to=`, `GET /api/external/export/contable?date_from=`. Cada respuesta deja traza en `api_key_logs` (sin identificadores de llave en logs de aplicación).
 - **Migración**: `bun run migrate` (Prisma) o aplicar `database/migrations/20260510120000_api_keys_audit_log.up.sql` para flujos manuales.
 - **Hashing**: el secreto se persiste **únicamente** como `scrypt` hex (64 chars), determinista usando el pepper `API_KEY_HASH_PEPPER` (fallback `JWT_SECRET`) como salt fijo — esto permite el lookup O(1) por índice único en `key_hash`. Hash asíncrono para no bloquear el event loop (~50–80 ms por verificación).
 
