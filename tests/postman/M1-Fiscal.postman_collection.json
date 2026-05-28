@@ -23,17 +23,17 @@
 		},
 		{
 			"key": "username",
-			"value": "",
+			"value": "mariano.carretero",
 			"type": "string"
 		},
 		{
 			"key": "password",
-			"value": "",
+			"value": "Fuego2026!",
 			"type": "string"
 		},
 		{
 			"key": "org_id",
-			"value": "1",
+			"value": "101",
 			"type": "string"
 		},
 		{
