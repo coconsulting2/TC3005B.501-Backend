@@ -539,7 +539,7 @@ export async function previewImport(
  * @param {Record<string, string[]>} [permissionExtrasByUser] - userName → códigos de permiso adicionales (directos, no incluidos en el rol)
  * @param {{ globalPassword?: string, perUser?: Record<string, string> }} [passwordOptions] - contraseñas (obligatorias por archivo o global)
  * @param {Record<string, string>} [roleOverridesByUser] - userName → rol elegido en UI; tiene PRIORIDAD sobre mappedRoleName y sobre roleMappings
- * @param {{ createNewOrganization?: boolean }} [applyOptions]
+ * @param {{ createNewOrganization?: boolean, newOrganizationName?: string }} [applyOptions]
  * @param {Record<string, { templateRoleName: string, permissions: string[], customRoleName?: string }>} [customImportRolesByUser] - userName → rol nuevo (se crea en BD al aplicar) clonando tope del rol base. Si trae `customRoleName`, se usa como semilla del nombre final.
  */
 export async function applyImport(
@@ -601,7 +601,19 @@ export async function applyImport(
     if (!entry.newOrgSpec) {
       throw new Error("Vista previa incompleta: falta la definición de la organización nueva.");
     }
-    const { organization } = await createClientOrganizationOnly(entry.newOrgSpec);
+    const nameOverride =
+      typeof applyOptions?.newOrganizationName === "string"
+        ? applyOptions.newOrganizationName.trim()
+        : "";
+    const orgSpecToCreate =
+      nameOverride.length > 0
+        ? { ...entry.newOrgSpec, nombre: nameOverride }
+        : entry.newOrgSpec;
+    if (!orgSpecToCreate.nombre?.trim()) {
+      throw new Error("El nombre de la organización nueva es obligatorio.");
+    }
+    validateImportOrganizationSpec(orgSpecToCreate);
+    const { organization } = await createClientOrganizationOnly(orgSpecToCreate);
     orgIdBig = BigInt(organization.id);
     const orgRolesFresh = await prisma.role.findMany({
       where: { organizationId: orgIdBig },
