@@ -17,6 +17,39 @@ import { withRls } from "../database/config/rlsConnection.js";
 import { bootstrapOrganizationCatalogs, ensureOrganizationAdmin } from "../prisma/seedHelpers/bootstrapOrganization.js";
 
 /**
+ * Resync PostgreSQL serial for `organizaciones.id` when it lags behind MAX(id)
+ * (common after migrations/seeds with explicit ids). Safe no-op if already aligned.
+ *
+ * @param {import("@prisma/client").PrismaClient|import("@prisma/client").Prisma.TransactionClient} [client]
+ */
+async function syncOrganizationIdSequence(client = prisma) {
+  await client.$executeRaw`
+    SELECT setval(
+      pg_get_serial_sequence('organizaciones', 'id'),
+      COALESCE((SELECT MAX(id) FROM organizaciones), 0),
+      true
+    )
+  `;
+}
+
+/**
+ * @param {object} data - Prisma Organization create data
+ * @param {import("@prisma/client").PrismaClient|import("@prisma/client").Prisma.TransactionClient} [client]
+ */
+async function createOrganizationRow(data, client = prisma) {
+  await syncOrganizationIdSequence(client);
+  try {
+    return await client.organization.create({ data });
+  } catch (err) {
+    if (err?.code === "P2002") {
+      await syncOrganizationIdSequence(client);
+      return await client.organization.create({ data });
+    }
+    throw err;
+  }
+}
+
+/**
  * Crea una nueva organización CLIENT con su admin inicial. Solo super-admin Ditta.
  *
  * @param {{ nombre: string, rfc?: string|null, razonSocial?: string|null, timezone?: string, baseCurrency?: string, adminEmail: string, adminNombre: string, adminPassword: string }} input
@@ -53,8 +86,7 @@ export async function createOrganization(input) {
   // Crear org + bootstrap catalogs + admin user dentro de bypass cross-tenant
   // (el caller es Ditta y necesita escribir en una org que aún no existe).
   return withRls(1n, { bypass: true }, async () => {
-    const org = await prisma.organization.create({
-      data: {
+    const org = await createOrganizationRow({
         nombre,
         rfc: rfc ?? null,
         razonSocial: razonSocial ?? null,
@@ -62,8 +94,7 @@ export async function createOrganization(input) {
         baseCurrency,
         kind: "CLIENT",
         status: "CONFIGURING",
-      },
-    });
+      }, prisma);
 
     await bootstrapOrganizationCatalogs(prisma, org.id, { includeDittaSuperAdmin: false });
 
@@ -107,8 +138,7 @@ export async function createClientOrganizationOnly(input) {
   }
 
   return withRls(1n, { bypass: true }, async () => {
-    const org = await prisma.organization.create({
-      data: {
+    const org = await createOrganizationRow({
         nombre: nombre.trim(),
         rfc: rfc ?? null,
         razonSocial: razonSocial ?? null,
@@ -116,8 +146,7 @@ export async function createClientOrganizationOnly(input) {
         baseCurrency,
         kind: "CLIENT",
         status: "CONFIGURING",
-      },
-    });
+      }, prisma);
 
     await bootstrapOrganizationCatalogs(prisma, org.id, { includeDittaSuperAdmin: false });
 
