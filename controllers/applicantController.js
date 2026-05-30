@@ -86,6 +86,8 @@ export const getApplicantRequest = async (req, res) => {
       request_id: baseData.request_id,
       request_status_id: baseData.request_status_id,
       request_status: baseData.request_status,
+      selected_flight_offer: baseData.selected_flight_offer ?? null,
+      selected_hotel_offer: baseData.selected_hotel_offer ?? null,
       notes: baseData.notes,
       requested_fee: baseData.requested_fee,
       imposed_fee: baseData.imposed_fee,

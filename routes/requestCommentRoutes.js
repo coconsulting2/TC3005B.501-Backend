@@ -25,8 +25,8 @@ const validateCreateComment = [
     .toInt(),
   body("content")
     .trim()
-    .isLength({ min: 1 })
-    .withMessage("Comment content is required"),
+    .isLength({ min: 1, max: 45000 })
+    .withMessage("Comment content is required and under max length"),
 ];
 
 const validateReadComments = [

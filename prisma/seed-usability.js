@@ -33,8 +33,13 @@ import {
 } from "./seedHelpers/bootstrapOrganization.js";
 import { buildRequestWorkflowSnapshots } from "../services/buildRequestWorkflowSnapshots.js";
 import { connectMongo, disconnectMongo, uploadFile } from "../services/fileStorage.js";
+import {
+  parseCFDI,
+  buildComprobanteRegistroBodyFromXml,
+} from "../services/cfdiParserService.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const USABILITY_CFDI_DIR = path.join(__dirname, "fixtures", "usability-cfdi");
 const FIXTURE_DIR = path.join(__dirname, "..", "tests");
 const FIXTURE_XML_RESTAURANT = path.join(
   FIXTURE_DIR,
@@ -224,6 +229,250 @@ async function attachWorkflowSnapshots(orgId, requestId, userId, departmentId, r
 /**
  * Sube XML/PDF de fixtures a GridFS para que CxP pueda abrir archivos en la UI.
  */
+/**
+ * PDF emparejado por nombre base (uuid.xml → uuid.pdf) o tenis.xml → *Tenis*.pdf; si no, PDF genérico de tests.
+ */
+function resolveUsabilityPdfPath(xmlFileName) {
+  const base = path.basename(xmlFileName, ".xml");
+  const paired = path.join(USABILITY_CFDI_DIR, `${base}.pdf`);
+  if (fs.existsSync(paired)) return paired;
+
+  if (base.toLowerCase() === "tenis") {
+    const hit = fs
+      .readdirSync(USABILITY_CFDI_DIR)
+      .find((f) => /\.pdf$/i.test(f) && /tenis|asics/i.test(f));
+    if (hit) return path.join(USABILITY_CFDI_DIR, hit);
+  }
+
+  return FIXTURE_PDF;
+}
+
+/** ¿Hay al menos un XML local en prisma/fixtures/usability-cfdi/? */
+function hasUsabilityCfdiXml(xmlFileName) {
+  return fs.existsSync(path.join(USABILITY_CFDI_DIR, xmlFileName));
+}
+
+/**
+ * Comprobantes de R6 (CxP): XML reales si existen en la máquina; si no, sintéticos de tests/.
+ * Nunca falla el seed por archivos faltantes (carpeta gitignored).
+ */
+async function seedR6Receipts(orgId, requestId, rtMap) {
+  const uatReceiptsR6 = [
+    {
+      xml: "tenis.xml",
+      type: rtMap["Transporte"] ?? rtMap["Comida"],
+      satEstado: "Vigente",
+    },
+    {
+      xml: "bd381ab8-bea9-4db4-9f92-45e4b0268348.xml",
+      type: rtMap["Comida"],
+      satEstado: "Vigente",
+    },
+    {
+      xml: "92d31a61-9958-4133-ac86-d75bc00384e6.xml",
+      type: rtMap["Hospedaje"] ?? rtMap["Comida"],
+      satEstado: "Vigente",
+    },
+    {
+      xml: "cf28cc7c-a315-4fa9-a7c2-38bffd522fda.xml",
+      type: rtMap["Comida"],
+      satEstado: "Cancelado",
+    },
+  ];
+
+  let fromLocal = 0;
+  for (const row of uatReceiptsR6) {
+    if (!row.type || !hasUsabilityCfdiXml(row.xml)) continue;
+    const receipt = await createReceiptFromUsabilityXml(
+      orgId,
+      requestId,
+      row.type,
+      row.xml,
+      { validation: "Pendiente", satEstado: row.satEstado },
+    );
+    if (receipt) fromLocal += 1;
+  }
+
+  if (fromLocal > 0) {
+    console.log(
+      `  ✓ R6 comprobantes: ${fromLocal} desde prisma/fixtures/usability-cfdi/ (local)`,
+    );
+    return;
+  }
+
+  console.log(
+    "  ℹ Sin XML en prisma/fixtures/usability-cfdi/ — usando comprobantes sintéticos (tests/)",
+  );
+  await createReceiptWithCfdi(orgId, requestId, rtMap["Hospedaje"], {
+    amount: 8500,
+    satEstado: "Vigente",
+    emisorNombre: "Hotel Fiesta Americana MTY",
+    gridFs: { xmlPath: FIXTURE_XML_HOTEL, pdfPath: FIXTURE_PDF, baseName: "uat-hotel-mty" },
+  });
+  await createReceiptWithCfdi(orgId, requestId, rtMap["Comida"], {
+    amount: 2800,
+    satEstado: "Cancelado",
+    emisorNombre: "Restaurante La Nacional",
+    gridFs: {
+      xmlPath: FIXTURE_XML_RESTAURANT,
+      pdfPath: FIXTURE_PDF,
+      baseName: "uat-rest-cancelado-sat",
+    },
+  });
+  await createReceiptWithCfdi(orgId, requestId, rtMap["Transporte"], {
+    amount: 1200,
+    satEstado: "Vigente",
+    emisorNombre: "Uber Transporte MX",
+    gridFs: {
+      xmlPath: FIXTURE_XML_RESTAURANT,
+      pdfPath: FIXTURE_PDF,
+      baseName: "uat-uber-mty",
+    },
+  });
+  await createReceiptWithCfdi(orgId, requestId, rtMap["Vuelo"], {
+    amount: 6500,
+    satEstado: "Vigente",
+    emisorNombre: "Volaris SAB de CV",
+    gridFs: { xmlPath: FIXTURE_XML_HOTEL, pdfPath: FIXTURE_PDF, baseName: "uat-vuelo-mty" },
+  });
+  console.log("  ✓ R6 comprobantes: 4 sintéticos (tests/fixtures)");
+}
+
+/**
+ * R6b — dos comprobantes iguales (mismo monto / emisor) para escenario CxP “¿está duplicado?”.
+ * Usa CFDI sintéticos (UUID distintos); no reutiliza XML de usability-cfdi.
+ */
+async function seedR6bDuplicateReceipts(orgId, requestId, rtMap) {
+  const dupAmount = 1850;
+  const emisor = "Restaurante El Porvenir MTY";
+  const comidaType = rtMap["Comida"];
+  if (!comidaType) return;
+
+  await createReceiptWithCfdi(orgId, requestId, comidaType, {
+    amount: dupAmount,
+    validation: "Pendiente",
+    satEstado: "Vigente",
+    emisorNombre: emisor,
+    gridFs: {
+      xmlPath: FIXTURE_XML_RESTAURANT,
+      pdfPath: FIXTURE_PDF,
+      baseName: "uat-dup-comida-1",
+    },
+  });
+  await createReceiptWithCfdi(orgId, requestId, comidaType, {
+    amount: dupAmount,
+    validation: "Pendiente",
+    satEstado: "Vigente",
+    emisorNombre: emisor,
+    gridFs: {
+      xmlPath: FIXTURE_XML_RESTAURANT,
+      pdfPath: FIXTURE_PDF,
+      baseName: "uat-dup-comida-2",
+    },
+  });
+  console.log("  ✓ R6b comprobantes: 2× Comida $1,850 (posible duplicado)");
+}
+
+function mapRegistroToCfdiCreate(reg, orgId, receiptId, satEstado) {
+  const vigente = satEstado === "Vigente";
+  return {
+    organizationId: orgId,
+    receiptId,
+    uuid: reg.uuid,
+    fechaTimbrado: new Date(reg.fecha_timbrado),
+    rfcPac: reg.rfc_pac,
+    version: reg.version,
+    serie: reg.serie ?? null,
+    folio: reg.folio ?? null,
+    fechaEmision: new Date(reg.fecha_emision),
+    tipoComprobante: reg.tipo_comprobante,
+    lugarExpedicion: reg.lugar_expedicion,
+    exportacion: reg.exportacion ?? "01",
+    metodoPago: reg.metodo_pago,
+    formaPago: reg.forma_pago,
+    moneda: reg.moneda,
+    tipoCambio: reg.tipo_cambio,
+    subtotal: reg.subtotal,
+    descuento: reg.descuento ?? 0,
+    iva: reg.iva ?? 0,
+    impuestos: reg.impuestos ?? undefined,
+    totalRetenidos: reg.total_retenidos ?? 0,
+    total: reg.total,
+    rfcEmisor: reg.rfc_emisor,
+    nombreEmisor: reg.nombre_emisor,
+    regimenFiscalEmisor: reg.regimen_fiscal_emisor,
+    rfcReceptor: reg.rfc_receptor,
+    nombreReceptor: reg.nombre_receptor,
+    domicilioFiscalReceptor: reg.domicilio_fiscal_receptor,
+    regimenFiscalReceptor: reg.regimen_fiscal_receptor,
+    usoCfdi: reg.uso_cfdi,
+    satCodigoEstatus: vigente
+      ? "S - Comprobante obtenido satisfactoriamente"
+      : "N - 602: Comprobante no encontrado",
+    satEstado,
+    satEsCancelable: vigente ? "Cancelable sin aceptación" : null,
+    satEstatusCancelacion: null,
+    satValidacionEfos: "200",
+  };
+}
+
+/**
+ * Crea comprobante + CFDI desde XML real en prisma/fixtures/usability-cfdi/ y adjunta GridFS.
+ */
+async function createReceiptFromUsabilityXml(
+  orgId,
+  requestId,
+  receiptTypeId,
+  xmlFileName,
+  opts = {},
+) {
+  const {
+    validation = "Pendiente",
+    satEstado = "Vigente",
+    refund = true,
+  } = opts;
+
+  const xmlPath = path.join(USABILITY_CFDI_DIR, xmlFileName);
+  if (!fs.existsSync(xmlPath)) {
+    console.warn(`  ⚠ No existe ${xmlPath}; omitiendo comprobante.`);
+    return null;
+  }
+
+  const xmlContent = fs.readFileSync(xmlPath, "utf-8");
+  const parsed = parseCFDI(xmlContent);
+  const reg = buildComprobanteRegistroBodyFromXml(xmlContent);
+
+  const receipt = await prisma.receipt.create({
+    data: {
+      organizationId: orgId,
+      requestId,
+      receiptTypeId,
+      amount: parsed.total,
+      validation,
+      refund,
+      cfdiUuid: parsed.uuid,
+      cfdiVersion: reg.version,
+      cfdiEmisorRfc: reg.rfc_emisor,
+      cfdiReceptorRfc: reg.rfc_receptor,
+      cfdiFecha: new Date(reg.fecha_emision),
+      cfdiTotal: reg.total,
+    },
+  });
+
+  await prisma.cfdiComprobante.create({
+    data: mapRegistroToCfdiCreate(reg, orgId, receipt.receiptId, satEstado),
+  });
+
+  const pdfPath = resolveUsabilityPdfPath(xmlFileName);
+  await attachGridFsToReceipt(orgId, receipt.receiptId, {
+    xmlPath,
+    pdfPath,
+    baseName: path.basename(xmlFileName, ".xml"),
+  });
+
+  return receipt;
+}
+
 async function attachGridFsToReceipt(orgId, receiptId, { xmlPath, pdfPath, baseName }) {
   if (!fs.existsSync(xmlPath) || !fs.existsSync(pdfPath)) {
     console.warn(`  ⚠ Fixtures no encontrados para receipt ${receiptId}; omitiendo archivos.`);
@@ -272,6 +521,44 @@ async function resetOrgTravelData(orgId) {
     select: { routeId: true },
   });
   const routeIds = [...new Set(links.map((l) => l.routeId))];
+
+  const receipts = await prisma.receipt.findMany({
+    where: { requestId: { in: requestIds } },
+    select: { receiptId: true },
+  });
+  const receiptIds = receipts.map((r) => r.receiptId);
+
+  if (receiptIds.length) {
+    await prisma.cfdiComprobante.deleteMany({
+      where: { receiptId: { in: receiptIds } },
+    });
+    await prisma.gastoTramo.deleteMany({
+      where: { receiptId: { in: receiptIds } },
+    });
+    await prisma.policyException.updateMany({
+      where: { receiptId: { in: receiptIds } },
+      data: { receiptId: null },
+    });
+  }
+
+  await prisma.anticipoPolizaSnapshot.deleteMany({
+    where: { requestId: { in: requestIds } },
+  });
+  await prisma.accountingPoliza.deleteMany({
+    where: { requestId: { in: requestIds } },
+  });
+  await prisma.solicitudHistorial.deleteMany({
+    where: { requestId: { in: requestIds } },
+  });
+  await prisma.alert.deleteMany({
+    where: { requestId: { in: requestIds } },
+  });
+  await prisma.requestComment.deleteMany({
+    where: { requestId: { in: requestIds } },
+  });
+  await prisma.policyException.deleteMany({
+    where: { requestId: { in: requestIds } },
+  });
 
   await prisma.receipt.deleteMany({ where: { requestId: { in: requestIds } } });
   await prisma.routeRequest.deleteMany({ where: { organizationId: orgId } });
@@ -525,12 +812,32 @@ async function main() {
   await attachWorkflowSnapshots(orgId, r3.requestId, r3User, r2Dept, 22000, mexicoId);
   console.log(`  ✓ R3 (id=${r3.requestId}) status=5 → Agencia reserva (${D.r3Begin}–${D.r3End})`);
 
-  const r4 = await createRequest(orgId, r2User, 9, {
-    notes: "CANCELADO — Viaje a Mérida cancelado por presupuesto",
-    requestedFee: 18000, imposedFee: 0, requestDays: 3,
+  /** R4 — Emiliano: agencia cotizó vuelo+hotel y luego el empleado canceló (guión esc. 2 agencia). */
+  const r4 = await createRequest(orgId, r2User, 5, {
+    notes: "UAT Agencia — Emiliano Delgadillo · Mérida (reserva hecha, después cancelada)",
+    requestedFee: 18000, imposedFee: 18000, requestDays: 3,
     destCity: "Mérida", beginDate: D.r4Begin, endDate: D.r4End,
+    planeNeeded: true, hotelNeeded: true,
   });
-  console.log(`  ✓ R4 (id=${r4.requestId}) status=9 → Agencia ve cancelada`);
+  await attachWorkflowSnapshots(orgId, r4.requestId, r2User, r2Dept, 18000, mexicoId);
+  await prisma.request.update({
+    where: { requestId: r4.requestId },
+    data: {
+      selectedFlightOffer: {
+        label: "Volaris Y4 712 — MTY ↔ MID",
+        summary: "Reserva confirmada antes de la cancelación del viaje",
+        status: "cancelled_with_trip",
+      },
+      selectedHotelOffer: {
+        label: "Hotel Fiesta Inn Mérida",
+        summary: "2 noches — cancelado con la solicitud",
+        status: "cancelled_with_trip",
+      },
+      requestStatusId: 9,
+      active: false,
+    },
+  });
+  console.log(`  ✓ R4 (id=${r4.requestId}) status=9 — Emiliano / Mérida (reserva previa + cancelada)`);
 
   const r5 = await createRequest(orgId, solicitanteId, 6, {
     notes: "Viaje a Guadalajara — subir comprobantes (restaurante + taxi)",
@@ -541,34 +848,28 @@ async function main() {
   console.log(`  ✓ R5 (id=${r5.requestId}) status=6 → Solicitante sube comprobantes`);
 
   const r6 = await createRequest(orgId, solicitanteId, 7, {
-    notes: "Viaje a Monterrey — liquidación CxP (guión: Ana Martínez / Ángel)",
+    notes: "UAT CxP — Ángel MTY: revisar comprobantes (SAT cancelado) + liquidar + Terminar",
     requestedFee: 25000, imposedFee: 25000, requestDays: 3,
     destCity: "Monterrey", beginDate: D.r6Begin, endDate: D.r6End,
     tripEndDate: D.r6TripEnd,
   });
+  await attachWorkflowSnapshots(
+    orgId, r6.requestId, solicitanteId, solicitanteDept, 25000, mexicoId,
+  );
+  await seedR6Receipts(orgId, r6.requestId, rtMap);
+  console.log(`  ✓ R6 (id=${r6.requestId}) status=7 — CxP liquidación (4 comprobantes)`);
 
-  await createReceiptWithCfdi(orgId, r6.requestId, rtMap["Hospedaje"], {
-    amount: 8500, satEstado: "Vigente", emisorNombre: "Hotel Fiesta Americana MTY",
-    gridFs: { xmlPath: FIXTURE_XML_HOTEL, pdfPath: FIXTURE_PDF, baseName: "uat-hotel-mty" },
+  const r6b = await createRequest(orgId, solicitanteId, 7, {
+    notes: "UAT CxP — Ángel: posible comida duplicada (guión: comentar antes de rechazar)",
+    requestedFee: 12000, imposedFee: 12000, requestDays: 2,
+    destCity: "Monterrey", beginDate: D.r6Begin, endDate: D.r6End,
+    tripEndDate: D.r6TripEnd,
   });
-  await createReceiptWithCfdi(orgId, r6.requestId, rtMap["Comida"], {
-    amount: 2800, satEstado: "Cancelado", emisorNombre: "Restaurante La Nacional",
-    gridFs: { xmlPath: FIXTURE_XML_RESTAURANT, pdfPath: FIXTURE_PDF, baseName: "uat-rest-cancelado-sat" },
-  });
-  await createReceiptWithCfdi(orgId, r6.requestId, rtMap["Transporte"], {
-    amount: 1200, satEstado: "Vigente", emisorNombre: "Uber Transporte MX",
-    gridFs: { xmlPath: FIXTURE_XML_RESTAURANT, pdfPath: FIXTURE_PDF, baseName: "uat-uber-mty" },
-  });
-  await createReceiptWithCfdi(orgId, r6.requestId, rtMap["Vuelo"], {
-    amount: 6500, satEstado: "Vigente", emisorNombre: "Volaris SAB de CV",
-    gridFs: { xmlPath: FIXTURE_XML_HOTEL, pdfPath: FIXTURE_PDF, baseName: "uat-vuelo-mty" },
-  });
-  await createReceiptWithCfdi(orgId, r6.requestId, rtMap["Comida"], {
-    amount: 45, satEstado: "Vigente", moneda: "USD", tipoCambio: 17.25,
-    emisorRfc: "XEXX010101000", emisorNombre: "Airport Lounge Services Inc",
-    gridFs: { xmlPath: FIXTURE_XML_RESTAURANT, pdfPath: FIXTURE_PDF, baseName: "uat-lounge-usd" },
-  });
-  console.log(`  ✓ R6 (id=${r6.requestId}) status=7 + 5 receipts (XML/PDF fixtures si Mongo OK)`);
+  await attachWorkflowSnapshots(
+    orgId, r6b.requestId, solicitanteId, solicitanteDept, 12000, mexicoId,
+  );
+  await seedR6bDuplicateReceipts(orgId, r6b.requestId, rtMap);
+  console.log(`  ✓ R6b (id=${r6b.requestId}) status=7 — CxP aclaración (2 comprobantes iguales)`);
 
   const r7 = await createRequest(orgId, solicitanteId, 8, {
     notes: "Viaje a CDMX — finalizado y liquidado",
@@ -577,16 +878,23 @@ async function main() {
     beginDate: D.r7Begin, endDate: D.r7End,
     tripEndDate: D.r7TripEnd, isExported: false,
   });
+  // Historial R7: CFDI sintéticos (UUID único; los XML de usability-cfdi ya están en R6).
   await createReceiptWithCfdi(orgId, r7.requestId, rtMap["Hospedaje"], {
-    amount: 4200, validation: "Aprobado", satEstado: "Vigente",
+    amount: 4200,
+    validation: "Aprobado",
+    satEstado: "Vigente",
     emisorNombre: "Hotel Presidente CDMX",
   });
   await createReceiptWithCfdi(orgId, r7.requestId, rtMap["Comida"], {
-    amount: 1800, validation: "Aprobado", satEstado: "Vigente",
+    amount: 1800,
+    validation: "Aprobado",
+    satEstado: "Vigente",
     emisorNombre: "Restaurante Pujol",
   });
   await createReceiptWithCfdi(orgId, r7.requestId, rtMap["Vuelo"], {
-    amount: 5500, validation: "Aprobado", satEstado: "Vigente",
+    amount: 5500,
+    validation: "Aprobado",
+    satEstado: "Vigente",
     emisorNombre: "Aeroméxico SA de CV",
   });
   console.log(`  ✓ R7 (id=${r7.requestId}) status=8 finalizado + 3 receipts aprobados`);
@@ -623,11 +931,11 @@ async function main() {
   console.log(`║  Agencia:       erick.morales       id=${userMap["erick.morales"]}`);
   console.log("╠────────────────────────────────────────────────────────────  ╣");
   console.log(`║  R1=${r1.requestId} (2)  R2=${r2.requestId} (2)  R3=${r3.requestId} (5)  R4=${r4.requestId} (9)`);
-  console.log(`║  R5=${r5.requestId} (6)  R6=${r6.requestId} (7)  R7=${r7.requestId} (8)  R8=${r8.requestId} (8)`);
+  console.log(`║  R5=${r5.requestId} (6)  R6=${r6.requestId} (7)  R6b=${r6b.requestId} (7)`);
+  console.log(`║  R7=${r7.requestId} (8)  R8=${r8.requestId} (8)`);
   console.log("╠────────────────────────────────────────────────────────────  ╣");
-  console.log("║  CxP: R6 tiene XML/PDF en GridFS (restaurante cancelado SAT)   ║");
-  console.log("║  Subir comprobantes manual: tests/.../CFDI-v40-restaurant.xml   ║");
-  console.log("║                        + tests/fixtures/storage/valid.pdf      ║");
+  console.log("║  CxP eder.cantero: R6b=comentario duplicado · R6=liquidar+Terminar ║");
+  console.log("║  R6 XML locales: prisma/fixtures/usability-cfdi/ (gitignored)      ║");
   console.log("╠────────────────────────────────────────────────────────────  ╣");
   console.log("║  Re-ejecutar: node prisma/seed-usability.js (fechas = hoy+N)    ║");
   console.log("║  Import E2E (otra org): cocoPruebas-team.csv / .json          ║");

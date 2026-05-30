@@ -195,12 +195,27 @@ async function bootstrapDitta() {
   console.warn("Ditta bootstrapped.");
 }
 
+async function seedLogsLevel() {
+  await prisma.logLevel.createMany({
+    data: [
+      { id: 10, level: "TRACE" },
+      { id: 20, level: "DEBUG" },
+      { id: 30, level: "INFO" },
+      { id: 40, level: "WARN" },
+      { id: 50, level: "ERROR" },
+      { id: 60, level: "FATAL" },
+    ],
+    skipDuplicates: true,
+  });
+}
+
 async function main() {
   console.warn("Seeding reference data...");
 
   await seedGlobalPermissions();
   await seedGlobalRequestStatus();
   await seedGlobalGeography();
+  await seedLogsLevel();
 
   await bootstrapDitta();
 

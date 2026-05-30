@@ -101,27 +101,27 @@ export class CsvImportStrategy extends BaseImportStrategy {
     let sectionCeCo = null;
     let sectionEmpleados = null;
 
-    const firstRowStr = (records[0] || []).join(',').toLowerCase();
-    const isMultiSection = firstRowStr.includes('catalogo sociedades') || records.some(r => r[0] && String(r[0]).toLowerCase().includes('catalogo de empleados'));
+    const firstRowStr = (records[0] || []).join(",").toLowerCase();
+    const isMultiSection = firstRowStr.includes("catalogo sociedades") || records.some(r => r[0] && String(r[0]).toLowerCase().includes("catalogo de empleados"));
 
     if (isMultiSection) {
       let currentSection = null;
       for (const row of records) {
-        const firstCell = String(row[0] || '').trim().toLowerCase();
-        
-        if (firstCell.startsWith('catalogo sociedades')) { currentSection = 'sociedades'; sectionSociedades = []; continue; }
-        else if (firstCell.startsWith('catalogo contable')) { currentSection = 'contable'; sectionContable = []; continue; }
-        else if (firstCell.startsWith('clases de documento')) { currentSection = 'clases'; continue; }
-        else if (firstCell.startsWith('catalogo de ceco')) { currentSection = 'ceco'; sectionCeCo = []; continue; }
-        else if (firstCell.startsWith('catalogo de empleados')) { currentSection = 'empleados'; sectionEmpleados = []; continue; }
-        else if (firstCell === '*') { currentSection = null; continue; }
-        
+        const firstCell = String(row[0] || "").trim().toLowerCase();
+
+        if (firstCell.startsWith("catalogo sociedades")) { currentSection = "sociedades"; sectionSociedades = []; continue; }
+        else if (firstCell.startsWith("catalogo contable")) { currentSection = "contable"; sectionContable = []; continue; }
+        else if (firstCell.startsWith("clases de documento")) { currentSection = "clases"; continue; }
+        else if (firstCell.startsWith("catalogo de ceco")) { currentSection = "ceco"; sectionCeCo = []; continue; }
+        else if (firstCell.startsWith("catalogo de empleados")) { currentSection = "empleados"; sectionEmpleados = []; continue; }
+        else if (firstCell === "*") { currentSection = null; continue; }
+
         if (row.every(c => !String(c).trim())) continue;
-        
-        if (currentSection === 'sociedades') sectionSociedades.push(row);
-        else if (currentSection === 'contable') sectionContable.push(row);
-        else if (currentSection === 'ceco') sectionCeCo.push(row);
-        else if (currentSection === 'empleados') sectionEmpleados.push(row);
+
+        if (currentSection === "sociedades") sectionSociedades.push(row);
+        else if (currentSection === "contable") sectionContable.push(row);
+        else if (currentSection === "ceco") sectionCeCo.push(row);
+        else if (currentSection === "empleados") sectionEmpleados.push(row);
       }
     } else {
       sectionEmpleados = records;
@@ -237,8 +237,8 @@ export class CsvImportStrategy extends BaseImportStrategy {
     if (sectionSociedades && sectionSociedades.length > 1) {
       for (let i = 1; i < sectionSociedades.length; i++) {
         const row = sectionSociedades[i];
-        const code = String(row[0] || '').trim();
-        const name = String(row[1] || '').trim();
+        const code = String(row[0] || "").trim();
+        const name = String(row[1] || "").trim();
         if (code && name) {
           societies.push({ code, name });
         }
@@ -249,8 +249,8 @@ export class CsvImportStrategy extends BaseImportStrategy {
     if (sectionCeCo && sectionCeCo.length > 1) {
       for (let i = 1; i < sectionCeCo.length; i++) {
         const row = sectionCeCo[i];
-        const costsCenter = String(row[0] || '').trim();
-        const departmentName = String(row[1] || '').trim();
+        const costsCenter = String(row[0] || "").trim();
+        const departmentName = String(row[1] || "").trim();
         if (costsCenter && departmentName) {
           departments.push({ costsCenter, departmentName });
         }

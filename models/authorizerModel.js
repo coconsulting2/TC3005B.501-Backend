@@ -9,20 +9,48 @@ export { SolicitudHistorialAccion };
 
 const Authorizer = {
   /**
-   * Retrieve alerts for a department filtered by request status.
-   * @param {number} id - Department ID.
-   * @param {number} statusId - Request status ID to filter by.
-   * @param {number} n - Max number of alerts to return (0 = no limit).
-   * @returns {Promise<Array<Object>>} Alert rows.
+   * Alertas para N1/N2: solicitudes en el estado que les corresponde y donde el
+   * snapshot del workflow los designa como aprobador (o, fallback, mismo depto del solicitante).
+   *
+   * @param {object} params
+   * @param {number} params.authorizerUserId
+   * @param {string} params.roleName - "N1" | "N2"
+   * @param {number} params.statusId - request_status_id (2=N1, 3=N2)
+   * @param {number} [params.departmentId] - fallback legacy por depto del solicitante
+   * @param {number} params.limit - máximo de filas (0 = sin límite)
+   * @returns {Promise<Array<Object>>}
    */
-  async getAlerts(id, statusId, n) {
-    const alerts = await prisma.alert.findMany({
-      where: {
-        request: {
-          user: { departmentId: Number(id) },
-          requestStatusId: Number(statusId),
-        },
+  async getAlertsForAuthorizer({
+    authorizerUserId,
+    roleName,
+    statusId,
+    departmentId,
+    limit,
+  }) {
+    const snapshotPath = roleName === "N2" ? ["n2UserId"] : ["n1UserId"];
+    const approverFilter = {
+      workflowPreSnapshot: {
+        path: snapshotPath,
+        equals: Number(authorizerUserId),
       },
+    };
+
+    /** @type {import('@prisma/client').Prisma.AlertWhereInput} */
+    const where = {
+      request: {
+        requestStatusId: Number(statusId),
+        active: true,
+        OR: [
+          approverFilter,
+          ...(departmentId != null
+            ? [{ user: { departmentId: Number(departmentId) } }]
+            : []),
+        ],
+      },
+    };
+
+    const alerts = await prisma.alert.findMany({
+      where,
       include: {
         request: {
           include: { user: true },
@@ -30,7 +58,7 @@ const Authorizer = {
         alertMessage: true,
       },
       orderBy: { alertDate: "desc" },
-      ...(n !== 0 ? { take: Number(n) } : {}),
+      ...(limit !== 0 ? { take: Number(limit) } : {}),
     });
 
     return alerts.map((a) => ({
@@ -41,6 +69,19 @@ const Authorizer = {
       alert_date: a.alertDate.toISOString().split("T")[0],
       alert_time: a.alertDate.toISOString().split("T")[1].split(".")[0],
     }));
+  },
+
+  /**
+   * @deprecated Usar getAlertsForAuthorizer — conservado por compatibilidad de ruta.
+   */
+  async getAlerts(id, statusId, n) {
+    return this.getAlertsForAuthorizer({
+      authorizerUserId: 0,
+      roleName: "N1",
+      statusId,
+      departmentId: id,
+      limit: n,
+    });
   },
 
   /**

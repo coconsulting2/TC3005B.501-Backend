@@ -312,6 +312,31 @@ model RequestComment {
   @@map("Request_Comment")
 }
 
+// Hard coded for pino log code
+model LogLevel {
+  id          Int     @id @map("id")
+  level       String  @map("level") @db.VarChar(64)
+  description String? @map("description") @db.VarChar(255)
+  log         Log[]
+
+  @@map("Log_Level")
+}
+
+model Log {
+  id      Int      @id @default(autoincrement()) @map("id")
+  service String   @map("service") @db.VarChar(255)
+  levelId Int      @map("level_id")
+  message String   @map("message")
+  context Json     @map("context") @db.JsonB
+  at      DateTime @default(now()) @map("at")
+
+  level LogLevel @relation(fields: [levelId], references: [id], onDelete: NoAction)
+
+  @@index([levelId])
+  @@index([at])
+  @@map("Log")
+}
+
 /// Póliza de anticipo (AV) generada en hitos del ciclo de vida (aprobación de solicitud / comprobación de gastos).
 model AnticipoPolizaSnapshot {
   id             Int          @id @default(autoincrement()) @map("id")
@@ -509,6 +534,9 @@ model CfdiComprobante {
   subtotal        Float
   descuento       Float    @default(0.0)
   iva             Float    @default(0.0)
+  /// Desglose SAT: traslados y retenciones (001 ISR, 002 IVA, 003 IEPS). Ver `cfdiImpuestos.js`.
+  impuestos       Json?
+  totalRetenidos  Float    @default(0.0) @map("total_retenidos")
   total           Float
 
   rfcEmisor           String @map("rfc_emisor") @db.VarChar(13)
@@ -674,6 +702,7 @@ model ReimbursementTimeLimit {
 model ApiKey {
   id             Int       @id @default(autoincrement())
   organizationId BigInt    @map("org_id")
+  name           String    @db.VarChar(120)
   keyHash        String    @unique @map("key_hash") @db.VarChar(64)
   scope          Json
   expiresAt      DateTime  @map("expires_at")

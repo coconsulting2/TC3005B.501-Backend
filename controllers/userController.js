@@ -43,6 +43,7 @@ export async function getUserData(req, res) {
 export const login = async (req, res) => {
   try {
     const { username, password } = req.body;
+    const MAX_AGE = 1000 * 60 * 60 * 24;
     const result = await userService.authenticateUser(username, password, req);
     const permissions = await loadEffectivePermissions(result.user_id);
     const deptCookie =
@@ -57,27 +58,27 @@ export const login = async (req, res) => {
     res
       .cookie("token", result.token, {
         ...sessionCookie,
-        maxAge: 1000 * 60 * 60, // 1 hour
+        maxAge: MAX_AGE,
       })
       .cookie("role", result.role, {
         ...sessionCookie,
-        maxAge: 1000 * 60 * 60 * 24,
+        maxAge: MAX_AGE * 5,
       })
       .cookie("username", result.username, {
         ...sessionCookie,
-        maxAge: 1000 * 60 * 60,
+        maxAge: MAX_AGE,
       })
       .cookie("id", result.user_id.toString(), {
         ...sessionCookie,
-        maxAge: 1000 * 60 * 60,
+        maxAge: MAX_AGE,
       })
       .cookie("department_id", deptCookie, {
         ...sessionCookie,
-        maxAge: 1000 * 60 * 60,
+        maxAge: MAX_AGE,
       })
       .cookie("no_empleado", result.no_empleado || "", {
         ...sessionCookie,
-        maxAge: 1000 * 60 * 60,
+        maxAge: MAX_AGE,
       })
       .json({ ...result, permissions });
   } catch (error) {
