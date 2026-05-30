@@ -200,6 +200,75 @@ function sameBigInt(a, b) {
 }
 
 /**
+ * Infiere roles N1/N2/Solicitante cuando un usuario no tiene rol en el archivo,
+ * basándose en las referencias de jefe inmediato (managerNoEmpleado / managerUserName).
+ *
+ * Reglas:
+ *   - Referenciado como jefe por ≥1 empleado del archivo → N1
+ *   - Jefe de un N1 que también está en el archivo → N2
+ *   - No referenciado como jefe de nadie → Solicitante
+ *
+ * Solo actúa sobre filas sin mappedRoleName ni externalRoleLabel.
+ * Mutates rows in-place; añade mappedRoleName y roleAutoDetected.
+ *
+ * @param {Array<object>} rows
+ * @param {string[]} validRoleNames
+ */
+function inferRolesByHierarchy(rows, validRoleNames) {
+  const n1Role       = validRoleNames.find((n) => n.toLowerCase() === "n1");
+  const n2Role       = validRoleNames.find((n) => n.toLowerCase() === "n2");
+  const solicitante  = validRoleNames.find((n) => n.toLowerCase() === "solicitante");
+
+  if (!n1Role && !n2Role && !solicitante) return;
+
+  // Índice: id (noEmpleado o userName) → row
+  const idToRow = new Map();
+  for (const row of rows) {
+    const empId    = String(row.noEmpleado  ?? "").trim();
+    const userName = String(row.userName    ?? "").trim();
+    if (empId)    idToRow.set(empId, row);
+    if (userName) idToRow.set(userName, row);
+  }
+
+  // Conjunto de IDs referenciados como jefe por alguna fila
+  const isReferencedAsJefe = new Set();
+  for (const row of rows) {
+    const mgrSAP = String(row.managerNoEmpleado ?? "").trim();
+    const mgrStd = String(row.managerUserName   ?? "").trim();
+    if (mgrSAP) isReferencedAsJefe.add(mgrSAP);
+    if (mgrStd) isReferencedAsJefe.add(mgrStd);
+  }
+
+  if (isReferencedAsJefe.size === 0) return;
+
+  // Paso 1: asignar N1 o Solicitante
+  for (const row of rows) {
+    if (row.mappedRoleName || row.externalRoleLabel) continue;
+    const myId = String(row.noEmpleado || row.userName || "").trim();
+    if (!myId) continue;
+
+    if (isReferencedAsJefe.has(myId)) {
+      if (n1Role) { row.mappedRoleName = n1Role; row.roleAutoDetected = true; }
+    } else {
+      if (solicitante) { row.mappedRoleName = solicitante; row.roleAutoDetected = true; }
+    }
+  }
+
+  // Paso 2: promover jefe de un N1 a N2
+  if (n2Role) {
+    for (const row of rows) {
+      if (!row.roleAutoDetected || row.mappedRoleName !== n1Role) continue;
+      const managerId = String(row.managerNoEmpleado || row.managerUserName || "").trim();
+      if (!managerId) continue;
+      const managerRow = idToRow.get(managerId);
+      if (managerRow && managerRow.roleAutoDetected && managerRow.mappedRoleName === n1Role) {
+        managerRow.mappedRoleName = n2Role;
+      }
+    }
+  }
+}
+
+/**
  * @param {object} row
  * @param {Map<string, bigint>} roleNameToId lower → roleId
  * @param {Map<bigint, string[]>} permByRoleId
@@ -225,6 +294,8 @@ function buildPreviewRow(row, roleNameToId, permByRoleId) {
     effectivePermissions: rolePermissionCodes,
     /** UI: avisa al admin que el archivo traía contraseñas (que ya descartamos). */
     hasFilePassword: Boolean(row.hasFilePassword),
+    /** true cuando el rol fue inferido automáticamente por jerarquía (jefe inmediato). */
+    roleAutoDetected: Boolean(row.roleAutoDetected),
   };
 }
 
@@ -387,6 +458,8 @@ export async function previewImport(
     };
   });
 
+  inferRolesByHierarchy(processedRows, validRoleNames);
+
   const { valid, errors } = validateImportRows(processedRows, validRoleNames);
 
   const userNamesToCheck = valid.map((r) => r.userName);
@@ -539,7 +612,7 @@ export async function previewImport(
  * @param {Record<string, string[]>} [permissionExtrasByUser] - userName → códigos de permiso adicionales (directos, no incluidos en el rol)
  * @param {{ globalPassword?: string, perUser?: Record<string, string> }} [passwordOptions] - contraseñas (obligatorias por archivo o global)
  * @param {Record<string, string>} [roleOverridesByUser] - userName → rol elegido en UI; tiene PRIORIDAD sobre mappedRoleName y sobre roleMappings
- * @param {{ createNewOrganization?: boolean }} [applyOptions]
+ * @param {{ createNewOrganization?: boolean, newOrganizationName?: string }} [applyOptions]
  * @param {Record<string, { templateRoleName: string, permissions: string[], customRoleName?: string }>} [customImportRolesByUser] - userName → rol nuevo (se crea en BD al aplicar) clonando tope del rol base. Si trae `customRoleName`, se usa como semilla del nombre final.
  */
 export async function applyImport(
@@ -601,7 +674,19 @@ export async function applyImport(
     if (!entry.newOrgSpec) {
       throw new Error("Vista previa incompleta: falta la definición de la organización nueva.");
     }
-    const { organization } = await createClientOrganizationOnly(entry.newOrgSpec);
+    const nameOverride =
+      typeof applyOptions?.newOrganizationName === "string"
+        ? applyOptions.newOrganizationName.trim()
+        : "";
+    const orgSpecToCreate =
+      nameOverride.length > 0
+        ? { ...entry.newOrgSpec, nombre: nameOverride }
+        : entry.newOrgSpec;
+    if (!orgSpecToCreate.nombre?.trim()) {
+      throw new Error("El nombre de la organización nueva es obligatorio.");
+    }
+    validateImportOrganizationSpec(orgSpecToCreate);
+    const { organization } = await createClientOrganizationOnly(orgSpecToCreate);
     orgIdBig = BigInt(organization.id);
     const orgRolesFresh = await prisma.role.findMany({
       where: { organizationId: orgIdBig },

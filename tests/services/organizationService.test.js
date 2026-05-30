@@ -27,6 +27,7 @@ const mockPrisma = {
   accountingDocType: { upsert: jest.fn() },
   accountingSociety: { upsert: jest.fn() },
   user: { upsert: jest.fn() },
+  $executeRaw: jest.fn().mockResolvedValue(1),
   $executeRawUnsafe: jest.fn(),
   $transaction: jest.fn(async (fn) => fn(mockPrisma)),
 };
