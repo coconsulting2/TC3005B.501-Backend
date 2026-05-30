@@ -282,6 +282,9 @@ function serializeRoleRow(role) {
   };
 }
 
+/**
+ *
+ */
 function assertTenantResolved() {
   const ctx = getTenantContext();
   if (!ctx?.organizationId) {
@@ -324,7 +327,7 @@ export async function createTenantRole(payload) {
     throw err;
   }
 
-  let codes = [...(payload.permissions || [])].map((c) => String(c).trim()).filter(Boolean);
+  const codes = [...(payload.permissions || [])].map((c) => String(c).trim()).filter(Boolean);
   if (payload.is_admin && !codes.includes(ADMIN_MANAGE_ROLE_CODE)) {
     codes.push(ADMIN_MANAGE_ROLE_CODE);
   }

@@ -77,14 +77,18 @@ async function uniqueRoleNameInOrg(organizationId, desired) {
 }
 
 /**
- * Crea roles «a medida» antes de validar overrides: cada entrada es userName → { templateRoleName, permissions }.
+ * Crea roles «a medida» antes de validar overrides: cada entrada es userName →
+ * { templateRoleName, permissions, customRoleName? }. Si el admin envía un
+ * `customRoleName` lo usamos como semilla del nombre final (saneado, recortado
+ * a 40 caracteres y forzado único con `uniqueRoleNameInOrg`). Si no llega o
+ * queda vacío, mantenemos el comportamiento previo (`Imp·<userName>` auto).
  *
  * @param {object} opts
  * @param {bigint} opts.organizationId
  * @param {Map<string, number>} opts.roleMap
  * @param {string[]} opts.validRoleNames
  * @param {Array<{ userName: string }>} opts.rows
- * @param {Record<string, { templateRoleName?: string, permissions?: unknown }>} opts.customImportRolesByUser
+ * @param {Record<string, { templateRoleName?: string, permissions?: unknown, customRoleName?: string }>} opts.customImportRolesByUser
  * @returns {Promise<Record<string, string>>} userName → roleName creado
  */
 async function createCustomImportRolesInApply(opts) {
@@ -104,6 +108,7 @@ async function createCustomImportRolesInApply(opts) {
     }
     const s = spec && typeof spec === "object" ? spec : {};
     const templateRoleName = String(s.templateRoleName ?? "").trim();
+    const customRoleName = String(s.customRoleName ?? "").trim();
     const permissionsRaw = Array.isArray(s.permissions) ? s.permissions : [];
     const permissions = [...new Set(permissionsRaw.map((c) => String(c ?? "").trim()).filter(Boolean))];
 
@@ -112,6 +117,11 @@ async function createCustomImportRolesInApply(opts) {
     }
     if (permissions.length === 0) {
       throw new Error(`customImportRoles[${userName}]: la lista de permisos no puede estar vacía.`);
+    }
+    if (customRoleName && customRoleName.length > 40) {
+      throw new Error(
+        `customImportRoles[${userName}]: «customRoleName» no puede exceder 40 caracteres.`
+      );
     }
 
     const templateId = roleMap.get(templateRoleName.toLowerCase());
@@ -141,7 +151,10 @@ async function createCustomImportRolesInApply(opts) {
       );
     }
 
-    const desiredName = await uniqueRoleNameInOrg(organizationId, buildImportCustomRoleBaseName(userName));
+    const seedName = customRoleName
+      ? customRoleName.slice(0, 40)
+      : buildImportCustomRoleBaseName(userName);
+    const desiredName = await uniqueRoleNameInOrg(organizationId, seedName);
 
     const newRole = await prisma.role.create({
       data: {
@@ -599,8 +612,8 @@ export async function previewImport(
  * @param {Record<string, string[]>} [permissionExtrasByUser] - userName → códigos de permiso adicionales (directos, no incluidos en el rol)
  * @param {{ globalPassword?: string, perUser?: Record<string, string> }} [passwordOptions] - contraseñas (obligatorias por archivo o global)
  * @param {Record<string, string>} [roleOverridesByUser] - userName → rol elegido en UI; tiene PRIORIDAD sobre mappedRoleName y sobre roleMappings
- * @param {{ createNewOrganization?: boolean }} [applyOptions]
- * @param {Record<string, { templateRoleName: string, permissions: string[] }>} [customImportRolesByUser] - userName → rol nuevo (se crea en BD al aplicar) clonando tope del rol base
+ * @param {{ createNewOrganization?: boolean, newOrganizationName?: string }} [applyOptions]
+ * @param {Record<string, { templateRoleName: string, permissions: string[], customRoleName?: string }>} [customImportRolesByUser] - userName → rol nuevo (se crea en BD al aplicar) clonando tope del rol base. Si trae `customRoleName`, se usa como semilla del nombre final.
  */
 export async function applyImport(
   previewToken,
@@ -661,7 +674,19 @@ export async function applyImport(
     if (!entry.newOrgSpec) {
       throw new Error("Vista previa incompleta: falta la definición de la organización nueva.");
     }
-    const { organization } = await createClientOrganizationOnly(entry.newOrgSpec);
+    const nameOverride =
+      typeof applyOptions?.newOrganizationName === "string"
+        ? applyOptions.newOrganizationName.trim()
+        : "";
+    const orgSpecToCreate =
+      nameOverride.length > 0
+        ? { ...entry.newOrgSpec, nombre: nameOverride }
+        : entry.newOrgSpec;
+    if (!orgSpecToCreate.nombre?.trim()) {
+      throw new Error("El nombre de la organización nueva es obligatorio.");
+    }
+    validateImportOrganizationSpec(orgSpecToCreate);
+    const { organization } = await createClientOrganizationOnly(orgSpecToCreate);
     orgIdBig = BigInt(organization.id);
     const orgRolesFresh = await prisma.role.findMany({
       where: { organizationId: orgIdBig },
@@ -1006,7 +1031,7 @@ export async function applyImport(
   /** @type {{ userName: string, email: string, temporaryPassword: string } | undefined} */
   let bootstrapAdmin = undefined;
   if (entry.createNewOrganization && created.length > 0) {
-    const adminRole = await prisma.role.findFirst({ where: { organizationId: orgIdBig, roleName: 'Administrador' }});
+    const adminRole = await prisma.role.findFirst({ where: { organizationId: orgIdBig, roleName: "Administrador" }});
     if (adminRole) {
       const hasAdmin = await prisma.user.findFirst({ where: { organizationId: orgIdBig, roleId: adminRole.roleId } });
       if (!hasAdmin) {

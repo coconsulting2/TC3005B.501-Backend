@@ -10,8 +10,17 @@ import { consultarCfdiWithRetries, acuseToCfdiRow } from "../services/satConsult
 import mailData from "../services/email/mailData.js";
 import { Mail } from "../services/email/mail.cjs";
 import { isWithinDeadline } from "../services/reimbursementTimeService.js";
+import prisma from "../database/config/prisma.js";
+import { createComment } from "../services/requestCommentService.js";
 
 const EFOS_EMISOR_BLACKLIST_APPROVAL = ["100", "101", "104"];
+
+/**
+ * Estados visibles en GET /accounts-payable/requests (historial CxP).
+ * 7 = Validación de comprobantes · 8 = Finalizado
+ * (catálogo global Request_status, ver seed.js).
+ */
+const CXP_HISTORIAL_STATUS_IDS = [7, 8];
 
 /**
  * Lista "0, 1, 0" del modelo → true si algún tramo requiere hotel o avión.
@@ -109,7 +118,8 @@ const validateReceiptsHandler = async (req, res) => {
 /**
  * Approves or rejects a single receipt.
  * Maps approval (1=approved→validation 2, 0=rejected→validation 3).
- * @param {import('express').Request} req - Express request (params: receipt_id, body: { approval: 0|1 })
+ * Al rechazar, `comentario` (o `comment`) es obligatorio y se publica en el chat de la solicitud.
+ * @param {import('express').Request} req - Express request (params: receipt_id, body: { approval: 0|1, comentario? })
  * @param {import('express').Response} res - Express response
  * @returns {void} JSON with receipt status update result
  */
@@ -121,6 +131,16 @@ const validateReceipt = async (req, res) => {
         return res.status(400).json({
             error: "Invalid input (only values 0 or 1 accepted for approval)"
         });
+    }
+
+    let rejectComment = null;
+    if (approval === 0) {
+        rejectComment = String(req.body?.comentario ?? req.body?.comment ?? "").trim();
+        if (!rejectComment) {
+            return res.status(400).json({
+                error: "El comentario es obligatorio al rechazar un comprobante.",
+            });
+        }
     }
 
     try {
@@ -182,6 +202,28 @@ const validateReceipt = async (req, res) => {
             return res.status(400).json({ error: "Failed to update travel request status" });
         }
 
+        if (
+            approval === 0 &&
+            rejectComment &&
+            Number.isFinite(Number(receipt.request_id))
+        ) {
+            const typeLabel = receipt.receipt_type_name
+                ? `«${receipt.receipt_type_name}»`
+                : `#${receiptId}`;
+            const commentBody = `Comprobante ${typeLabel} rechazado: ${rejectComment}`;
+            const commentResult = await createComment(
+                Number(req.user.user_id),
+                Number(receipt.request_id),
+                commentBody,
+            );
+            if (!commentResult.success) {
+                console.warn(
+                    "[validateReceipt] Comprobante rechazado; comentario no guardado:",
+                    commentResult.error,
+                );
+            }
+        }
+
         if (approval === 1 && Number.isFinite(Number(receipt.request_id))) {
             try {
                 await AccountsPayableService.validateReceiptsAndUpdateStatus(Number(receipt.request_id));
@@ -241,9 +283,74 @@ const getExpenseValidations = async (req, res) => {
     }
 };
 
+/**
+ * Historial de solicitudes para CxP: solo validación de comprobantes y finalizadas.
+ * @param {import('express').Request} req - Express request
+ * @param {import('express').Response} res - Express response
+ */
+const getAllRequests = async (req, res) => {
+    const org_id = BigInt(req.tenant?.organizationId ?? req.user.organization_id);
+
+    try {
+        const requests = await prisma.request.findMany({
+            where: {
+                organizationId: org_id,
+                active: true,
+                requestStatusId: { in: CXP_HISTORIAL_STATUS_IDS },
+            },
+            select: {
+                requestId: true,
+                requestStatus: { select: { status: true } },
+                routeRequests: {
+                    select: {
+                        route: {
+                            select: {
+                                destinationCountry: { select: { countryName: true } },
+                                beginningDate: true,
+                                endingDate: true
+                            }
+                        }
+                    },
+                    orderBy: { route: { routerIndex: "asc" } }
+                },
+                user: { select: { userName: true } }
+            },
+            orderBy: { creationDate: "desc" }
+        });
+
+        const formatted = requests.map(r => {
+            const firstRoute = r.routeRequests?.[0]?.route;
+            const lastRoute = r.routeRequests?.[r.routeRequests.length - 1]?.route;
+
+            const formatDate = (date) => {
+                if (!date) return "—";
+                const d = new Date(date);
+                return isNaN(d.getTime()) ? "—" : d.toISOString().split("T")[0];
+            };
+
+            const userName = r.user?.userName || "Usuario Desconocido";
+
+            return {
+                request_id: r.requestId,
+                request_status: r.requestStatus?.status || "Desconocido",
+                destination_country: firstRoute?.destinationCountry?.countryName || "—",
+                beginning_date: formatDate(firstRoute?.beginningDate),
+                ending_date: formatDate(lastRoute?.endingDate),
+                requester_name: userName // optional extra info
+            };
+        });
+
+        return res.status(200).json(formatted);
+    } catch (error) {
+        console.error("Error in getAllRequests controller:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
+};
+
 export default {
     attendTravelRequest,
     validateReceiptsHandler,
     validateReceipt,
     getExpenseValidations,
+    getAllRequests,
 };

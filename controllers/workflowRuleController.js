@@ -19,6 +19,8 @@ function getOrgId(req) {
 /**
  * GET /api/workflow-rules
  * Lista todas las reglas de la organización con su departamento.
+ * @param req
+ * @param res
  */
 export async function listRules(req, res) {
   try {
@@ -57,6 +59,8 @@ export async function listRules(req, res) {
 /**
  * GET /api/workflow-rules/departments
  * Lista los departamentos de la organización (para el filtro del panel).
+ * @param req
+ * @param res
  */
 export async function listDepartments(req, res) {
   try {
@@ -76,6 +80,8 @@ export async function listDepartments(req, res) {
 /**
  * GET /api/workflow-rules/roles
  * Lista los roles de la organización (para selects del panel).
+ * @param req
+ * @param res
  */
 export async function listRoles(req, res) {
   try {
@@ -95,6 +101,8 @@ export async function listRoles(req, res) {
 /**
  * POST /api/workflow-rules
  * Crea una nueva regla de workflow.
+ * @param req
+ * @param res
  */
 export async function createRule(req, res) {
   try {
@@ -167,6 +175,8 @@ export async function createRule(req, res) {
 /**
  * PUT /api/workflow-rules/:id
  * Actualiza una regla existente (scoped a la org).
+ * @param req
+ * @param res
  */
 export async function updateRule(req, res) {
   try {
@@ -244,6 +254,8 @@ export async function updateRule(req, res) {
 /**
  * PATCH /api/workflow-rules/:id/toggle
  * Activa o desactiva una regla (soft delete).
+ * @param req
+ * @param res
  */
 export async function toggleRule(req, res) {
   try {

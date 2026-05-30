@@ -5,6 +5,25 @@
 import authorizerServices from "../services/authorizerService.js";
 import { Mail } from "../services/email/mail.cjs";
 import mailData from "../services/email/mailData.js";
+import prisma from "../database/config/prisma.js";
+import { buildSolicitudJourney } from "../services/solicitudJourneyService.js";
+
+/** Permisos que permiten ver historial de solicitudes ajenas en el mismo tenant. */
+const HISTORIAL_BROAD_VIEW_PERMISSIONS = [
+  "travel_request:view_any",
+  "travel_request:authorize",
+  "travel_agent:attend",
+  "accounts_payable:attend",
+];
+
+/**
+ * @param {Set<string>|undefined} permissionSet
+ * @returns {boolean}
+ */
+function canViewAnyTravelRequestHistorial(permissionSet) {
+  if (!(permissionSet instanceof Set)) return false;
+  return HISTORIAL_BROAD_VIEW_PERMISSIONS.some((code) => permissionSet.has(code));
+}
 
 /**
  *
@@ -103,6 +122,78 @@ export const reassignSolicitud = async (req, res) => {
       return res.status(error.status).json({ error: error.message });
     }
     console.error("reassignSolicitud:", error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+/**
+ * GET /api/solicitudes/:id/historial
+ * @param req
+ * @param res
+ */
+export const getSolicitudHistorial = async (req, res) => {
+  const request_id = Number(req.params.id);
+  const user_id = Number(req.user.user_id);
+  const org_id = BigInt(req.tenant?.organizationId ?? req.user.organization_id);
+
+  try {
+    const request = await prisma.request.findUnique({
+      where: { requestId: request_id },
+      select: {
+        userId: true,
+        organizationId: true,
+        requestStatusId: true,
+        creationDate: true,
+        workflowPreSnapshot: true,
+        requestStatus: { select: { status: true } },
+        routeRequests: {
+          include: {
+            route: { select: { hotelNeeded: true, planeNeeded: true } },
+          },
+        },
+      },
+    });
+
+    if (!request) {
+      return res.status(404).json({ error: "Solicitud no encontrada" });
+    }
+
+    if (request.organizationId !== org_id) {
+      return res.status(403).json({ error: "Acceso denegado" });
+    }
+
+    if (
+      !canViewAnyTravelRequestHistorial(req.user.permissionSet) &&
+      request.userId !== user_id
+    ) {
+      return res.status(403).json({ error: "Acceso denegado" });
+    }
+
+    const historial = await prisma.solicitudHistorial.findMany({
+      where: { requestId: request_id },
+      include: {
+        user: {
+          select: {
+            userName: true,
+            role: { select: { roleName: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const journey = buildSolicitudJourney({
+      currentStatusId: request.requestStatusId,
+      currentStatusLabel: request.requestStatus?.status ?? "",
+      workflowPreSnapshot: request.workflowPreSnapshot,
+      routeRequests: request.routeRequests,
+      creationDate: request.creationDate,
+      historial,
+    });
+
+    return res.status(200).json(journey);
+  } catch (error) {
+    console.error("getSolicitudHistorial:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
 };

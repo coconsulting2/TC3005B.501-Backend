@@ -112,11 +112,29 @@ const ApprovalSubstituteModel = {
     });
   },
 
-  async createAlert(requestId, messageId) {
+  async createAlert(requestId, requestStatusId) {
+    const request = await prisma.request.findUnique({
+      where: { requestId: Number(requestId) },
+      select: { organizationId: true, requestStatusId: true },
+    });
+    if (!request) return;
+
+    const statusId = Number(requestStatusId ?? request.requestStatusId);
+    const { findAlertMessageIdForRequestStatus } = await import(
+      "../services/alertMessageResolver.js"
+    );
+    const messageId = await findAlertMessageIdForRequestStatus(
+      prisma,
+      request.organizationId,
+      statusId,
+    );
+    if (!messageId) return;
+
     await prisma.alert.create({
       data: {
         requestId: Number(requestId),
-        messageId: Number(messageId),
+        messageId,
+        organizationId: request.organizationId,
       },
     });
   },

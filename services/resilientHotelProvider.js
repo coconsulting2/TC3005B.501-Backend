@@ -5,7 +5,13 @@ import { DuffelStaysProvider } from "./duffelStaysProvider.js";
 import { MockHotelProvider } from "./mockHotelProvider.js";
 import { isStaysAccessDeniedError } from "./duffelStaysApi.js";
 
+/**
+ *
+ */
 export class ResilientHotelProvider {
+  /**
+   *
+   */
   constructor() {
     this._duffel = new DuffelStaysProvider();
     this._mock = new MockHotelProvider();

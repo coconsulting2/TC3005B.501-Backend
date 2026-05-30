@@ -122,6 +122,9 @@ export function enrichOfferFromFetchAllRates(searchResult, baseOffer) {
  * @property {number} huespedes
  */
 
+/**
+ *
+ */
 export class DuffelStaysProvider {
   /**
    * @param {HotelSearchParams} params
