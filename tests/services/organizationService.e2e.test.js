@@ -12,6 +12,7 @@
  *
  * Requires the dev stack (Postgres). Run with: bun run test:e2e (or the e2e jest invocation).
  */
+import { afterAll, describe, expect, it } from "@jest/globals";
 import prisma from "../../database/config/prisma.js";
 import { createOrganization } from "../../services/organizationService.js";
 
