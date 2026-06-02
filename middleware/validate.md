@@ -2,7 +2,7 @@
 
 La documentación **única y actualizada** vive en el wiki del monorepo:
 
-**[cocowiki/docs/documentacionAPI-SAT.md](../../cocowiki/docs/documentacionAPI-SAT.md)**
+**[cocowiki/docs/desarrollo/documentacion-api-sat.md](../../cocowiki/docs/desarrollo/documentacion-api-sat.md)**
 
 Ahí está definido de forma unificada:
 
