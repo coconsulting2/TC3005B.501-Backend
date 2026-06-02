@@ -930,7 +930,7 @@ export async function applyImport(
       });
 
       await prisma.user.update({
-        where: { userId: user.userId },
+        where: { userId: user.userId, organizationId: orgIdBig },
         data: { noEmpleado },
       });
 
@@ -994,7 +994,7 @@ export async function applyImport(
       const managerUserId = managerByNoEmpleado.get(link.managerNoEmpleado);
       if (!managerUserId || Number(managerUserId) === Number(link.userId)) continue;
       await prisma.user.update({
-        where: { userId: Number(link.userId) },
+        where: { userId: Number(link.userId), organizationId: orgIdBig },
         data: { managerUserId: Number(managerUserId) },
       });
     }
@@ -1022,7 +1022,7 @@ export async function applyImport(
       const mid = byLower.get(mgrUserName.toLowerCase());
       if (!sid || !mid || Number(sid) === Number(mid)) continue;
       await prisma.user.update({
-        where: { userId: Number(sid) },
+        where: { userId: Number(sid), organizationId: orgIdBig },
         data: { managerUserId: Number(mid) },
       });
     }
