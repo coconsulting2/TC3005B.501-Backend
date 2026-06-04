@@ -1,0 +1,94 @@
+/**
+ * @module chartOfAccountController
+ * @description CRUD endpoints para el catálogo contable maestro (ChartOfAccount, US-24).
+ */
+import prisma from "../database/config/prisma.js";
+import * as svc from "../services/chartOfAccountService.js";
+
+/**
+ * Resolves the organization id of the authenticated user.
+ * @param {import("express").Request} req
+ * @returns {Promise<bigint>}
+ */
+async function resolveOrgId(req) {
+  const userId = Number(req.user.user_id);
+  const user = await prisma.user.findUnique({ where: { userId }, select: { organizationId: true } });
+  if (!user || user.organizationId === null) {
+    const err = new Error("Usuario sin organización asignada.");
+    err.status = 403;
+    throw err;
+  }
+  return user.organizationId;
+}
+
+/**
+ * @param {import("express").Response} res
+ * @param {Error & { status?: number }} error
+ * @param {string} label
+ */
+function handleError(res, error, label) {
+  if (error.status) return res.status(error.status).json({ error: error.message });
+  console.error(`${label}:`, error);
+  return res.status(500).json({ error: "Internal server error" });
+}
+
+/**
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ */
+export const list = async (req, res) => {
+  try {
+    const organizationId = await resolveOrgId(req);
+    const rows = await svc.listAccounts(organizationId, { activeOnly: req.query.activeOnly !== "false" });
+    return res.status(200).json({ accounts: rows });
+  } catch (e) { return handleError(res, e, "chartOfAccount.list"); }
+};
+
+/**
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ */
+export const get = async (req, res) => {
+  try {
+    const organizationId = await resolveOrgId(req);
+    const row = await svc.getAccount(Number(req.params.id), organizationId);
+    if (!row) return res.status(404).json({ error: `Cuenta contable ${req.params.id} no encontrada.` });
+    return res.status(200).json(row);
+  } catch (e) { return handleError(res, e, "chartOfAccount.get"); }
+};
+
+/**
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ */
+export const create = async (req, res) => {
+  try {
+    const organizationId = await resolveOrgId(req);
+    const created = await svc.createAccount(organizationId, req.body);
+    return res.status(201).json(created);
+  } catch (e) { return handleError(res, e, "chartOfAccount.create"); }
+};
+
+/**
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ */
+export const update = async (req, res) => {
+  try {
+    const organizationId = await resolveOrgId(req);
+    const updated = await svc.updateAccount(Number(req.params.id), organizationId, req.body);
+    return res.status(200).json(updated);
+  } catch (e) { return handleError(res, e, "chartOfAccount.update"); }
+};
+
+/**
+ * @param {import("express").Request} req
+ * @param {import("express").Response} res
+ */
+export const deactivate = async (req, res) => {
+  try {
+    const organizationId = await resolveOrgId(req);
+    await svc.deactivateAccount(Number(req.params.id), organizationId);
+    return res.status(204).send();
+  } catch (e) { return handleError(res, e, "chartOfAccount.deactivate"); }
+};

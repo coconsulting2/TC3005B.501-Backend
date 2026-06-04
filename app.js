@@ -33,6 +33,7 @@ import flightsRoutes from "./routes/flightsRoutes.js";
 import hotelsRoutes from "./routes/hotelsRoutes.js";
 import requestCommentRoutes from "./routes/requestCommentRoutes.js";
 import workflowRuleRoutes from "./routes/workflowRuleRoutes.js";
+import chartOfAccountRoutes from "./routes/chartOfAccountRoutes.js";
 
 import { handleAuthError } from "./middleware/authErrors.js";
 
@@ -156,6 +157,8 @@ app.use("/api/organizations", organizationRoutes);
 app.use("/api/onboarding/import", onboardingImportRoutes);
 // M1-010 — Exportación contable al ERP (polizas AV/GV).
 app.use("/api/export", exportRoutes);
+// US-24 — Catálogo contable maestro: CRUD de cuentas por organización.
+app.use("/api/chart-of-accounts", chartOfAccountRoutes);
 app.use("/api/reports", reportRoutes);
 // TF-009 — Política de viáticos: topes de hotel y comida por organización.
 app.use("/api/viaticos-policy", viaticasPolicyRoutes);
