@@ -85,7 +85,7 @@ export async function createOrganization(input) {
 
   // Crear org + bootstrap catalogs + admin user dentro de bypass cross-tenant
   // (el caller es Ditta y necesita escribir en una org que aún no existe).
-  return withRls(1n, { bypass: true }, async () => {
+  return withRls(1n, { bypass: true }, async (tx) => {
     const org = await createOrganizationRow({
         nombre,
         rfc: rfc ?? null,
@@ -94,12 +94,12 @@ export async function createOrganization(input) {
         baseCurrency,
         kind: "CLIENT",
         status: "CONFIGURING",
-      }, prisma);
+      }, tx);
 
-    await bootstrapOrganizationCatalogs(prisma, org.id, { includeDittaSuperAdmin: false });
+    await bootstrapOrganizationCatalogs(tx, org.id, { includeDittaSuperAdmin: false });
 
     const userName = adminEmail.split("@")[0].replace(/[^a-z0-9_]/gi, "_").slice(0, 60);
-    await ensureOrganizationAdmin(prisma, org.id, {
+    await ensureOrganizationAdmin(tx, org.id, {
       userName,
       email: adminEmail,
       password: adminPassword,
@@ -137,7 +137,7 @@ export async function createClientOrganizationOnly(input) {
     throw err;
   }
 
-  return withRls(1n, { bypass: true }, async () => {
+  return withRls(1n, { bypass: true }, async (tx) => {
     const org = await createOrganizationRow({
         nombre: nombre.trim(),
         rfc: rfc ?? null,
@@ -146,9 +146,9 @@ export async function createClientOrganizationOnly(input) {
         baseCurrency,
         kind: "CLIENT",
         status: "CONFIGURING",
-      }, prisma);
+      }, tx);
 
-    await bootstrapOrganizationCatalogs(prisma, org.id, { includeDittaSuperAdmin: false });
+    await bootstrapOrganizationCatalogs(tx, org.id, { includeDittaSuperAdmin: false });
 
     return { organization: serializeOrganization(org) };
   });
