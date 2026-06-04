@@ -1,4 +1,4 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: CocoAPI — Documentación Completa
   version: 3.0.0
@@ -2193,11 +2193,11 @@ components:
       properties:
         header:
           $ref: "#/components/schemas/PolizaHeader"
-        detalle:
+        detalles:
           type: array
           items:
             $ref: "#/components/schemas/PolizaLine"
-      required: [header, detalle]
+      required: [header, detalles]
 
     PolizaHeader:
       type: object
