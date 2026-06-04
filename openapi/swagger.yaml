@@ -2877,7 +2877,8 @@ components:
 
     CommentsStreamEvent:
       type: object
-      description: Payload emitido como evento SSE. Se serializa como `data: <JSON>\n\n`.
+      description: |
+        Payload emitido como evento SSE. Se serializa como `data: <JSON>\n\n`.
       properties:
         success:
           type: boolean
