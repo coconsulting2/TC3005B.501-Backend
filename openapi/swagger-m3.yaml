@@ -1,0 +1,1917 @@
+openapi: 3.0.3
+info:
+  title: CocoAPI - Modulo 3
+  version: 1.0.0
+  description: |
+    Documentacion de endpoints del Modulo 3.
+    Incluye gestión de organizaciones (multi-tenant), sincronización de empleados,
+    claves API, reportes por centro de costo, notificaciones (in-app + Web Push),
+    borradores de solicitud y comentarios en solicitudes.
+servers:
+  - url: https://localhost:3000
+    description: Local HTTPS
+tags:
+  - name: Organizaciones
+    description: Gestión de tenants (organizaciones). Solo Ditta (ROOT) puede crear/listar todas.
+  - name: Empleados
+    description: Sincronización del catálogo de empleados desde RH/SAP.
+  - name: ApiKeys
+    description: Administración de claves API por organización para integraciones machine-to-machine.
+  - name: Reportes
+    description: Reportes de gastos y métricas por organización.
+  - name: Notificaciones
+    description: Centro de notificaciones in-app y Web Push (VAPID).
+  - name: Borradores
+    description: Creación y confirmación de borradores de solicitudes de viaje.
+  - name: Comentarios
+    description: Comentarios por solicitud de viaje (paginados y via SSE).
+  - name: Webhooks
+    description: Eventos enviados por CocoAPI a sistemas externos vía webhook.
+
+paths:
+  # ─────────────────────────────────────────────
+  # ORGANIZATIONS
+  # ─────────────────────────────────────────────
+  /api/organizations:
+    get:
+      tags: [Organizaciones]
+      summary: Listar todas las organizaciones
+      description: |
+        Retorna la lista paginada de organizaciones. Solo accesible con permiso
+        `organization:list_all` (rol Ditta/ROOT).
+        Soporta filtros opcionales por `kind` y `status`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          description: Filtrar por tipo de organización.
+          schema:
+            type: string
+            enum: [ROOT, CLIENT]
+        - name: status
+          in: query
+          required: false
+          description: Filtrar por estado de la organización.
+          schema:
+            type: string
+            enum: [CONFIGURING, ACTIVE, SUSPENDED]
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+      responses:
+        "200":
+          description: Lista paginada de organizaciones
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Organization"
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  pageSize:
+                    type: integer
+              example:
+                data:
+                  - id: "1"
+                    nombre: "Ditta"
+                    kind: "ROOT"
+                    status: "ACTIVE"
+                    timezone: "America/Mexico_City"
+                    baseCurrency: "MXN"
+                total: 1
+                page: 1
+                pageSize: 25
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Organizaciones]
+      summary: Crear nueva organización (tenant)
+      description: |
+        Crea un nuevo tenant CLIENT. Requiere permiso `organization:create` (solo Ditta/ROOT).
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrganizationCreateInput"
+            example:
+              nombre: "Empresa Ejemplo S.A. de C.V."
+              razonSocial: "EMPRESA EJEMPLO S.A. DE C.V."
+              rfc: "EEJ900101AAA"
+              timezone: "America/Mexico_City"
+              baseCurrency: "MXN"
+      responses:
+        "201":
+          description: Organización creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/organizations/me:
+    get:
+      tags: [Organizaciones]
+      summary: Obtener la organización del usuario autenticado
+      description: |
+        Retorna los datos de la organización a la que pertenece el usuario en el JWT actual.
+        Requiere permiso `user:view_self`.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Organización del usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Organización no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Organización no encontrada"
+
+  /api/organizations/{id}:
+    get:
+      tags: [Organizaciones]
+      summary: Obtener organización por ID
+      description: |
+        Retorna los datos de una organización por su ID. Requiere permiso `organization:read`.
+        Los usuarios no-ROOT solo pueden leer su propia organización.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          description: Datos de la organización
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Organización no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Organización no encontrada"
+    patch:
+      tags: [Organizaciones]
+      summary: Actualizar datos de una organización
+      description: |
+        Actualiza campos de una organización. Requiere permiso `organization:update`.
+        Los usuarios no-ROOT solo pueden editar su propia organización.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrganizationUpdateInput"
+            example:
+              nombre: "Nuevo Nombre S.A."
+              timezone: "America/Monterrey"
+      responses:
+        "200":
+          description: Organización actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Organización no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/organizations/{id}/activate:
+    post:
+      tags: [Organizaciones]
+      summary: Activar una organización suspendida
+      description: |
+        Cambia el estado de la organización a `ACTIVE`. Requiere permiso `organization:activate`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          description: Organización activada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Organización no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/organizations/{id}/suspend:
+    post:
+      tags: [Organizaciones]
+      summary: Suspender una organización activa
+      description: |
+        Cambia el estado de la organización a `SUSPENDED`. Requiere permiso `organization:suspend`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/OrgId"
+      responses:
+        "200":
+          description: Organización suspendida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Organization"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Organización no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ─────────────────────────────────────────────
+  # EMPLOYEES — SYNC
+  # ─────────────────────────────────────────────
+  /api/admin/employees/sync:
+    post:
+      tags: [Empleados]
+      summary: Sincronizar empleado desde RH/SAP
+      description: |
+        Recibe una transacción de empleado proveniente de RH o SAP y actualiza el catálogo
+        `empleado` del tenant. Si el empleado no existe, se crea (upsert). El `no_empleado`
+        es la clave natural por organización.
+
+        Requiere permiso `user:edit`. La organización se determina automáticamente del JWT
+        o de la impersonación activa.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmployeeSyncRequest"
+            example:
+              header:
+                idTransaction: "TXN-20260601-001"
+              detalle:
+                noEmpleado: "EMP001"
+                nombre: "Juan Pérez García"
+                email: "juan.perez@empresa.com"
+                jefeInmediato: "EMP000"
+                proveedor: "PROV001234"
+                ceco: "CC001"
+                status: "A"
+                fechaAlta: "2024-01-15"
+      responses:
+        "200":
+          description: Empleado sincronizado correctamente
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeSyncResponse"
+              example:
+                idTransaction: "TXN-20260601-001"
+                status: "ok"
+                noEmpleado: "EMP001"
+                accion_realizada: "upserted"
+        "400":
+          description: Datos de empleado inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeSyncErrorResponse"
+              example:
+                idTransaction: "TXN-20260601-001"
+                status: "error"
+                noEmpleado: "EMP001"
+                accion_realizada: null
+                errores: ["noEmpleado is required"]
+        "401":
+          description: Token ausente o inválido / organización no disponible en contexto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeSyncErrorResponse"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ─────────────────────────────────────────────
+  # API KEYS
+  # ─────────────────────────────────────────────
+  /api/keys/generate:
+    post:
+      tags: [ApiKeys]
+      summary: Generar nueva clave API
+      description: |
+        Genera una nueva API key para la organización indicada. El secreto se devuelve
+        **una sola vez** en la respuesta; solo el hash SHA-256 queda almacenado en BD.
+        Requiere permiso `api_key:manage`. Los admins no-ROOT solo pueden gestionar keys
+        de su propia organización.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeyGenerateRequest"
+            example:
+              name: "Integración ERP SAP"
+              org_id: "1"
+              scope:
+                permissions: ["expense:view", "report:read"]
+              expires_at: "2027-01-01T00:00:00Z"
+      responses:
+        "201":
+          description: Clave API generada. El campo `key` solo se incluye en esta respuesta.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyGenerateResponse"
+              example:
+                id: 1
+                org_id: "1"
+                name: "Integración ERP SAP"
+                key: "coco_live_abc123def456..."
+                scope:
+                  permissions: ["expense:view", "report:read"]
+                expires_at: "2027-01-01T00:00:00.000Z"
+                active: true
+                created_at: "2026-06-01T12:00:00.000Z"
+                created_by: 42
+        "400":
+          description: Parámetros inválidos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Sin permiso o la organización no pertenece al usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Cannot manage API keys for this organization"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/keys/{id}/revoke:
+    delete:
+      tags: [ApiKeys]
+      summary: Revocar una clave API
+      description: |
+        Marca la clave API como revocada (soft delete). Requiere permiso `api_key:manage`.
+        Registra `revoked_at` en BD; la key deja de ser válida inmediatamente.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID numérico de la clave API.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Clave revocada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyRevokeResponse"
+              example:
+                id: 1
+                org_id: "1"
+                name: "Integración ERP SAP"
+                active: false
+                revoked_at: "2026-06-02T10:30:00.000Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Sin permiso o la organización no pertenece al usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Clave no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "API key not found"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/keys/org/{orgId}:
+    get:
+      tags: [ApiKeys]
+      summary: Listar claves API de una organización
+      description: |
+        Retorna todas las claves API de la organización indicada (activas y revocadas).
+        El campo secreto y el hash **nunca** se exponen. Requiere permiso `api_key:manage`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          description: ID de la organización (BigInt como string).
+          schema:
+            type: string
+            pattern: "^[1-9][0-9]*$"
+      responses:
+        "200":
+          description: Lista de claves API
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiKeyListItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Sin permiso o la organización no pertenece al usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/keys/{id}/logs:
+    get:
+      tags: [ApiKeys]
+      summary: Obtener logs de uso de una clave API
+      description: |
+        Retorna el historial de llamadas registradas para la clave API indicada,
+        con cursor para paginación keyset. Requiere permiso `api_key:manage`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID numérico de la clave API.
+          schema:
+            type: integer
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: cursor
+          in: query
+          required: false
+          description: ID numérico del último registro visto (para paginación keyset).
+          schema:
+            type: string
+            pattern: "^[0-9]+$"
+      responses:
+        "200":
+          description: Lista de entradas de log
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ApiKeyLog"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Sin permiso o la organización no pertenece al usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Clave no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ─────────────────────────────────────────────
+  # REPORTS
+  # ─────────────────────────────────────────────
+  /api/reports/expenses-by-cc:
+    get:
+      tags: [Reportes]
+      summary: Reporte de gastos por centro de costo
+      description: |
+        Retorna un reporte agregado de gastos agrupado por centro de costo (CeCo) para la
+        organización del usuario autenticado. La visibilidad de datos depende de los permisos:
+        - `travel_request:view_any` o `policy:manage` → ve todos los usuarios.
+        - `travel_request:authorize` → ve su árbol de reportes.
+        - Solo `expense:view` → ve sus propios gastos.
+
+        Soporta filtros opcionales por rango de fechas, estado de solicitud y CeCo específico.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Fecha de inicio del rango (ISO 8601 date).
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: false
+          description: Fecha de fin del rango (ISO 8601 date).
+          schema:
+            type: string
+            format: date
+        - name: costsCenter
+          in: query
+          required: false
+          description: Filtrar por un CeCo específico.
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          description: Filtrar por estado de la solicitud.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Reporte de gastos por centro de costo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpensesByCCReport"
+              example:
+                summary:
+                  totalAmount: 150000.50
+                  requestCount: 12
+                byCostCenter:
+                  - costsCenter: "CC001"
+                    departmentName: "Operaciones"
+                    totalAmount: 80000.00
+                    requestCount: 7
+                  - costsCenter: "CC002"
+                    departmentName: "Ventas"
+                    totalAmount: 70000.50
+                    requestCount: 5
+        "400":
+          description: No hay organización en contexto
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "No hay organización en contexto. Inicia sesión de nuevo."
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ─────────────────────────────────────────────
+  # NOTIFICATIONS
+  # ─────────────────────────────────────────────
+  /api/notifications/vapid-public-key:
+    get:
+      tags: [Notificaciones]
+      summary: Obtener clave pública VAPID
+      description: |
+        Retorna la clave pública VAPID necesaria para que el frontend pueda crear
+        una suscripción Web Push. Requiere autenticación.
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Clave pública VAPID
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  key:
+                    type: string
+                    description: Clave pública VAPID en formato Base64url.
+              example:
+                key: "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U"
+
+  /api/notifications/preferences/{userId}:
+    get:
+      tags: [Notificaciones]
+      summary: Obtener preferencias de notificación del usuario
+      description: |
+        Retorna las preferencias de notificación (email, in-app, push) de un usuario.
+        Requiere autenticación.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Preferencias del usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPreferences"
+              example:
+                userId: 1
+                emailNotif: true
+                appNotif: true
+                browserNotif: false
+        "400":
+          description: userId inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    put:
+      tags: [Notificaciones]
+      summary: Actualizar preferencias de notificación del usuario
+      description: |
+        Crea o actualiza (upsert) las preferencias de notificación de un usuario.
+        Solo se actualizan los campos enviados. Requiere autenticación.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationPreferencesInput"
+            example:
+              emailNotif: true
+              appNotif: false
+              browserNotif: true
+      responses:
+        "200":
+          description: Preferencias actualizadas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPreferences"
+        "400":
+          description: userId inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/notifications/subscribe:
+    post:
+      tags: [Notificaciones]
+      summary: Registrar suscripción Web Push
+      description: |
+        Almacena una suscripción de Web Push API para el usuario autenticado.
+        El objeto `subscription` debe provenir de `PushManager.subscribe()` del browser.
+        Requiere autenticación.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PushSubscribeRequest"
+            example:
+              subscription:
+                endpoint: "https://fcm.googleapis.com/fcm/send/abc123"
+                keys:
+                  p256dh: "BEl62iUYgUivxIkv69yViEuiBIa..."
+                  auth: "HTk8v..."
+      responses:
+        "201":
+          description: Suscripción registrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PushSubscribeResponse"
+        "400":
+          description: Payload de suscripción inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Invalid subscription payload"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/notifications/{userId}:
+    get:
+      tags: [Notificaciones]
+      summary: Obtener notificaciones de un usuario
+      description: |
+        Retorna las notificaciones in-app del usuario (máximo 50, más recientes primero).
+        Requiere autenticación.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Lista de notificaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+              example:
+                - notificationId: 10
+                  userId: 1
+                  message: "Tu solicitud #42 fue aprobada por N1."
+                  isRead: false
+                  createdAt: "2026-06-01T09:00:00.000Z"
+        "400":
+          description: userId inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/notifications/{userId}/unread-count:
+    get:
+      tags: [Notificaciones]
+      summary: Obtener conteo de notificaciones no leídas
+      description: |
+        Retorna la cantidad de notificaciones no leídas del usuario. Requiere autenticación.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          description: Conteo de no leídas
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    description: Número de notificaciones no leídas.
+              example:
+                count: 3
+        "400":
+          description: userId inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/notifications/{id}/read:
+    put:
+      tags: [Notificaciones]
+      summary: Marcar notificación como leída
+      description: |
+        Marca una notificación individual como leída. Requiere autenticación.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de la notificación.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Notificación marcada como leída
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+        "400":
+          description: ID de notificación inválido
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Notificación no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Notification not found"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ─────────────────────────────────────────────
+  # DRAFTS
+  # ─────────────────────────────────────────────
+  /api/applicant/create-draft-travel-request/{user_id}:
+    post:
+      tags: [Borradores]
+      summary: Crear borrador de solicitud de viaje
+      description: |
+        Crea una solicitud de viaje en estado **BORRADOR** para el usuario indicado.
+        Los campos son menos estrictos que en una solicitud definitiva, permitiendo
+        guardar avances parciales. Requiere permiso `travel_request:create`.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: ID del usuario solicitante.
+          schema:
+            type: integer
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DraftTravelRequestInput"
+            example:
+              notes: "Viaje a Monterrey para reunión con cliente"
+              requestedFee: 5000.00
+              routes:
+                - originCity: "Ciudad de México"
+                  destinationCity: "Monterrey"
+                  beginningDate: "2026-07-10"
+      responses:
+        "201":
+          description: Borrador creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRequestResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/applicant/confirm-draft-travel-request/{user_id}/{request_id}:
+    put:
+      tags: [Borradores]
+      summary: Confirmar y enviar borrador de solicitud
+      description: |
+        Convierte un borrador en una solicitud definitiva y la envía al flujo de aprobación.
+        Requiere permiso `travel_request:submit`. Solo el usuario propietario puede confirmar su borrador.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          description: ID del usuario propietario del borrador.
+          schema:
+            type: integer
+            minimum: 1
+        - name: request_id
+          in: path
+          required: true
+          description: ID de la solicitud borrador a confirmar.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: Solicitud confirmada y enviada al flujo de aprobación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelRequestResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Borrador o usuario no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  # ─────────────────────────────────────────────
+  # COMMENTS
+  # ─────────────────────────────────────────────
+  /api/solicitudes/{id}/comments:
+    post:
+      tags: [Comentarios]
+      summary: Crear comentario en una solicitud
+      description: |
+        Agrega un comentario al hilo de una solicitud de viaje. El usuario solo puede
+        comentar como sí mismo (JWT `user_id` debe coincidir con el `user_id` del body).
+        Requiere autenticación.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SolicitudId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommentRequest"
+            example:
+              user_id: 1
+              content: "¿Se puede ajustar el presupuesto para incluir hospedaje?"
+      responses:
+        "201":
+          description: Comentario creado
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+              example:
+                message: "Successfully posted comment"
+        "400":
+          description: Validación fallida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: No se puede comentar como otro usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Cannot comment as another user"
+        "404":
+          description: Solicitud no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+    get:
+      tags: [Comentarios]
+      summary: Obtener comentarios de una solicitud (paginados)
+      description: |
+        Retorna los comentarios de una solicitud de viaje con paginación keyset
+        (cursor-based). Requiere autenticación.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SolicitudId"
+        - name: user_id
+          in: query
+          required: true
+          description: ID del usuario solicitante (debe coincidir con el JWT).
+          schema:
+            type: integer
+            minimum: 1
+        - name: limit
+          in: query
+          required: true
+          description: Número de comentarios a retornar.
+          schema:
+            type: integer
+            minimum: 10
+            maximum: 200
+        - name: cursor
+          in: query
+          required: false
+          description: Cursor para la siguiente página (string opaco devuelto por la API).
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comentarios paginados
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommentsResponse"
+              example:
+                message: "OK"
+                comments:
+                  - id: 5
+                    content: "¿Se puede ajustar el presupuesto para incluir hospedaje?"
+                    at: "2026-06-01T10:00:00.000Z"
+                    userId: 1
+                    requestId: 42
+                meta:
+                  limit: 10
+                  next: "cursor_token_abc"
+        "400":
+          description: Validación fallida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: No se pueden leer comentarios de otro usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Solicitud no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/solicitudes/{id}/comments/stream:
+    get:
+      tags: [Comentarios]
+      summary: Stream de comentarios via Server-Sent Events (SSE)
+      description: |
+        Establece una conexión SSE (Server-Sent Events) para recibir comentarios en tiempo real.
+        El servidor envía el lote inicial de comentarios y luego emite actualizaciones a intervalos
+        regulares (configurable en `REQUEST_COMMENT_EVENT_INTERVAL_MS`).
+
+        La conexión se mantiene abierta hasta que el cliente la cierre. La respuesta usa
+        `Content-Type: text/event-stream`.
+
+        Requiere autenticación. El `user_id` en el query debe coincidir con el JWT.
+      security:
+        - BearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/SolicitudId"
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: limit
+          in: query
+          required: true
+          description: Número máximo de comentarios por evento.
+          schema:
+            type: integer
+            minimum: 10
+            maximum: 200
+      responses:
+        "200":
+          description: Stream SSE establecido. Los eventos tienen `data:` con JSON de `CommentsStreamEvent`.
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/CommentsStreamEvent"
+        "400":
+          description: Validación fallida (retorna JSON antes de abrir stream)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: No se pueden leer comentarios de otro usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Solicitud no encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+# ─────────────────────────────────────────────────────
+# WEBHOOKS (notificaciones salientes)
+# ─────────────────────────────────────────────────────
+# Los webhooks de notificaciones son entregados por el sistema vía Web Push (VAPID).
+# El flujo es: evento en BD → servicio de notificación → push a endpoint registrado.
+# A continuación se documentan los payloads que el servidor envía al endpoint del browser.
+webhooks:
+  solicitudAprobada:
+    post:
+      tags: [Webhooks]
+      summary: Notificación push — Solicitud aprobada
+      description: |
+        Enviada al endpoint del navegador cuando una solicitud de viaje del usuario es
+        aprobada por un aprobador N1 o N2.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookNotificationPayload"
+            example:
+              title: "Solicitud aprobada"
+              body: "Tu solicitud #42 fue aprobada."
+              icon: "/icons/check.png"
+              data:
+                requestId: 42
+                event: "solicitud_aprobada"
+      responses:
+        "200":
+          description: Notificación recibida por el service worker del browser.
+        "410":
+          description: Suscripción expirada o inválida (el servidor la elimina de BD).
+
+  solicitudRechazada:
+    post:
+      tags: [Webhooks]
+      summary: Notificación push — Solicitud rechazada
+      description: |
+        Enviada al endpoint del navegador cuando una solicitud de viaje del usuario es
+        rechazada por un aprobador N1 o N2.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookNotificationPayload"
+            example:
+              title: "Solicitud rechazada"
+              body: "Tu solicitud #42 fue rechazada. Motivo: presupuesto insuficiente."
+              icon: "/icons/reject.png"
+              data:
+                requestId: 42
+                event: "solicitud_rechazada"
+      responses:
+        "200":
+          description: Notificación recibida por el service worker del browser.
+        "410":
+          description: Suscripción expirada o inválida.
+
+  comprobantesRequeridos:
+    post:
+      tags: [Webhooks]
+      summary: Notificación push — Comprobantes requeridos
+      description: |
+        Enviada cuando una solicitud aprobada entra al estado de comprobación de gastos,
+        recordando al solicitante que debe cargar sus comprobantes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookNotificationPayload"
+            example:
+              title: "Carga tus comprobantes"
+              body: "Tu solicitud #42 está lista para recibir comprobantes."
+              icon: "/icons/receipt.png"
+              data:
+                requestId: 42
+                event: "comprobantes_requeridos"
+      responses:
+        "200":
+          description: Notificación recibida por el service worker del browser.
+        "410":
+          description: Suscripción expirada o inválida.
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    OrgId:
+      name: id
+      in: path
+      required: true
+      description: ID de la organización (BigInt como string).
+      schema:
+        type: string
+        pattern: "^[1-9][0-9]*$"
+    UserId:
+      name: userId
+      in: path
+      required: true
+      description: ID numérico del usuario.
+      schema:
+        type: integer
+        minimum: 1
+    SolicitudId:
+      name: id
+      in: path
+      required: true
+      description: ID numérico de la solicitud de viaje.
+      schema:
+        type: integer
+        minimum: 1
+
+  responses:
+    Unauthorized:
+      description: Token ausente o inválido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/AuthErrorResponse"
+    Forbidden:
+      description: Rol o permiso insuficiente
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/AuthErrorResponse"
+    BadRequest:
+      description: Datos de entrada inválidos
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: Error interno del servidor
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Internal server error"
+
+  schemas:
+    # ── Common ──────────────────────────────────
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    AuthErrorResponse:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        error:
+          type: string
+      required: [statusCode, message, error]
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              msg:
+                type: string
+              path:
+                type: string
+      required: [errors]
+
+    # ── Organizations ────────────────────────────
+    Organization:
+      type: object
+      properties:
+        id:
+          type: string
+          description: BigInt serializado como string.
+        nombre:
+          type: string
+          maxLength: 100
+        razonSocial:
+          type: string
+          maxLength: 200
+          nullable: true
+        rfc:
+          type: string
+          maxLength: 13
+          nullable: true
+        logoUrl:
+          type: string
+          nullable: true
+        timezone:
+          type: string
+          default: "America/Mexico_City"
+        baseCurrency:
+          type: string
+          maxLength: 3
+          default: "MXN"
+        kind:
+          type: string
+          enum: [ROOT, CLIENT]
+        status:
+          type: string
+          enum: [CONFIGURING, ACTIVE, SUSPENDED]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, nombre, kind, status, timezone, baseCurrency]
+
+    OrganizationCreateInput:
+      type: object
+      required: [nombre]
+      properties:
+        nombre:
+          type: string
+          maxLength: 100
+        razonSocial:
+          type: string
+          maxLength: 200
+          nullable: true
+        rfc:
+          type: string
+          maxLength: 13
+          nullable: true
+        timezone:
+          type: string
+          default: "America/Mexico_City"
+        baseCurrency:
+          type: string
+          maxLength: 3
+          default: "MXN"
+
+    OrganizationUpdateInput:
+      type: object
+      properties:
+        nombre:
+          type: string
+          maxLength: 100
+        razonSocial:
+          type: string
+          nullable: true
+        rfc:
+          type: string
+          maxLength: 13
+          nullable: true
+        timezone:
+          type: string
+        baseCurrency:
+          type: string
+          maxLength: 3
+        logoUrl:
+          type: string
+          nullable: true
+
+    # ── Employees ────────────────────────────────
+    EmployeeSyncRequest:
+      type: object
+      required: [header, detalle]
+      properties:
+        header:
+          type: object
+          required: [idTransaction]
+          properties:
+            idTransaction:
+              type: string
+              description: Identificador único de la transacción enviada por RH/SAP.
+        detalle:
+          type: object
+          required: [noEmpleado, nombre, proveedor, ceco, fechaAlta]
+          properties:
+            noEmpleado:
+              type: string
+              maxLength: 10
+              description: Clave natural del empleado en RH/SAP.
+            nombre:
+              type: string
+              maxLength: 100
+            email:
+              type: string
+              maxLength: 100
+              nullable: true
+            jefeInmediato:
+              type: string
+              maxLength: 10
+              nullable: true
+              description: no_empleado del jefe directo.
+            proveedor:
+              type: string
+              maxLength: 11
+              description: Código de proveedor SAP del empleado.
+            ceco:
+              type: string
+              maxLength: 10
+              description: Centro de costo al que pertenece el empleado.
+            status:
+              type: string
+              enum: ["A", "I"]
+              default: "A"
+              description: "A = Activo, I = Inactivo."
+            fechaAlta:
+              type: string
+              format: date
+              description: Fecha de alta en formato ISO 8601 (YYYY-MM-DD).
+
+    EmployeeSyncResponse:
+      type: object
+      properties:
+        idTransaction:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: ["ok", "error"]
+        noEmpleado:
+          type: string
+          nullable: true
+        accion_realizada:
+          type: string
+          nullable: true
+          description: "'upserted', 'created', 'updated' según corresponda."
+      required: [status]
+
+    EmployeeSyncErrorResponse:
+      type: object
+      properties:
+        idTransaction:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: ["error"]
+        noEmpleado:
+          type: string
+          nullable: true
+        accion_realizada:
+          type: string
+          nullable: true
+        errores:
+          type: array
+          items:
+            type: string
+      required: [status, errores]
+
+    # ── API Keys ─────────────────────────────────
+    ApiKeyGenerateRequest:
+      type: object
+      required: [name, org_id, scope, expires_at]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Nombre descriptivo de la clave (ej. "Integración ERP").
+        org_id:
+          type: string
+          description: ID de la organización (BigInt como string).
+          pattern: "^[1-9][0-9]*$"
+        scope:
+          type: object
+          description: |
+            Objeto JSON libre con los permisos acotados para esta key.
+            Ejemplo: `{ "permissions": ["expense:view", "report:read"] }`
+        expires_at:
+          type: string
+          format: date-time
+          description: Fecha de expiración en ISO 8601.
+
+    ApiKeyGenerateResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        org_id:
+          type: string
+          description: BigInt serializado como string.
+        name:
+          type: string
+        key:
+          type: string
+          description: |
+            Secreto de la clave API. **Solo se retorna en este response** (no queda almacenado en BD).
+        scope:
+          type: object
+        expires_at:
+          type: string
+          format: date-time
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: integer
+          description: user_id del creador.
+      required: [id, org_id, name, key, scope, expires_at, active, created_at, created_by]
+
+    ApiKeyRevokeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        org_id:
+          type: string
+        name:
+          type: string
+        active:
+          type: boolean
+          enum: [false]
+        revoked_at:
+          type: string
+          format: date-time
+      required: [id, org_id, name, active, revoked_at]
+
+    ApiKeyListItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        org_id:
+          type: string
+        name:
+          type: string
+        scope:
+          type: object
+        expires_at:
+          type: string
+          format: date-time
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        active:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: integer
+      required: [id, org_id, name, scope, expires_at, active, created_at, created_by]
+
+    ApiKeyLog:
+      type: object
+      properties:
+        id:
+          type: string
+          description: BigInt serializado como string.
+        keyId:
+          type: integer
+        endpoint:
+          type: string
+        responseCode:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+      required: [id, keyId, endpoint, responseCode, timestamp]
+
+    # ── Reports ──────────────────────────────────
+    ExpensesByCCReport:
+      type: object
+      properties:
+        summary:
+          type: object
+          properties:
+            totalAmount:
+              type: number
+            requestCount:
+              type: integer
+        byCostCenter:
+          type: array
+          items:
+            type: object
+            properties:
+              costsCenter:
+                type: string
+                nullable: true
+              departmentName:
+                type: string
+                nullable: true
+              totalAmount:
+                type: number
+              requestCount:
+                type: integer
+
+    # ── Notifications ────────────────────────────
+    NotificationPreferences:
+      type: object
+      properties:
+        userId:
+          type: integer
+        emailNotif:
+          type: boolean
+        appNotif:
+          type: boolean
+        browserNotif:
+          type: boolean
+      required: [userId, emailNotif, appNotif, browserNotif]
+
+    NotificationPreferencesInput:
+      type: object
+      properties:
+        emailNotif:
+          type: boolean
+        appNotif:
+          type: boolean
+        browserNotif:
+          type: boolean
+
+    PushSubscribeRequest:
+      type: object
+      required: [subscription]
+      properties:
+        subscription:
+          type: object
+          required: [endpoint, keys]
+          properties:
+            endpoint:
+              type: string
+              format: uri
+              description: URL del endpoint de push del navegador.
+            keys:
+              type: object
+              required: [p256dh, auth]
+              properties:
+                p256dh:
+                  type: string
+                  description: Clave pública del cliente en Base64url.
+                auth:
+                  type: string
+                  description: Secret de autenticación en Base64url.
+
+    PushSubscribeResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        endpoint:
+          type: string
+      required: [id, userId, endpoint]
+
+    Notification:
+      type: object
+      properties:
+        notificationId:
+          type: integer
+        userId:
+          type: integer
+        message:
+          type: string
+          maxLength: 255
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required: [notificationId, userId, message, isRead, createdAt]
+
+    WebhookNotificationPayload:
+      type: object
+      description: Payload enviado al endpoint push del navegador (Web Push API).
+      properties:
+        title:
+          type: string
+          description: Título de la notificación push.
+        body:
+          type: string
+          description: Cuerpo del mensaje de la notificación.
+        icon:
+          type: string
+          description: Ruta del ícono a mostrar en la notificación.
+        data:
+          type: object
+          description: Datos adicionales para el service worker.
+          properties:
+            requestId:
+              type: integer
+              nullable: true
+            event:
+              type: string
+              description: Tipo de evento que originó la notificación.
+      required: [title, body]
+
+    # ── Drafts ───────────────────────────────────
+    DraftTravelRequestInput:
+      type: object
+      properties:
+        notes:
+          type: string
+          description: Descripción o notas del viaje.
+          nullable: true
+        requestedFee:
+          type: number
+          description: Monto estimado del viaje.
+          nullable: true
+        routes:
+          type: array
+          description: Lista parcial de tramos del viaje (pueden estar incompletos en borrador).
+          items:
+            type: object
+            properties:
+              originCity:
+                type: string
+                nullable: true
+              destinationCity:
+                type: string
+                nullable: true
+              beginningDate:
+                type: string
+                format: date
+                nullable: true
+              endingDate:
+                type: string
+                format: date
+                nullable: true
+              planeNeeded:
+                type: boolean
+                default: false
+              hotelNeeded:
+                type: boolean
+                default: false
+
+    TravelRequestResponse:
+      type: object
+      properties:
+        requestId:
+          type: integer
+        userId:
+          type: integer
+        requestStatusId:
+          type: integer
+        notes:
+          type: string
+          nullable: true
+        requestedFee:
+          type: number
+          nullable: true
+        creationDate:
+          type: string
+          format: date-time
+        message:
+          type: string
+          nullable: true
+
+    # ── Comments ─────────────────────────────────
+    CreateCommentRequest:
+      type: object
+      required: [user_id, content]
+      properties:
+        user_id:
+          type: integer
+          minimum: 1
+          description: ID del usuario que comenta (debe coincidir con el JWT).
+        content:
+          type: string
+          minLength: 1
+          maxLength: 45000
+          description: Contenido del comentario.
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        content:
+          type: string
+        at:
+          type: string
+          format: date-time
+        userId:
+          type: integer
+        requestId:
+          type: integer
+      required: [id, content, at, userId, requestId]
+
+    CommentsResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        comments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+        meta:
+          type: object
+          nullable: true
+          properties:
+            limit:
+              type: integer
+            next:
+              type: string
+              description: Cursor para la siguiente página. Ausente si no hay más resultados.
+              nullable: true
+      required: [message, comments]
+
+    CommentsStreamEvent:
+      type: object
+      description: |
+        Payload emitido como evento SSE en el stream de comentarios.
+        Se serializa como `data: <JSON>\n\n`.
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Comment"
+        next:
+          type: string
+          nullable: true

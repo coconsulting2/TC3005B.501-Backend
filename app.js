@@ -43,6 +43,8 @@ import csrf from "csurf";
 import path from "path";
 import { fileURLToPath } from "url";
 import swaggerUi from "swagger-ui-express";
+import yaml from "js-yaml";
+import fs from "fs";
 import { close, logger } from "./utils/log/logger.js";
 import { httpLogger } from "./utils/log/logger.http.js";
 
@@ -162,16 +164,22 @@ app.use("/api/viaticos-policy", viaticasPolicyRoutes);
 // Workflow rules CRUD — solo Administrador de org (workflow:manage)
 app.use("/api/workflow-rules", workflowRuleRoutes);
 
+// Cargar el swagger consolidado (M1 + M2 + M3) desde archivo YAML.
+const swaggerDocument = yaml.load(
+    fs.readFileSync(path.join(__dirname, "openapi", "swagger.yaml"), "utf8")
+);
+
 const swaggerOptions = {
-    explorer: true,
+    explorer: false,
+    customSiteTitle: "CocoAPI Docs",
     swaggerOptions: {
-        urls: [
-            { url: "/openapi/swagger-m1.yaml", name: "Modulo 1 - Core" },
-            { url: "/openapi/swagger-m2.yaml", name: "Modulo 2 - Admin & Workflow" }
-        ]
-    }
+        // Documentacion consolidada de todos los modulos
+        defaultModelsExpandDepth: 1,
+        defaultModelExpandDepth: 2,
+        docExpansion: "list",
+    },
 };
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(null, swaggerOptions));
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument, swaggerOptions));
 
 // CSRF error handler — must be BEFORE handleAuthError so csurf rejections
 // get proper JSON + CORS headers instead of Express's default HTML error page.
