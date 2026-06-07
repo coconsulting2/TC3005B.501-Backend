@@ -161,7 +161,7 @@ async function cityId(name) {
 
 async function createRequest(orgId, userId, statusId, opts) {
   const {
-    notes = "", requestedFee = 0, imposedFee = 0, requestDays = 3,
+    notes = "", tripName, requestedFee = 0, imposedFee = 0, requestDays = 3,
     originCountry = "México", originCity = "CDMX",
     destCountry = "México", destCity = "Monterrey",
     beginDate = "2026-05-20", endDate = "2026-05-23",
@@ -169,12 +169,15 @@ async function createRequest(orgId, userId, statusId, opts) {
     tripEndDate = null, isExported = false,
   } = opts;
 
+  const defaultTripName = tripName || (notes ? notes.split("—")[0].trim() : "Viaje de negocios");
+
   const req = await prisma.request.create({
     data: {
       organizationId: orgId,
       userId,
       requestStatusId: statusId,
       notes,
+      tripName: defaultTripName,
       requestedFee,
       imposedFee,
       requestDays,

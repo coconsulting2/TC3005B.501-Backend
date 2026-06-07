@@ -8,6 +8,8 @@ import { generalRateLimiter } from "../middleware/rateLimiters.js";
 import {
   listRules,
   listDepartments,
+  listCountries,
+  listReceiptTypes,
   listRoles,
   previewRules,
   createRule,
@@ -19,6 +21,8 @@ const router = express.Router();
 
 // Auxiliares para los selects del panel
 router.get("/departments", generalRateLimiter, ...requirePermission("workflow:manage"), listDepartments);
+router.get("/countries", generalRateLimiter, ...requirePermission("workflow:manage"), listCountries);
+router.get("/receipt-types", generalRateLimiter, ...requirePermission("workflow:manage"), listReceiptTypes);
 router.get("/roles", generalRateLimiter, ...requirePermission("workflow:manage"), listRoles);
 
 // CRUD de reglas

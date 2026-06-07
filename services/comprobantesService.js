@@ -15,6 +15,7 @@ import ComprobantesModel from "../models/comprobantesModel.js";
 import { selloUltimos8FromSello } from "./cfdiParserService.js";
 import { consultarCfdiWithRetries, acuseToCfdiRow } from "./satConsultaService.js";
 import { assertRequestAllowsReceiptUpload } from "./requestReceiptUploadPolicy.js";
+import { getFxRateToTarget } from "./fxPublicService.js";
 
 /**
  * EFOS codes where the RFC Emisor itself appears in the blacklist.
@@ -130,6 +131,19 @@ export async function insertarComprobanteInternacional(receiptId, body) {
 
   const nombreReceptor = notas ? `INTERNACIONAL — ${notas}` : "INTERNACIONAL";
 
+  let tipoCambio = 1.0;
+  if (moneda !== "MXN") {
+    try {
+      tipoCambio = await getFxRateToTarget(moneda, "MXN");
+    } catch (fxErr) {
+      console.error("insertarComprobanteInternacional FX:", fxErr);
+      throw {
+        status: 503,
+        message: "No se pudo obtener el tipo de cambio. Intente más tarde.",
+      };
+    }
+  }
+
   return prisma.$transaction(async (tx) => {
     const updateData = {
       amount: total,
@@ -164,7 +178,7 @@ export async function insertarComprobanteInternacional(receiptId, body) {
         metodoPago: "PUE",
         formaPago: "99",
         moneda,
-        tipoCambio: 1.0,
+        tipoCambio,
         subtotal: total,
         descuento: 0.0,
         iva: 0.0,

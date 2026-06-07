@@ -3,10 +3,15 @@
  * @description POST /api/solicitudes/:id/aprobar|rechazar|reasignar (M2-005).
  */
 import authorizerServices from "../services/authorizerService.js";
-import { Mail } from "../services/email/mail.cjs";
-import mailData from "../services/email/mailData.js";
 import prisma from "../database/config/prisma.js";
 import { buildSolicitudJourney } from "../services/solicitudJourneyService.js";
+import {
+  notifyRequestApproved,
+  notifyRequestRejected,
+  notifyRequestEscalated,
+  notifySafe,
+} from "../services/workflowNotificationService.js";
+import { createNotification } from "../services/notificationService.js";
 
 /** Permisos que permiten ver historial de solicitudes ajenas en el mismo tenant. */
 const HISTORIAL_BROAD_VIEW_PERMISSIONS = [
@@ -26,19 +31,16 @@ function canViewAnyTravelRequestHistorial(permissionSet) {
 }
 
 /**
- *
- * @param request_id
+ * @param {number} request_id
+ * @param {number} actor_user_id
+ * @param {{ outcome: string }} result
  */
-async function notifyApplicantSafe(request_id) {
-  try {
-    const { user_email, user_name, status } = await mailData(request_id);
-    await Mail(user_email, user_name, request_id, status);
-  } catch (mailErr) {
-    console.error(
-      "solicitudWorkflow: correo no enviado (operación ya aplicada):",
-      mailErr,
-    );
+async function notifyAfterApproval(request_id, actor_user_id, result) {
+  if (result.outcome === "ESCALADO") {
+    await notifySafe(() => notifyRequestEscalated(request_id));
+    return;
   }
+  await notifySafe(() => notifyRequestApproved(request_id, actor_user_id));
 }
 
 /**
@@ -55,7 +57,7 @@ export const approveSolicitud = async (req, res) => {
       request_id,
       user_id,
     );
-    await notifyApplicantSafe(request_id);
+    await notifyAfterApproval(request_id, user_id, result);
     return res.status(200).json({
       message: "Solicitud actualizada correctamente",
       new_status: result.new_status,
@@ -86,7 +88,9 @@ export const rejectSolicitud = async (req, res) => {
       user_id,
       comentario,
     );
-    await notifyApplicantSafe(request_id);
+    await notifySafe(() =>
+      notifyRequestRejected(request_id, comentario),
+    );
     return res.status(200).json(result);
   } catch (error) {
     if (error.status) {
@@ -115,7 +119,10 @@ export const reassignSolicitud = async (req, res) => {
       Number(target_user_id),
       motivo,
     );
-    await notifyApplicantSafe(request_id);
+    await notifySafe(async () => {
+      const msg = `Se te reasignó la solicitud #${request_id} para aprobación.`;
+      await createNotification(Number(target_user_id), msg);
+    });
     return res.status(200).json(result);
   } catch (error) {
     if (error.status) {

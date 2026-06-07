@@ -2,7 +2,7 @@
  * @file routes/onboardingImportRoutes.js
  * @description /api/onboarding/import — importación masiva de usuarios para onboarding.
  *
- * Requiere permiso onboarding:import (solo DittaSuperAdmin o AdminOrg con ese permiso).
+ * Requiere permiso onboarding:import (OrgAdmin y DittaSuperAdmin). Crear org nueva exige organization:create (solo Ditta).
  * Multer: memoria (no disco), límite 2 MB, tipos JSON/CSV.
  */
 import express from "express";

@@ -61,12 +61,18 @@ const saveSelectedFlightOffer = async (req, res) => {
   if (!offer || typeof offer !== "object" || Array.isArray(offer)) {
     return res.status(400).json({ error: "offer must be a JSON object" });
   }
+  const routerIndex = req.body?.router_index;
+  const segmentLabel = req.body?.segment_label;
   try {
     const exists = await TravelAgent.requestExists(requestId);
     if (!exists) {
       return res.status(404).json({ error: "Travel request not found" });
     }
-    await TravelAgent.saveSelectedFlightOffer(requestId, offer);
+    await TravelAgent.saveSelectedFlightOffer(requestId, offer, {
+      routerIndex:
+        routerIndex !== undefined && routerIndex !== null ? Number(routerIndex) : 0,
+      segmentLabel: typeof segmentLabel === "string" ? segmentLabel : undefined,
+    });
     return res.status(200).json({
       message: "Flight offer saved",
       requestId,

@@ -16,6 +16,17 @@ import { createComment } from "../services/requestCommentService.js";
 const EFOS_EMISOR_BLACKLIST_APPROVAL = ["100", "101", "104"];
 
 /**
+ * Comprobantes sin CFDI mexicano (recibo internacional): no consultar SAT al aprobar.
+ * @param {{ tipoComprobante?: string, satEstado?: string|null }|null|undefined} cfdi
+ * @returns {boolean}
+ */
+function isInternationalCfdi(cfdi) {
+  if (!cfdi) return false;
+  if (cfdi.tipoComprobante === "INTERNACIONAL") return true;
+  return String(cfdi.satEstado ?? "").trim().toLowerCase() === "internacional";
+}
+
+/**
  * Estados visibles en GET /accounts-payable/requests (historial CxP).
  * 7 = Validación de comprobantes · 8 = Finalizado
  * (catálogo global Request_status, ver seed.js).
@@ -168,31 +179,33 @@ const validateReceipt = async (req, res) => {
                 });
             }
             const c = receipt.cfdiComprobante;
-            try {
-                const acuse = await consultarCfdiWithRetries({
-                    rfcEmisor: c.rfcEmisor,
-                    rfcReceptor: c.rfcReceptor,
-                    total: c.total,
-                    uuid: c.uuid,
-                    selloUltimos8: null,
-                });
-                const row = acuseToCfdiRow(acuse);
-                await ComprobantesModel.updateSatAcuseByReceiptId(receiptId, row);
-                if (acuse.estado !== "Vigente") {
-                    return res.status(409).json({
-                        error: `El SAT reporta el CFDI como '${acuse.estado}'. No se puede aprobar el reembolso.`,
+            if (!isInternationalCfdi(c)) {
+                try {
+                    const acuse = await consultarCfdiWithRetries({
+                        rfcEmisor: c.rfcEmisor,
+                        rfcReceptor: c.rfcReceptor,
+                        total: c.total,
+                        uuid: c.uuid,
+                        selloUltimos8: null,
+                    });
+                    const row = acuseToCfdiRow(acuse);
+                    await ComprobantesModel.updateSatAcuseByReceiptId(receiptId, row);
+                    if (acuse.estado !== "Vigente") {
+                        return res.status(409).json({
+                            error: `El SAT reporta el CFDI como '${acuse.estado}'. No se puede aprobar el reembolso.`,
+                        });
+                    }
+                    if (EFOS_EMISOR_BLACKLIST_APPROVAL.includes(String(acuse.validacionEFOS))) {
+                        return res.status(409).json({
+                            error: "El emisor figura en lista EFOS. No se puede aprobar el reembolso.",
+                        });
+                    }
+                } catch (satErr) {
+                    console.error("SAT validation on approve:", satErr);
+                    return res.status(503).json({
+                        error: "No se pudo validar el CFDI con el SAT. Intente mas tarde.",
                     });
                 }
-                if (EFOS_EMISOR_BLACKLIST_APPROVAL.includes(String(acuse.validacionEFOS))) {
-                    return res.status(409).json({
-                        error: "El emisor figura en lista EFOS. No se puede aprobar el reembolso.",
-                    });
-                }
-            } catch (satErr) {
-                console.error("SAT validation on approve:", satErr);
-                return res.status(503).json({
-                    error: "No se pudo validar el CFDI con el SAT. Intente mas tarde.",
-                });
             }
         }
 

@@ -79,6 +79,46 @@ export async function listDepartments(req, res) {
 }
 
 /**
+ * GET /api/workflow-rules/countries
+ * Catálogo global de países (para reglas por destino).
+ * @param req
+ * @param res
+ */
+export async function listCountries(req, res) {
+  try {
+    const countries = await prisma.country.findMany({
+      select: { countryId: true, countryName: true },
+      orderBy: { countryName: "asc" },
+    });
+    return res.json(countries);
+  } catch (err) {
+    console.error("listCountries error:", err);
+    return res.status(500).json({ error: "Error al listar países." });
+  }
+}
+
+/**
+ * GET /api/workflow-rules/receipt-types
+ * Tipos de comprobante de la organización (para reglas por gasto).
+ * @param req
+ * @param res
+ */
+export async function listReceiptTypes(req, res) {
+  try {
+    const orgId = getOrgId(req);
+    const types = await prisma.receiptType.findMany({
+      where: { organizationId: orgId },
+      select: { receiptTypeId: true, receiptTypeName: true },
+      orderBy: { receiptTypeName: "asc" },
+    });
+    return res.json(types);
+  } catch (err) {
+    console.error("listReceiptTypes error:", err);
+    return res.status(500).json({ error: "Error al listar tipos de comprobante." });
+  }
+}
+
+/**
  * GET /api/workflow-rules/roles
  * Lista los roles de la organización (para selects del panel).
  * @param req
