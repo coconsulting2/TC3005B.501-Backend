@@ -62,6 +62,7 @@ const Applicant = {
     const {
       router_index,
       notes,
+      trip_name,
       requested_fee = 0,
       imposed_fee = 0,
       origin_country_name,
@@ -122,6 +123,7 @@ const Applicant = {
           userId: Number(userId),
           requestStatusId: request_status,
           notes,
+          tripName: trip_name,
           requestedFee: requested_fee,
           imposedFee: imposed_fee,
           requestDays: request_days,
@@ -189,6 +191,7 @@ const Applicant = {
     const {
       router_index,
       notes,
+      trip_name,
       requested_fee = 0,
       imposed_fee = 0,
       origin_country_name,
@@ -217,15 +220,19 @@ const Applicant = {
     const request_days = getRequestDays(allRoutes);
 
     return await prisma.$transaction(async (tx) => {
-      // Update the request
+      const updateData = {
+        notes,
+        requestedFee: requested_fee,
+        imposedFee: imposed_fee,
+        requestDays: request_days,
+      };
+      if (trip_name !== undefined) {
+        updateData.tripName = trip_name;
+      }
+
       await tx.request.update({
         where: { requestId: Number(requestId) },
-        data: {
-          notes,
-          requestedFee: requested_fee,
-          imposedFee: imposed_fee,
-          requestDays: request_days,
-        },
+        data: updateData,
       });
 
       // Delete old route links and routes
@@ -382,6 +389,7 @@ const Applicant = {
       return {
         request_id: r.requestId,
         status: r.requestStatus.status,
+        trip_name: r.tripName,
         destination_country: firstRoute?.destinationCountry?.countryName || null,
         beginning_date: firstRoute?.beginningDate || null,
         ending_date: firstRoute?.endingDate || null,
@@ -431,6 +439,7 @@ const Applicant = {
         request_status: request.requestStatus.status,
         ...offerFields,
         notes: request.notes,
+        trip_name: request.tripName,
         requested_fee: request.requestedFee,
         imposed_fee: request.imposedFee,
         request_days: request.requestDays,
@@ -461,6 +470,7 @@ const Applicant = {
         request_status: request.requestStatus.status,
         ...offerFields,
         notes: request.notes,
+        trip_name: request.tripName,
         requested_fee: request.requestedFee,
         imposed_fee: request.imposedFee,
         request_days: request.requestDays,
@@ -513,6 +523,7 @@ const Applicant = {
     const {
       router_index = 0,
       notes = "",
+      trip_name,
       requested_fee = 0,
       imposed_fee = 0,
       origin_country_name = "notSelected",
@@ -546,6 +557,7 @@ const Applicant = {
           userId: Number(userId),
           requestStatusId: 1,
           notes,
+          ...(trip_name !== undefined && trip_name !== "" ? { tripName: trip_name } : {}),
           requestedFee: requested_fee,
           imposedFee: imposed_fee,
           requestDays: request_days,

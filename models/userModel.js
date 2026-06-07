@@ -71,6 +71,7 @@ const User = {
         request_id: request.requestId,
         request_status: request.requestStatus.status,
         notes: request.notes,
+        trip_name: request.tripName,
         requested_fee: request.requestedFee,
         imposed_fee: request.imposedFee,
         request_days: request.requestDays,
@@ -98,6 +99,7 @@ const User = {
         request_id: request.requestId,
         request_status: request.requestStatus.status,
         notes: request.notes,
+        trip_name: request.tripName,
         requested_fee: request.requestedFee,
         imposed_fee: request.imposedFee,
         request_days: request.requestDays,
@@ -161,6 +163,8 @@ const User = {
       return {
         request_id: r.requestId,
         user_id: r.userId,
+        trip_name: r.tripName ?? null,
+        requester_name: r.user?.userName ?? null,
         destination_country: firstRoute?.destinationCountry?.countryName || null,
         beginning_date: firstRoute?.beginningDate || null,
         ending_date: firstRoute?.endingDate || null,
@@ -295,6 +299,8 @@ const User = {
       return {
         request_id: r.requestId,
         user_id: r.userId,
+        trip_name: r.tripName ?? null,
+        requester_name: r.user?.userName ?? null,
         destination_country: firstRoute?.destinationCountry?.countryName || null,
         beginning_date: firstRoute?.beginningDate || null,
         ending_date: firstRoute?.endingDate || null,

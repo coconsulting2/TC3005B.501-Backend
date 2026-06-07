@@ -63,7 +63,7 @@ export const getInbox = async (req, res) => {
       where,
       select: {
         requestId: true, requestStatusId: true, creationDate: true, lastModDate: true,
-        requestedFee: true, notes: true, tripEndDate: true,
+        requestedFee: true, notes: true, tripName: true, tripEndDate: true,
         user: { select: { userId: true, userName: true, email: true, department: { select: { departmentName: true, costsCenter: true } } } },
         routeRequests: { select: { route: { select: { idDestinationCountry: true, destinationCountry: { select: { countryName: true } } } } } },
         policyExceptions: { where: { status: "PENDING" }, select: { exceptionId: true } },
@@ -78,6 +78,7 @@ export const getInbox = async (req, res) => {
       lastModDate: r.lastModDate,
       requestedFee: r.requestedFee,
       notes: r.notes,
+      tripName: r.tripName,
       tripEndDate: r.tripEndDate,
       requesterName: r.user?.userName || null,
       requesterEmail: r.user?.email || null,

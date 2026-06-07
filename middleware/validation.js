@@ -118,6 +118,14 @@ export const validateTravelRequest = [
     .stripLow()
     .withMessage("Notes have to be a string")
     .bail(),
+  body("trip_name")
+    .isString()
+    .trim()
+    .notEmpty()
+    .withMessage("Trip name cannot be empty.")
+    .isLength({ max: 120 })
+    .withMessage("Trip name must be at most 120 characters.")
+    .bail(),
 
   body("requested_fee")
     .isFloat({min: 0})
@@ -318,6 +326,13 @@ export const validateDraftTravelRequest = [
     .escape()
     .stripLow()
     .withMessage("Notes have to be a string")
+    .bail(),
+  body("trip_name")
+    .optional()
+    .isString()
+    .trim()
+    .isLength({ max: 120 })
+    .withMessage("Trip name must be at most 120 characters.")
     .bail(),
 
   body("requested_fee")

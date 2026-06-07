@@ -4,6 +4,7 @@
  * Scoped a req.tenant.organizationId (multi-tenant).
  */
 import prisma from "../database/config/prisma.js";
+import { previewWorkflowRules } from "../services/workflowRulePreviewService.js";
 
 /**
  * Helper: obtiene el orgId del tenant context.
@@ -95,6 +96,53 @@ export async function listRoles(req, res) {
   } catch (err) {
     console.error("listRoles error:", err);
     return res.status(500).json({ error: "Error al listar roles." });
+  }
+}
+
+/**
+ * POST /api/workflow-rules/preview
+ * Simula niveles de aprobación sin persistir (motor real).
+ * @param req
+ * @param res
+ */
+export async function previewRules(req, res) {
+  try {
+    const orgId = getOrgId(req);
+    const {
+      amount,
+      ruleType,
+      departmentId,
+      currency,
+      destinationCountryIds,
+      receiptTypeIds,
+      orgLevel,
+      draftRule,
+      editingRuleId,
+    } = req.body ?? {};
+
+    if (amount === undefined || amount === null) {
+      return res.status(400).json({ error: "El campo amount es obligatorio." });
+    }
+
+    const result = await previewWorkflowRules(orgId, {
+      amount,
+      ruleType,
+      departmentId,
+      currency,
+      destinationCountryIds,
+      receiptTypeIds,
+      orgLevel,
+      draftRule,
+      editingRuleId,
+    });
+
+    return res.json(result);
+  } catch (err) {
+    if (err.status === 400) {
+      return res.status(400).json({ error: err.message });
+    }
+    console.error("previewRules error:", err);
+    return res.status(500).json({ error: "Error al simular reglas de workflow." });
   }
 }
 

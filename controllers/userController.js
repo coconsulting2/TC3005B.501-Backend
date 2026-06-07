@@ -139,6 +139,8 @@ export const getTravelRequestsByDeptStatus = async (req, res) => {
     const formatted = travelRequests.map((r) => ({
       request_id: r.request_id,
       user_id: r.user_id,
+      trip_name: r.trip_name,
+      requester_name: r.requester_name,
       destination_country: r.destination_country,
       beginning_date: formatDate(r.beginning_date),
       ending_date: formatDate(r.ending_date),
@@ -193,6 +195,8 @@ export const getTravelRequestsForApprover = async (req, res) => {
     const formatted = travelRequests.map((r) => ({
       request_id: r.request_id,
       user_id: r.user_id,
+      trip_name: r.trip_name,
+      requester_name: r.requester_name,
       destination_country: r.destination_country,
       beginning_date: formatDate(r.beginning_date),
       ending_date: formatDate(r.ending_date),
@@ -231,6 +235,7 @@ export const getTravelRequestById = async (req, res) => {
       request_id: base.request_id,
       request_status: base.request_status,
       notes: base.notes,
+      trip_name: base.trip_name,
       requested_fee: base.requested_fee,
       imposed_fee: base.imposed_fee,
       request_days: base.request_days,

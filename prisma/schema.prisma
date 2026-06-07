@@ -265,6 +265,7 @@ model Request {
   organizationId           BigInt                   @map("organization_id")
   requestStatusId          Int                      @default(1) @map("request_status_id")
   notes                    String?                  @db.Text
+  tripName                 String?                  @map("trip_name") @db.VarChar(120)
   requestedFee             Float?                   @map("requested_fee")
   imposedFee               Float?                   @map("imposed_fee")
   requestDays              Float?                   @map("request_days")
