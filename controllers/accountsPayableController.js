@@ -300,6 +300,7 @@ const getAllRequests = async (req, res) => {
             },
             select: {
                 requestId: true,
+                tripName: true,
                 requestStatus: { select: { status: true } },
                 routeRequests: {
                     select: {
@@ -332,6 +333,7 @@ const getAllRequests = async (req, res) => {
 
             return {
                 request_id: r.requestId,
+                trip_name: r.tripName,
                 request_status: r.requestStatus?.status || "Desconocido",
                 destination_country: firstRoute?.destinationCountry?.countryName || "—",
                 beginning_date: formatDate(firstRoute?.beginningDate),

@@ -130,6 +130,8 @@ describe("User.getTravelRequestsForApprover", () => {
       {
         request_id: 7001,
         user_id: 42,
+        trip_name: null,
+        requester_name: null,
         destination_country: "México",
         beginning_date: RESULT_ROW.routeRequests[0].route.beginningDate,
         ending_date: RESULT_ROW.routeRequests[0].route.endingDate,

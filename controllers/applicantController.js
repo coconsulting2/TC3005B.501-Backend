@@ -50,6 +50,7 @@ export const getApplicantRequests = async (req, res) => {
 
     const formattedRequests = applicantRequests.map((request) => ({
       request_id: request.request_id,
+      trip_name: request.trip_name,
       destination_country: request.destination_country,
       beginning_date: formatDate(request.beginning_date),
       ending_date: formatDate(request.ending_date),
@@ -89,6 +90,7 @@ export const getApplicantRequest = async (req, res) => {
       selected_flight_offer: baseData.selected_flight_offer ?? null,
       selected_hotel_offer: baseData.selected_hotel_offer ?? null,
       notes: baseData.notes,
+      trip_name: baseData.trip_name,
       requested_fee: baseData.requested_fee,
       imposed_fee: baseData.imposed_fee,
       request_days: baseData.request_days,

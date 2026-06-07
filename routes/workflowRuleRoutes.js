@@ -9,6 +9,7 @@ import {
   listRules,
   listDepartments,
   listRoles,
+  previewRules,
   createRule,
   updateRule,
   toggleRule,
@@ -22,6 +23,7 @@ router.get("/roles", generalRateLimiter, ...requirePermission("workflow:manage")
 
 // CRUD de reglas
 router.get("/", generalRateLimiter, ...requirePermission("workflow:manage"), listRules);
+router.post("/preview", generalRateLimiter, ...requirePermission("workflow:manage"), previewRules);
 router.post("/", generalRateLimiter, ...requirePermission("workflow:manage"), createRule);
 router.put("/:id", generalRateLimiter, ...requirePermission("workflow:manage"), updateRule);
 router.patch("/:id/toggle", generalRateLimiter, ...requirePermission("workflow:manage"), toggleRule);
