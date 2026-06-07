@@ -111,4 +111,19 @@ describe("workflowRulePreviewService", () => {
       status: 400,
     });
   });
+
+  test("rechaza editingRuleId no numérico", async () => {
+    await expect(
+      previewWorkflowRules(101n, {
+        amount: 10000,
+        draftRule: { ruleType: "pre", paramType: "importe", approvalLevel: 1 },
+        editingRuleId: "abc",
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+  });
+
+  test("defaultea currency inválida a MXN", async () => {
+    const result = await previewWorkflowRules(101n, { amount: 10000, currency: 123 });
+    expect(result.currencyEvaluated).toBe("MXN");
+  });
 });

@@ -6,7 +6,6 @@ import prisma from "../database/config/prisma.js";
 import {
   buildSnapshot,
   initialStatusFromLevels,
-  maxLevelFromImporteBands,
 } from "./workflowRulesEngine.js";
 
 const STATUS_LABELS = {
@@ -88,8 +87,15 @@ function draftToEngineRule(draft, organizationId) {
 function mergeDraftRule(rules, draftRule, editingRuleId) {
   if (!draftRule) return rules;
   const activeRules = rules.filter((r) => r.active);
-  if (editingRuleId) {
-    const editId = BigInt(editingRuleId);
+  if (editingRuleId !== undefined && editingRuleId !== null && String(editingRuleId).trim() !== "") {
+    let editId;
+    try {
+      editId = BigInt(String(editingRuleId).trim());
+    } catch {
+      const err = new Error("editingRuleId debe ser un entero válido.");
+      err.status = 400;
+      throw err;
+    }
     const idx = activeRules.findIndex((r) => r.id === editId);
     if (idx >= 0) {
       const next = [...activeRules];
@@ -200,7 +206,10 @@ export async function previewWorkflowRules(organizationId, input) {
 
   const ctx = {
     amount,
-    currency: (input.currency || "MXN").trim().toUpperCase(),
+    currency:
+      typeof input.currency === "string" && input.currency.trim()
+        ? input.currency.trim().toUpperCase()
+        : "MXN",
     destinationCountryIds: input.destinationCountryIds ?? [],
     receiptTypeIds: input.receiptTypeIds ?? [],
     orgLevel: input.orgLevel ?? null,
@@ -215,16 +224,13 @@ export async function previewWorkflowRules(organizationId, input) {
   );
 
   const importeRules = scoped.filter((r) => r.paramType === "importe");
-  const bandLevel = maxLevelFromImporteBands(amount, importeRules);
   const bandRule = importeRules
     .filter((r) => r.threshold !== null && amount <= Number(r.threshold))
     .sort((a, b) => Number(a.threshold) - Number(b.threshold))[0];
 
   const matchedImportBand = bandRule
     ? { threshold: Number(bandRule.threshold), approvalLevel: bandRule.approvalLevel }
-    : bandLevel
-      ? { threshold: null, approvalLevel: bandLevel }
-      : null;
+    : null;
 
   const snap = buildSnapshot(merged, ctx, ruleType, {
     n1UserId: null,
@@ -236,9 +242,7 @@ export async function previewWorkflowRules(organizationId, input) {
   const { summary, hints } = buildSpanishSummary(
     snap,
     amount,
-    bandRule
-      ? { threshold: Number(bandRule.threshold), approvalLevel: bandRule.approvalLevel }
-      : null,
+    matchedImportBand,
     scoped,
   );
 
@@ -251,9 +255,7 @@ export async function previewWorkflowRules(organizationId, input) {
     initialStatusLabel: STATUS_LABELS[initialStatusId] ?? "Revisión",
     summary,
     hints,
-    matchedImportBand: bandRule
-      ? { threshold: Number(bandRule.threshold), approvalLevel: bandRule.approvalLevel }
-      : null,
+    matchedImportBand,
     targetRole: snap.targetRole,
     amountEvaluated: amount,
     currencyEvaluated: ctx.currency,
