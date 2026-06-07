@@ -25,7 +25,7 @@ services:
       POSTGRES_PASSWORD: cocoscheme_dev
       POSTGRES_DB: CocoScheme
     # Host 5432 suele chocar con Postgres nativo de Windows (:: + 0.0.0.0).
-    # DBeaver / herramientas en el PC: 127.0.0.1:5434 (contenedor sigue en 5432).
+    # DBeaver / herra mientas en el PC: 127.0.0.1:5434 (contenedor sigue en 5432).
     ports:
       - "5434:5432"
     volumes:

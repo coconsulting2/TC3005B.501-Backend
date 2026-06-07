@@ -8,6 +8,7 @@ import { createRequestInsertAlert } from "../services/createRequestInsertAlert.j
 import { buildRequestWorkflowSnapshots } from "../services/buildRequestWorkflowSnapshots.js";
 import { applyRefundContextToRequest } from "../services/applyRefundContext.js";
 import { initialStatusFromLevels } from "../services/workflowRulesEngine.js";
+import { autoLinkReceiptToTramo } from "./gastoTramoModel.js";
 
 const Applicant = {
   /**
@@ -495,21 +496,31 @@ const Applicant = {
   },
 
   /**
-   * Inserts multiple receipts in a single transaction.
-   * @param {Array<{receipt_type_id: number, request_id: number, amount: number}>} receipts
+   * Inserts multiple receipts in a single transaction and links them to a tramo when aplica.
+   * @param {Array<{receipt_type_id: number, request_id: number, amount: number, route_id?: number}>} receipts
    * @returns {Promise<number>} Number of inserted rows
    */
   async createExpenseBatch(receipts) {
-    const creates = receipts.map((r) =>
-      prisma.receipt.create({
-        data: {
-          receiptTypeId: r.receipt_type_id,
-          requestId: r.request_id,
-          amount: r.amount,
-        },
-      })
-    );
-    const results = await prisma.$transaction(creates);
+    const results = await prisma.$transaction(async (tx) => {
+      const created = [];
+      for (const r of receipts) {
+        const receipt = await tx.receipt.create({
+          data: {
+            receiptTypeId: r.receipt_type_id,
+            requestId: r.request_id,
+            amount: r.amount,
+          },
+        });
+        await autoLinkReceiptToTramo(
+          tx,
+          r.request_id,
+          receipt.receiptId,
+          r.route_id,
+        );
+        created.push(receipt);
+      }
+      return created;
+    });
     return results.length;
   },
 

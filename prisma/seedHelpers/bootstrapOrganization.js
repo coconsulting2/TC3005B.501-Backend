@@ -77,6 +77,7 @@ const PERMISSION_GROUPS_DEFAULTS = [
       "integration:read", "integration:write",
       "organization:read", "organization:update",
       "workflow:manage",
+      "onboarding:import",
       "user:view_self",
     ],
   },

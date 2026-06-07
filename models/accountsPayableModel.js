@@ -213,6 +213,7 @@ const AccountsPayable = {
             uuid: c.uuid,
             satEstado: c.satEstado,
             tipoComprobante: c.tipoComprobante,
+            tipoCambio: c.tipoCambio != null ? Number(c.tipoCambio) : 1,
           } : null,
         };
       }),

@@ -9,6 +9,7 @@
     "dev": "node --watch index.js",
     "dev:with-ts-watch": "concurrently -n tsc,api -c blue,green \"bunx tsc -p tsconfig.build.json --watch --preserveWatchOutput\" \"node --watch index.js\"",
     "dummy_db": "bunx prisma db push --force-reset && node prisma/seed.js dev",
+    "demo_db": "bunx prisma db push --force-reset && node prisma/seed.js dev && node prisma/seed-usability.js && node prisma/seed.demo.js",
     "empty_db": "bunx prisma db push --force-reset && node prisma/seed.js",
     "migrate": "bunx prisma migrate dev",
     "generate": "bunx prisma generate",

@@ -302,6 +302,11 @@ export const validateExpenseReceipts = [
     .trim()
     .isLength({ min: 36, max: 36 })
     .withMessage("cfdi_uuid must be a 36-char UUID string when provided"),
+  body("receipts.*.route_id")
+    .optional()
+    .isInt({ min: 1 })
+    .toInt()
+    .withMessage("route_id must be a valid tramo ID when provided"),
   body("allow_missing_cfdi_uuid")
     .optional()
     .isBoolean()

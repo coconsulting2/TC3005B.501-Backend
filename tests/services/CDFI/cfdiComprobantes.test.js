@@ -516,6 +516,29 @@ describe("PUT /api/accounts-payable/validate-receipt/:receipt_id (SAT)", () => {
     expect(AccountsPayableService.validateReceiptsAndUpdateStatus).toHaveBeenCalledWith(501);
   });
 
+  test("200 al aprobar comprobante internacional sin consultar SAT", async () => {
+    AccountsPayable.findReceiptForValidation.mockResolvedValue({
+      receipt_id: 15,
+      request_id: 501,
+      validation: "Pendiente",
+      cfdiComprobante: {
+        ...mockCfdiApprove,
+        tipoComprobante: "INTERNACIONAL",
+        satEstado: "Internacional",
+        moneda: "USD",
+        tipoCambio: 17.25,
+      },
+    });
+    const res = await request(app)
+      .put("/api/accounts-payable/validate-receipt/15")
+      .set(CPP_AUTH_HEADERS)
+      .send({ approval: 1 });
+    expect(res.status).toBe(200);
+    expect(consultarCfdiWithRetries).not.toHaveBeenCalled();
+    expect(ComprobantesModel.updateSatAcuseByReceiptId).not.toHaveBeenCalled();
+    expect(AccountsPayable.validateReceipt).toHaveBeenCalledWith(15, 2);
+  });
+
   test("400 al rechazar sin comentario", async () => {
     AccountsPayable.findReceiptForValidation.mockResolvedValue({
       receipt_id: 14,

@@ -5,6 +5,103 @@
  */
 import prisma from "../database/config/prisma.js";
 
+/**
+ * @param {unknown} value
+ * @returns {number}
+ */
+function toAmount(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * @param {*} db - Prisma client or transaction
+ * @param {number} requestId
+ * @returns {Promise<number[]>}
+ */
+async function getRouteIdsForRequest(db, requestId) {
+  const rows = await db.routeRequest.findMany({
+    where: { requestId: Number(requestId) },
+    include: { route: { select: { routeId: true, routerIndex: true } } },
+    orderBy: { route: { routerIndex: "asc" } },
+  });
+  return rows.map((rr) => rr.route?.routeId).filter((id) => id != null);
+}
+
+/**
+ * Vincula un comprobante al tramo indicado o al único tramo del viaje.
+ * @param {*} db
+ * @param {number} requestId
+ * @param {number} receiptId
+ * @param {number|null|undefined} preferredRouteId
+ */
+async function autoLinkReceiptToTramo(db, requestId, receiptId, preferredRouteId) {
+  const rid = Number(requestId);
+  const receiptIdNum = Number(receiptId);
+
+  const existing = await db.gastoTramo.findUnique({
+    where: { receiptId: receiptIdNum },
+  });
+  if (existing) return existing;
+
+  const routeIds = await getRouteIdsForRequest(db, rid);
+  if (routeIds.length === 0) return null;
+
+  let routeId = preferredRouteId != null ? Number(preferredRouteId) : null;
+  if (routeId != null && !routeIds.includes(routeId)) {
+    routeId = null;
+  }
+  if (routeId == null && routeIds.length === 1) {
+    routeId = routeIds[0];
+  }
+  if (routeId == null) return null;
+
+  const routeRequest = await db.routeRequest.findFirst({
+    where: { requestId: rid, routeId },
+  });
+  if (!routeRequest) return null;
+
+  return db.gastoTramo.create({
+    data: {
+      requestId: rid,
+      routeId,
+      receiptId: receiptIdNum,
+    },
+  });
+}
+
+/**
+ * Para viajes de un solo tramo, vincula comprobantes huérfanos existentes.
+ * @param {number} requestId
+ */
+async function syncOrphanReceiptsForSingleTramoRequest(requestId) {
+  const rid = Number(requestId);
+  const routeIds = await getRouteIdsForRequest(prisma, rid);
+  if (routeIds.length !== 1) return;
+
+  const linked = await prisma.gastoTramo.findMany({
+    where: { requestId: rid },
+    select: { receiptId: true },
+  });
+  const linkedIds = new Set(linked.map((g) => g.receiptId));
+
+  const orphans = await prisma.receipt.findMany({
+    where: {
+      requestId: rid,
+      ...(linkedIds.size > 0 ? { receiptId: { notIn: [...linkedIds] } } : {}),
+    },
+    select: { receiptId: true },
+  });
+
+  if (orphans.length === 0) return;
+
+  await prisma.$transaction(async (tx) => {
+    for (const row of orphans) {
+      await autoLinkReceiptToTramo(tx, rid, row.receiptId, routeIds[0]);
+    }
+  });
+}
+
 const GastoTramo = {
   /**
    * Associates a receipt (comprobante) with a specific tramo of a viaje.
@@ -91,6 +188,8 @@ const GastoTramo = {
       throw new Error("VIAJE_NOT_FOUND");
     }
 
+    await syncOrphanReceiptsForSingleTramoRequest(requestId);
+
     const routeRequests = await prisma.routeRequest.findMany({
       where: { requestId: Number(requestId) },
       include: {
@@ -122,7 +221,7 @@ const GastoTramo = {
         gasto_tramo_id: gt.gastoTramoId,
         receipt_id: gt.receiptId,
         receipt_type: gt.receipt?.receiptType?.receiptTypeName ?? null,
-        amount: gt.receipt?.amount ?? 0,
+        amount: toAmount(gt.receipt?.amount),
         validation: gt.receipt?.validation ?? null,
         submission_date: gt.receipt?.submissionDate ?? null,
       }));
@@ -144,12 +243,57 @@ const GastoTramo = {
       };
     });
 
+    const linkedReceiptIds = new Set(
+      tramos.flatMap((t) => t.comprobantes.map((c) => c.receipt_id)),
+    );
+
+    const orphanReceipts = await prisma.receipt.findMany({
+      where: {
+        requestId: Number(requestId),
+        ...(linkedReceiptIds.size > 0
+          ? { receiptId: { notIn: [...linkedReceiptIds] } }
+          : {}),
+      },
+      include: { receiptType: true },
+      orderBy: { receiptId: "asc" },
+    });
+
+    if (orphanReceipts.length > 0 && tramos.length > 1) {
+      const comprobantes = orphanReceipts.map((r) => ({
+        gasto_tramo_id: null,
+        receipt_id: r.receiptId,
+        receipt_type: r.receiptType?.receiptTypeName ?? null,
+        amount: toAmount(r.amount),
+        validation: r.validation ?? null,
+        submission_date: r.submissionDate ?? null,
+      }));
+      const totalTramo = comprobantes.reduce((sum, c) => sum + c.amount, 0);
+      totalGeneral += totalTramo;
+      tramos.push({
+        tramo_id: null,
+        router_index: null,
+        origin_country: null,
+        origin_city: "Sin tramo",
+        destination_country: null,
+        destination_city: "asignado",
+        beginning_date: null,
+        ending_date: null,
+        comprobantes,
+        total_tramo: totalTramo,
+        unassigned: true,
+      });
+    }
+
     return {
       viaje_id: Number(requestId),
       tramos,
       total_general: totalGeneral,
     };
   },
+
+  autoLinkReceiptToTramo,
+  syncOrphanReceiptsForSingleTramoRequest,
 };
 
+export { autoLinkReceiptToTramo, syncOrphanReceiptsForSingleTramoRequest };
 export default GastoTramo;

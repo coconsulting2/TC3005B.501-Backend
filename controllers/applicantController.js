@@ -8,6 +8,10 @@ import { decrypt } from "../middleware/decryption.js";
 import { Mail } from "../services/email/mail.cjs";
 import mailData from "../services/email/mailData.js";
 import { checkFeeVsViaticosPolicy } from "../services/viaticasPolicyService.js";
+import {
+  notifyRequestSubmitted,
+  notifySafe,
+} from "../services/workflowNotificationService.js";
 
 /**
  * Retrieves an applicant by their user ID.
@@ -163,12 +167,7 @@ export const createTravelRequest = async (req, res) => {
       applicantId,
       travelDetails,
     );
-    try {
-      const { user_email, user_name, request_id, status } = await mailData(travelRequest.requestId);
-      await Mail(user_email, user_name, request_id, status);
-    } catch (mailErr) {
-      console.error("createTravelRequest: correo no enviado (solicitud ya creada):", mailErr);
-    }
+    await notifySafe(() => notifyRequestSubmitted(travelRequest.requestId));
     res.status(201).json(travelRequest);
   } catch (error) {
     if (error.status === 422) return res.status(422).json({ error: error.message });
@@ -332,15 +331,7 @@ export const confirmDraftTravelRequest = async (req, res) => {
 
   try {
     const result = await Applicant.confirmDraftTravelRequest(userId, requestId);
-    try {
-      const { user_email, user_name, status } = await mailData(requestId);
-      await Mail(user_email, user_name, requestId, status);
-    } catch (mailErr) {
-      console.warn(
-        "[confirmDraftTravelRequest] Borrador confirmado; correo no enviado:",
-        mailErr?.message || mailErr
-      );
-    }
+    await notifySafe(() => notifyRequestSubmitted(requestId));
     return res.status(200).json(result);
   } catch (error) {
     if (error.status) {

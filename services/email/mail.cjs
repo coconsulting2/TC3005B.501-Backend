@@ -11,10 +11,14 @@ const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const currentDate = new Date().toJSON().slice(0, 10);
 
+const smtpHost = process.env.MAIL_SMTP_HOST || "smtp.gmail.com";
+const smtpPort = Number(process.env.MAIL_SMTP_PORT || 465);
+const smtpSecure = process.env.MAIL_SMTP_SECURE !== "false";
+
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true,
+  host: smtpHost,
+  port: smtpPort,
+  secure: smtpSecure,
   auth: {
     user: process.env.MAIL_USER,
     pass: process.env.MAIL_PASSWORD,
@@ -30,31 +34,36 @@ const transporter = nodemailer.createTransport({
  * @param {string} username - Recipient's display name
  * @param {string|number} request_id - ID of the travel request
  * @param {string} status - New status label to display in the email
+ * @param {{ userId?: number, customSubject?: string, customHtml?: string }} [options]
  * @returns {Promise<void>}
  * @throws {Error} If Nodemailer fails to send the email
  */
-const Mail = async (email, username, request_id, status) => {
-  // --- M3-006: Check email preference ---
-  try {
-    const user = await prisma.user.findFirst({
-      where: { email },
-      include: { preference: true },
-    });
+const Mail = async (email, username, request_id, status, options = {}) => {
+  const { userId, customSubject, customHtml } = options;
 
-    // If user has a preference record and emailNotif is false, skip
+  if (!process.env.MAIL_USER || !process.env.MAIL_PASSWORD) {
+    console.warn("Mail skipped: MAIL_USER or MAIL_PASSWORD not configured");
+    return;
+  }
+
+  // --- M3-006: Check email preference (emails are encrypted in DB — use userId) ---
+  try {
+    const user = userId
+      ? await prisma.user.findUnique({
+          where: { userId: Number(userId) },
+          include: { preference: true },
+        })
+      : null;
+
     if (user?.preference && user.preference.emailNotif === false) {
       return;
     }
   } catch (prefError) {
-    // If preference lookup fails, proceed with sending (fail-open for emails)
     console.error("Could not check email preference, sending anyway:", prefError);
   }
 
-  const mailOptions = {
-    from: 'Portal de Viajes" <tu-correo@gmail.com>',
-    to: email,
-    subject: "Actualización de Solicitud de Viaje",
-    html: `
+  const fromAddress = process.env.MAIL_FROM || process.env.MAIL_USER;
+  const defaultHtml = `
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -89,7 +98,13 @@ const Mail = async (email, username, request_id, status) => {
   </div>
 </body>
 </html>
-    `,
+    `;
+
+  const mailOptions = {
+    from: `"Portal de Viajes" <${fromAddress}>`,
+    to: email,
+    subject: customSubject || "Actualización de Solicitud de Viaje",
+    html: customHtml || defaultHtml,
   };
   try {
     await transporter.sendMail(mailOptions);
