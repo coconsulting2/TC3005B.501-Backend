@@ -375,7 +375,7 @@ export const sendExpenseValidation = async (req, res) => {
 };
 
 /**
- * Deletes a receipt and its associated files from MongoDB.
+ * Deletes a receipt and its associated files from S3.
  * @param {import('express').Request} req - Express request (params: receipt_id)
  * @param {import('express').Response} res - Express response
  * @returns {void} JSON with deletion confirmation or 404/500 error

@@ -122,4 +122,53 @@ async function deleteObject(key) {
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
 }
 
-export { upload, getPresignedUrl, deleteObject, PRESIGNED_TTL_SECONDS };
+/**
+ * Error thrown when an object key does not exist in the bucket.
+ */
+class StorageObjectNotFoundError extends Error {
+  /** @param {string} key */
+  constructor(key) {
+    super(`Object not found: ${key}`);
+    this.name = "StorageObjectNotFoundError";
+    this.code = "STORAGE_NOT_FOUND";
+    this.key = key;
+  }
+}
+
+/**
+ * Returns a readable stream + metadata for an object so the backend can pipe the
+ * raw bytes back to the client (preserves the byte-streaming download contract).
+ * @param {string} key - Full S3 object key
+ * @returns {Promise<{ body: import('stream').Readable, contentType: string|undefined, contentLength: number|undefined }>}
+ * @throws {StorageObjectNotFoundError} If the key does not exist
+ */
+async function getObjectStream(key) {
+  const client = createS3Client();
+  const bucket = getBucketName();
+  try {
+    const res = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+    return {
+      body: res.Body,
+      contentType: res.ContentType,
+      contentLength: res.ContentLength,
+    };
+  } catch (error) {
+    if (
+      error?.name === "NoSuchKey" ||
+      error?.Code === "NoSuchKey" ||
+      error?.$metadata?.httpStatusCode === 404
+    ) {
+      throw new StorageObjectNotFoundError(key);
+    }
+    throw error;
+  }
+}
+
+export {
+  upload,
+  getPresignedUrl,
+  getObjectStream,
+  deleteObject,
+  StorageObjectNotFoundError,
+  PRESIGNED_TTL_SECONDS,
+};

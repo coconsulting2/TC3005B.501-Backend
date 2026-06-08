@@ -1,5 +1,5 @@
 import axios from "axios";
-import { MongoClient } from "mongodb";
+import prisma from "../database/config/prisma.js";
 import fs from "fs";
 import https from "https";
 
@@ -11,10 +11,6 @@ class ExchangeRateService {
    * Initializes API URLs, credentials, and certificate paths.
    */
   constructor() {
-    // Handle test environment where MONGO_URI might be undefined
-    const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/test";
-    this.mongoClient = new MongoClient(mongoUri);
-    this.db = null;
     this.wiseApiUrl = process.env.NODE_ENV === "production"
       ? "https://api-mtls.transferwise.com/v1/rates"
       : "https://api-mtls.wise-sandbox.com/v1/rates";
@@ -39,27 +35,11 @@ class ExchangeRateService {
   }
 
   /**
-   * Connects to MongoDB and caches the db handle.
-   * @returns {Promise<Object>} The connected MongoDB database instance.
-   */
-  async connectDB() {
-    if (!this.db) {
-      await this.mongoClient.connect();
-      this.db = this.mongoClient.db("cocoadb");
-    }
-    return this.db;
-  }
-
-  /**
-   * Disconnects from MongoDB.
+   * No-op conservado por compatibilidad con llamadores/tests; la conexión a
+   * Postgres la gestiona Prisma de forma global.
    * @returns {Promise<void>}
    */
-  async disconnect() {
-    if (this.mongoClient) {
-      await this.mongoClient.close();
-      this.db = null;
-    }
-  }
+  async disconnect() {}
 
   /**
    * Creates an axios instance configured with mTLS client certificates.
@@ -120,7 +100,6 @@ class ExchangeRateService {
    */
   async getCachedRate(source = "USD", target = "MXN") {
     try {
-      const db = await this.connectDB();
       const today = new Date().toISOString().split("T")[0];
 
       // Sanitize user input to prevent injection
@@ -132,10 +111,14 @@ class ExchangeRateService {
         throw new Error("Invalid currency codes");
       }
 
-      const cachedRate = await db.collection("exchange_rates").findOne({
-        source: sanitizedSource,
-        target: sanitizedTarget,
-        date: today
+      const cachedRate = await prisma.exchangeRate.findUnique({
+        where: {
+          source_target_date: {
+            source: sanitizedSource,
+            target: sanitizedTarget,
+            date: today,
+          },
+        },
       });
 
       if (cachedRate) {
@@ -162,7 +145,6 @@ class ExchangeRateService {
    */
   async cacheRate(source, target, rate, dataSource) {
     try {
-      const db = await this.connectDB();
       const today = new Date().toISOString().split("T")[0];
 
       // Sanitize user input to prevent injection
@@ -174,18 +156,17 @@ class ExchangeRateService {
         throw new Error("Invalid currency codes");
       }
 
-      await db.collection("exchange_rates").updateOne(
-        { source: sanitizedSource, target: sanitizedTarget, date: today },
-        {
-          $set: {
-            rate,
-            dataSource,
+      await prisma.exchangeRate.upsert({
+        where: {
+          source_target_date: {
+            source: sanitizedSource,
+            target: sanitizedTarget,
             date: today,
-            timestamp: new Date()
-          }
+          },
         },
-        { upsert: true }
-      );
+        update: { rate, dataSource, updatedAt: new Date() },
+        create: { source: sanitizedSource, target: sanitizedTarget, date: today, rate, dataSource },
+      });
     } catch (error) {
       console.error("Error caching rate:", error);
     }
