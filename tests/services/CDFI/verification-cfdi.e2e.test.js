@@ -12,7 +12,6 @@ import request from "supertest";
 import { mutedConsoleLogs } from "../../utils/muteConsole.js";
 import { loadInvoiceFixtures, pickRandomInvoiceByScenario } from "./server/invoiceFixtures.js";
 
-import { connectMongo, disconnectMongo, resetMongo } from "../../../services/fileStorage.js";
 import prisma, { connectPostgres, disconnectPostgres, resetPostgres } from "../../../database/config/prisma.js";
 
 /** @type {app} Express */
@@ -34,7 +33,6 @@ app.set("trust proxy", "loopback");
 const setupDBs = async () => {
     try {
         await mutedConsoleLogs(async () => {
-            await connectMongo();
             await connectPostgres();
         });
         console.info("[ E2E ] - Connected to DBs");
@@ -188,7 +186,6 @@ describe("CDFI Verification service", () => {
 
     beforeEach(async () => {
         await mutedConsoleLogs(async () => {
-            await resetMongo();
             await resetPostgres();
             await seedAuthForAccountsPayable();
         });
@@ -197,7 +194,6 @@ describe("CDFI Verification service", () => {
     afterAll(async () => {
         try {
             await mutedConsoleLogs(async () => {
-                await disconnectMongo();
                 await disconnectPostgres();
                 await stopSATMockServer();
             });
