@@ -1,17 +1,21 @@
 import RateLimit from "express-rate-limit";
 
-// In non-production environments (dev, test, CI) the aggressive limits prevent
-// E2E suites and local exploration. Production keeps the tight values.
-const isProd = process.env.NODE_ENV === "production";
+// Behind Caddy + Astro SSR the backend sees most traffic from a single upstream
+// IP (the proxy / the frontend container), so per-IP limits collapse all users
+// onto one bucket and trip almost immediately. For this single-box UAT/demo
+// deployment the limiter is effectively disabled: 1,000,000 requests per minute.
+// Overridable via RATE_LIMIT_MAX / RATE_LIMIT_WINDOW_MS if a real limit is wanted.
+const WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS) || 60 * 1000; // 1 minute
+const MAX = Number(process.env.RATE_LIMIT_MAX) || 1_000_000;
 
 export const generalRateLimiter = RateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: isProd ? 100 : 10000,
-    message: "Too many requests from this IP, please try again after 15 minutes",
+    windowMs: WINDOW_MS,
+    max: MAX,
+    message: "Too many requests from this IP, please try again later",
 });
 
 export const loginRateLimiter = RateLimit({
-    windowMs: 1 * 60 * 1000, // 1 minute
-    max: isProd ? 5 : 1000,
-    message: "Too many login attempts from this IP, please try again after a minute",
+    windowMs: WINDOW_MS,
+    max: MAX,
+    message: "Too many login attempts from this IP, please try again later",
 });
