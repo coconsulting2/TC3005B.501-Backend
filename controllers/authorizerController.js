@@ -4,8 +4,12 @@
  */
 import Authorizer from "../models/authorizerModel.js";
 import authorizerServices from "../services/authorizerService.js";
-import { Mail } from "../services/email/mail.cjs";
-import mailData from "../services/email/mailData.js";
+import {
+  notifyRequestApproved,
+  notifyRequestRejected,
+  notifyRequestEscalated,
+  notifySafe,
+} from "../services/workflowNotificationService.js";
 
 /**
  * Retrieves pending alerts for a department filtered by status.
@@ -40,7 +44,8 @@ const getAlerts = async (req, res) => {
 };
 
 /**
- * Approves a travel request and advances it to the next status. Sends email notification.
+ * Approves a travel request and advances it to the next status.
+ * Dispatches in-app + email notification (request approved, or escalated to N2).
  * @param {import('express').Request} req - Express request (params: request_id, user_id)
  * @param {import('express').Response} res - Express response
  * @returns {void} JSON with success message and new status
@@ -59,11 +64,12 @@ const authorizeTravelRequest = async (req, res) => {
       Number(request_id),
       Number(user_id),
     );
-    try {
-      const { user_email, user_name, status } = await mailData(request_id);
-      await Mail(user_email, user_name, request_id, status);
-    } catch (mailErr) {
-      console.error("authorizeTravelRequest: correo no enviado (solicitud ya actualizada):", mailErr);
+    if (outcome === "ESCALADO") {
+      await notifySafe(() => notifyRequestEscalated(Number(request_id)));
+    } else {
+      await notifySafe(() =>
+        notifyRequestApproved(Number(request_id), Number(user_id)),
+      );
     }
     return res.status(200).json({
       message: "Request status updated successfully",
@@ -80,7 +86,7 @@ const authorizeTravelRequest = async (req, res) => {
 };
 
 /**
- * Declines a travel request and sends email notification.
+ * Declines a travel request and dispatches in-app + email notification to the requester.
  * @param {import('express').Request} req - Express request (params: request_id, user_id)
  * @param {import('express').Response} res - Express response
  * @returns {void} JSON with decline result
@@ -102,12 +108,7 @@ const declineTravelRequest = async (req, res) => {
       Number(user_id),
       comentario,
     );
-    try {
-      const { user_email, user_name, status } = await mailData(request_id);
-      await Mail(user_email, user_name, request_id, status);
-    } catch (mailErr) {
-      console.error("declineTravelRequest: correo no enviado (solicitud ya actualizada):", mailErr);
-    }
+    await notifySafe(() => notifyRequestRejected(Number(request_id), comentario));
     return res.status(200).json(result);
   } catch (error) {
     if (error.status) {
