@@ -3,7 +3,8 @@
  * @description Data access layer for admin-related queries using Prisma.
  */
 import prisma from "../database/config/prisma.js";
-import { getTenantContext } from "../middleware/tenantContext.js";
+import { getTenantContext, withTenantContext } from "../middleware/tenantContext.js";
+import { withRls } from "../database/config/rlsConnection.js";
 import { ensureTenantApplicantUserPermissions } from "../services/tenantApplicantUserGrants.js";
 
 const Admin = {
@@ -30,7 +31,7 @@ const Admin = {
       where.organizationId = ctx.organizationId;
     }
 
-    const users = await prisma.user.findMany({
+    const queryArgs = {
       where,
       orderBy: [{ organizationId: "asc" }, { departmentId: "asc" }],
       include: {
@@ -38,7 +39,19 @@ const Admin = {
         department: true,
         organization: { select: { id: true, nombre: true } },
       },
-    });
+    };
+
+    // ROOT (Ditta) sin impersonar => lista GLOBAL de todas las organizaciones.
+    // El tenant scoping (extension + RLS) inyecta el filtro de org por defecto,
+    // así que para el caso global hay que correr con bypass explícito de tenant.
+    const rootGlobal = !!(ctx && ctx.isRoot && !ctx.bypassTenant && !narrowByOrg);
+
+    const users = rootGlobal
+      ? await withTenantContext(
+          { organizationId: ctx.organizationId, userId: ctx.userId, isRoot: true, bypassTenant: true },
+          () => withRls(ctx.organizationId, { bypass: true }, (tx) => tx.user.findMany(queryArgs)),
+        )
+      : await prisma.user.findMany(queryArgs);
 
     return users.map((u) => ({
       user_id: u.userId,
