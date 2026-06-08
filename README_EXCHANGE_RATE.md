@@ -6,7 +6,7 @@ This document describes the implementation of the currency exchange rate integra
 
 - **Primary API**: Wise API for real-time exchange rates
 - **Fallback API**: DOF (Banxico) API when Wise is unavailable
-- **Caching**: Daily rate caching in MongoDB to avoid excessive API calls
+- **Caching**: Daily rate caching in PostgreSQL to avoid excessive API calls
 - **Automatic Conversion**: Currency conversion with rate information
 - **Rate History**: Historical exchange rate data
 - **Supported Currencies**: List of available currencies from Wise
@@ -106,17 +106,20 @@ BANXICO_API_KEY=your_banxico_api_key_here
 
 ## Database Schema
 
-### Exchange Rates Collection (MongoDB)
+### Exchange Rates Table (PostgreSQL — Prisma model `ExchangeRate`, tabla `exchange_rates`)
 
-```javascript
-{
-  "_id": ObjectId,
-  "source": "USD",           // Source currency code
-  "target": "MXN",           // Target currency code
-  "rate": 17.5,              // Exchange rate
-  "dataSource": "Wise",     // "Wise" or "DOF"
-  "date": "2026-04-13",      // Date of the rate
-  "updatedAt": ISODate       // Last update timestamp
+```prisma
+model ExchangeRate {
+  id         Int      @id @default(autoincrement())
+  source     String   @db.VarChar(3)   // Source currency code
+  target     String   @db.VarChar(3)   // Target currency code
+  date       String   @db.VarChar(10)  // YYYY-MM-DD
+  rate       Float                       // Exchange rate
+  dataSource String   @map("data_source") // "Wise" or "DOF"
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([source, target, date])
+  @@map("exchange_rates")
 }
 ```
 
@@ -129,12 +132,11 @@ BANXICO_API_KEY=your_banxico_api_key_here
 - **Error Handling**: Comprehensive error handling with logging
 - **Rate Conversion**: Automatic currency conversion with metadata
 
-### Model Layer (`models/exchangeRateModel.js`)
+### Persistence Layer (Prisma — `ExchangeRate` model)
 
-- **Database Operations**: CRUD operations for exchange rates
-- **Indexing**: Optimized indexes for performance
-- **History Queries**: Rate history and statistics
-- **Cleanup**: Automatic cleanup of old rates
+- **Database Operations**: cache read/write via `prisma.exchangeRate.findUnique` / `upsert`
+- **Indexing**: unique `(source, target, date)` + indexes on `date` and `data_source`
+- **History Queries**: rate history served live from Banxico (no DB read needed)
 
 ### Controller Layer (`controllers/exchangeRateController.js`)
 
@@ -186,7 +188,7 @@ The service implements comprehensive error handling:
 
 - **Caching**: Daily caching reduces API calls by ~95%
 - **Database Indexing**: Optimized queries for rate lookups
-- **Connection Pooling**: Efficient MongoDB connection management
+- **Connection Pooling**: Efficient PostgreSQL connection management via Prisma
 - **Rate Limiting**: Protection against API abuse
 
 ## Security
@@ -210,7 +212,7 @@ Monitor the following metrics:
 ### Common Issues
 
 1. **API Key Not Found**: Ensure WISE_API_KEY is set in environment
-2. **MongoDB Connection**: Check MONGO_URI configuration
+2. **PostgreSQL Connection**: Check DATABASE_URL configuration
 3. **Rate Limiting**: Monitor API usage and implement backoff
 4. **Cache Stale**: Manual cache refresh available
 

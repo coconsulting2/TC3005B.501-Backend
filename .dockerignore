@@ -22,7 +22,7 @@ certs/server.csr
 certs/ca.srl
 certs/openssl.cnf
 backup_scripts
-openapi
+# NOTE: do NOT ignore `openapi/` — app.js loads openapi/swagger.yaml at boot.
 database/Entity Relationship Model
 database/README.md
 database/SQL_CONTRIBUITING.md

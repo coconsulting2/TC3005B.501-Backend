@@ -1,6 +1,6 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "windows", "debian-openssl-3.0.x"]
+  binaryTargets = ["native", "windows", "debian-openssl-3.0.x", "linux-arm64-openssl-3.0.x"]
 }
 
 datasource db {
@@ -489,9 +489,9 @@ model Receipt {
   refund           Boolean           @default(true)
   submissionDate   DateTime          @default(now()) @map("submission_date")
   validationDate   DateTime?         @map("validation_date")
-  pdfFileId        String?           @map("pdf_file_id") @db.VarChar(24)
+  pdfFileKey       String?           @map("pdf_file_key") @db.VarChar(1024)
   pdfFileName      String?           @map("pdf_file_name") @db.VarChar(255)
-  xmlFileId        String?           @map("xml_file_id") @db.VarChar(24)
+  xmlFileKey       String?           @map("xml_file_key") @db.VarChar(1024)
   xmlFileName      String?           @map("xml_file_name") @db.VarChar(255)
   cfdiUuid         String?           @unique @map("cfdi_uuid") @db.VarChar(36)
   cfdiVersion      String?           @map("cfdi_version") @db.VarChar(3)
@@ -1021,4 +1021,24 @@ model ViaticosPolicy {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("viaticos_policies")
+}
+
+// =====================================================================
+// EXCHANGE RATE CACHE — caché diario de tipos de cambio (USD/MXN, etc).
+// `date` se guarda como YYYY-MM-DD para alinear con el manejo de fechas
+// string del servicio (exchangeRateService).
+// =====================================================================
+model ExchangeRate {
+  id         Int      @id @default(autoincrement())
+  source     String   @db.VarChar(3)
+  target     String   @db.VarChar(3)
+  date       String   @map("date") @db.VarChar(10)
+  rate       Float
+  dataSource String   @map("data_source") @db.VarChar(40)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([source, target, date], map: "exchange_rate_source_target_date_unique")
+  @@index([date])
+  @@index([dataSource])
+  @@map("exchange_rates")
 }

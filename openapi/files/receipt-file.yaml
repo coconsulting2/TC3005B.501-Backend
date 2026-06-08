@@ -6,7 +6,7 @@ paths:
         - name: file_id
           in: path
           required: true
-          description: ID of the file stored in GridFS
+          description: S3 object key of the receipt file (may contain "/")
           schema:
             type: string
       responses:

@@ -12,9 +12,19 @@ import request from "supertest";
 import { BmxApi } from "./server/bmx-api.js";
 import { createTestJWT, LOCALHOST, ROLES } from "../../utils/createTestAuthToken.js";
 import { mutedConsoleLogs } from "../../utils/muteConsole.js";
-import { connectMongo, disconnectMongo, resetMongo } from "../../../services/fileStorage.js";
-import { connectPostgres, disconnectPostgres, resetPostgres } from "../../../database/config/prisma.js";
-import { MongoClient } from "mongodb";
+import prisma, { connectPostgres, disconnectPostgres, resetPostgres } from "../../../database/config/prisma.js";
+
+/**
+ * Reads a cached exchange rate row from Postgres by its natural key.
+ * @param {string} source
+ * @param {string} target
+ * @param {string} date YYYY-MM-DD
+ * @returns {Promise<object|null>}
+ */
+const findCachedRate = (source, target, date) =>
+    prisma.exchangeRate.findUnique({
+        where: { source_target_date: { source, target, date } },
+    });
 
 /** @type {import("express").Express} */
 import app from "../../../app.js";
@@ -84,19 +94,17 @@ const HEADERS = {
     "Authorization": `Bearer ${createTestJWT(ROLES.ACCOUNTS_PAYABLE, { IP: LOCALHOST })}`,
     "x-forwarded-for": LOCALHOST
 };
-let testMongoClient = null;
 
 app.set("trust proxy", "loopback");
 
 /**
- * Connects Mongo and Postgres test databases.
+ * Connects the Postgres test database.
  *
  * @returns {Promise<void>}
  */
 const setupDBs = async () => {
     try {
         await mutedConsoleLogs(async () => {
-            await connectMongo();
             await connectPostgres();
         });
         console.info("[ E2E ] - Connected to DBs");
@@ -116,25 +124,9 @@ describe("BER — Banxico Exchange Rate Service E2E [ NT-010 ]", () => {
 
     beforeEach(async () => {
         await mutedConsoleLogs(async () => {
-            await resetMongo();
             await resetPostgres();
             await BmxApi.store.resetAll();
         });
-        const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/test_cocoadb";
-        testMongoClient = new MongoClient(mongoUri);
-        await testMongoClient.connect();
-        const db = testMongoClient.db("cocoadb");
-        if (!db) throw Error("Mongo not connected");
-
-        const collections = await db.collections();
-        await Promise.all(collections.map((c) => c.deleteMany({})));
-    }, 5_000);
-
-    afterEach(async () => {
-        if (testMongoClient) {
-            await testMongoClient.close();
-            testMongoClient = null;
-        }
     }, 5_000);
 
     afterAll(async () => {
@@ -142,17 +134,10 @@ describe("BER — Banxico Exchange Rate Service E2E [ NT-010 ]", () => {
         jest.resetAllMocks();
         try {
             await mutedConsoleLogs(async () => {
-                // Import and disconnect the exchangeRateService to close its MongoDB connection
+                // disconnect() is a no-op kept for compatibility; Prisma owns the global pool.
                 const exchangeRateService = (await import("../../../services/exchangeRateService.js")).default;
                 await exchangeRateService.disconnect();
 
-                // Close test MongoDB client if still open
-                if (testMongoClient) {
-                    await testMongoClient.close();
-                    testMongoClient = null;
-                }
-
-                await disconnectMongo();
                 await disconnectPostgres();
                 await bmx_api.stop();
             });
@@ -182,45 +167,31 @@ describe("BER — Banxico Exchange Rate Service E2E [ NT-010 ]", () => {
             expect(typeof response.body.data.rate).toBe("number");
         }, 10_000);
 
-        it("[TC-002-V-02] Cache persists in MongoDB and is retrieved on second call", async () => {
-            const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/test_cocoadb";
-            const mongoClient = new MongoClient(mongoUri);
+        it("[TC-002-V-02] Cache persists in Postgres and is retrieved on second call", async () => {
+            const response1 = await request(app)
+                .get("/api/exchange-rate/rate?source=USD&target=MXN")
+                .set(HEADERS);
 
-            try {
-                await mongoClient.connect();
-                const db = mongoClient.db("cocoadb");
+            expect(response1.statusCode).toBe(200);
+            expect(response1.body.data).toMatchObject({
+                "rate": TODAY.rate,
+                "source": "DOF",
+                "date": TODAY.format,
+                "fromCache": false
+            });
 
-                const response1 = await request(app)
-                    .get("/api/exchange-rate/rate?source=USD&target=MXN")
-                    .set(HEADERS);
+            const cachedDoc = await findCachedRate("USD", "MXN", TODAY.string);
 
-                expect(response1.statusCode).toBe(200);
-                expect(response1.body.data).toMatchObject({
-                    "rate": TODAY.rate,
-                    "source": "DOF",
-                    "date": TODAY.format,
-                    "fromCache": false
-                });
+            expect(cachedDoc).not.toBeNull();
+            expect(cachedDoc.rate).toBe(response1.body.data.rate);
 
-                const cachedDoc = await db.collection("exchange_rates").findOne({
-                    source: "USD",
-                    target: "MXN",
-                    date: TODAY.string
-                });
+            const response2 = await request(app)
+                .get("/api/exchange-rate/rate?source=USD&target=MXN")
+                .set(HEADERS);
 
-                expect(cachedDoc).toBeDefined();
-                expect(cachedDoc.rate).toBe(response1.body.data.rate);
-
-                const response2 = await request(app)
-                    .get("/api/exchange-rate/rate?source=USD&target=MXN")
-                    .set(HEADERS);
-
-                expect(response2.statusCode).toBe(200);
-                expect(response2.body.data.fromCache).toBe(true);
-                expect(response2.body.data.rate).toBe(response1.body.data.rate);
-            } finally {
-                await mongoClient.close();
-            }
+            expect(response2.statusCode).toBe(200);
+            expect(response2.body.data.fromCache).toBe(true);
+            expect(response2.body.data.rate).toBe(response1.body.data.rate);
         });
 
         it.each([
@@ -289,77 +260,38 @@ describe("BER — Banxico Exchange Rate Service E2E [ NT-010 ]", () => {
 
     describe("Cache Behavior (Category CACHE)", () => {
         it("[TC-008-CACHE-01] First call: fromCache false; Second call: fromCache true", async () => {
-            const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/test_cocoadb";
-            const mongoClient = new MongoClient(mongoUri);
+            const res1 = await request(app)
+                .get("/api/exchange-rate/rate?source=USD&target=MXN")
+                .set(HEADERS);
 
-            try {
-                await mongoClient.connect();
-                const db = mongoClient.db("cocoadb");
+            expect(res1.body.data.fromCache).toBe(false);
+            const rate1 = res1.body.data.rate;
 
-                const res1 = await request(app)
-                    .get("/api/exchange-rate/rate?source=USD&target=MXN")
-                    .set(HEADERS);
+            const cached = await findCachedRate("USD", "MXN", TODAY.string);
+            expect(cached).not.toBeNull();
 
-                expect(res1.body.data.fromCache).toBe(false);
-                const rate1 = res1.body.data.rate;
+            const res2 = await request(app)
+                .get("/api/exchange-rate/rate?source=USD&target=MXN")
+                .set(HEADERS);
 
-                const cached = await db.collection("exchange_rates").findOne({
-                    source: "USD",
-                    target: "MXN",
-                    date: TODAY.string
-                });
-                expect(cached).toBeDefined();
-
-                const res2 = await request(app)
-                    .get("/api/exchange-rate/rate?source=USD&target=MXN")
-                    .set(HEADERS);
-
-                expect(res2.body.data.fromCache).toBe(true);
-                expect(res2.body.data.rate).toBe(rate1);
-            } finally {
-                await mongoClient.close();
-            }
+            expect(res2.body.data.fromCache).toBe(true);
+            expect(res2.body.data.rate).toBe(rate1);
         });
 
         it.each([
             { tcId: "TC-010-CACHE-03", src: "USD", target: "MXN" },
         ])("[$tcId] Different currency pairs have separate cache entries", async ({ src, target }) => {
-            const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/test_cocoadb";
-            const mongoClient = new MongoClient(mongoUri);
+            const res1 = await request(app)
+                .get(`/api/exchange-rate/rate?source=${src}&target=${target}`)
+                .set(HEADERS);
+            expect(res1.statusCode).toBe(200);
 
-            try {
-                await mongoClient.connect();
-                const db = mongoClient.db("cocoadb");
+            const cache = await findCachedRate(src, target, TODAY.string);
 
-                const res1 = await request(app)
-                    .get(`/api/exchange-rate/rate?source=${src}&target=${target}`)
-                    .set(HEADERS);
-                expect(res1.statusCode).toBe(200);
-
-                const cache = await db.collection("exchange_rates").findOne({
-                    source: src,
-                    target: target,
-                    date: TODAY.string
-                });
-
-                expect(cache).toBeDefined();
-            } finally {
-                await mongoClient.close();
-            }
+            expect(cache).not.toBeNull();
         });
 
         it("[TC-009-CACHE-02] Cache expires at end of day", async () => {
-            let db, mongoClient;
-
-            try {
-                mongoClient = new MongoClient(process.env.MONGO_URI);
-                await mongoClient.connect();
-                db = mongoClient.db("cocoadb");
-            } catch (err) {
-                console.error("Mongo did not connect - ", err);
-                expect(false).toBeTruthy();
-            }
-
             const resetToTimeMocked = installFixedDate(TODAY.yesterday, Date);
             const url = "/api/exchange-rate/rate?src=USD&target=MXN";
 
@@ -376,13 +308,9 @@ describe("BER — Banxico Exchange Rate Service E2E [ NT-010 ]", () => {
                 expect(res1_day1.body.data.rate).toBe(yesterdayRate);
 
                 {
-                    const cacheRecord = await db.collection("exchange_rates").findOne({
-                        source: "USD",
-                        target: "MXN",
-                        date: TODAY.yesterday_string
-                    });
+                    const cacheRecord = await findCachedRate("USD", "MXN", TODAY.yesterday_string);
 
-                    expect(cacheRecord).toBeDefined();
+                    expect(cacheRecord).not.toBeNull();
                     expect(cacheRecord).toHaveProperty("rate", yesterdayRate);
                 }
 
@@ -395,11 +323,7 @@ describe("BER — Banxico Exchange Rate Service E2E [ NT-010 ]", () => {
                 resetToTimeMocked();
 
                 {
-                    const cacheRecord = await db.collection("exchange_rates").findOne({
-                        source: "USD",
-                        target: "MXN",
-                        date: TODAY.string
-                    });
+                    const cacheRecord = await findCachedRate("USD", "MXN", TODAY.string);
 
                     expect(cacheRecord).toBeNull();
                 }
@@ -410,20 +334,15 @@ describe("BER — Banxico Exchange Rate Service E2E [ NT-010 ]", () => {
                 expect(res1_day2.body.data.rate).toBe(TODAY.rate);
                 expect(res1_day2.body.data.fromCache).toBe(false);
                 {
-                    const cacheRecord = await db.collection("exchange_rates").findOne({
-                        source: "USD",
-                        target: "MXN",
-                        date: TODAY.string
-                    });
+                    const cacheRecord = await findCachedRate("USD", "MXN", TODAY.string);
 
-                    expect(cacheRecord).toBeDefined();
+                    expect(cacheRecord).not.toBeNull();
                     expect(cacheRecord).toHaveProperty("rate", TODAY.rate);
                 }
             } catch (err) {
                 console.error(err);
                 expect(false).toBeTruthy();
             } finally {
-                await mongoClient.close();
                 resetToTimeMocked();
             }
         });

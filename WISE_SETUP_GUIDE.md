@@ -140,7 +140,7 @@ Once configured, the exchange rate service will:
 
 1. **Automatically obtain OAuth tokens** using client credentials
 2. **Use mTLS** for all Wise API calls
-3. **Cache exchange rates** daily in MongoDB
+3. **Cache exchange rates** daily in PostgreSQL
 4. **Fallback to DOF** if Wise API fails
 5. **Handle token refresh** automatically
 

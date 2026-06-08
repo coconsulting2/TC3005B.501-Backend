@@ -32,7 +32,7 @@ import {
   bootstrapOrganizationCatalogs,
 } from "./seedHelpers/bootstrapOrganization.js";
 import { buildRequestWorkflowSnapshots } from "../services/buildRequestWorkflowSnapshots.js";
-import { connectMongo, disconnectMongo, uploadFile } from "../services/fileStorage.js";
+import { upload } from "../services/storageService.js";
 import {
   parseCFDI,
   buildComprobanteRegistroBodyFromXml,
@@ -230,7 +230,7 @@ async function attachWorkflowSnapshots(orgId, requestId, userId, departmentId, r
 }
 
 /**
- * Sube XML/PDF de fixtures a GridFS para que CxP pueda abrir archivos en la UI.
+ * Sube XML/PDF de fixtures a S3 para que CxP pueda abrir archivos en la UI.
  */
 /**
  * PDF emparejado por nombre base (uuid.xml → uuid.pdf) o tenis.xml → *Tenis*.pdf; si no, PDF genérico de tests.
@@ -310,13 +310,13 @@ async function seedR6Receipts(orgId, requestId, rtMap) {
     amount: 8500,
     satEstado: "Vigente",
     emisorNombre: "Hotel Fiesta Americana MTY",
-    gridFs: { xmlPath: FIXTURE_XML_HOTEL, pdfPath: FIXTURE_PDF, baseName: "uat-hotel-mty" },
+    files: { xmlPath: FIXTURE_XML_HOTEL, pdfPath: FIXTURE_PDF, baseName: "uat-hotel-mty" },
   });
   await createReceiptWithCfdi(orgId, requestId, rtMap["Comida"], {
     amount: 2800,
     satEstado: "Cancelado",
     emisorNombre: "Restaurante La Nacional",
-    gridFs: {
+    files: {
       xmlPath: FIXTURE_XML_RESTAURANT,
       pdfPath: FIXTURE_PDF,
       baseName: "uat-rest-cancelado-sat",
@@ -326,7 +326,7 @@ async function seedR6Receipts(orgId, requestId, rtMap) {
     amount: 1200,
     satEstado: "Vigente",
     emisorNombre: "Uber Transporte MX",
-    gridFs: {
+    files: {
       xmlPath: FIXTURE_XML_RESTAURANT,
       pdfPath: FIXTURE_PDF,
       baseName: "uat-uber-mty",
@@ -336,7 +336,7 @@ async function seedR6Receipts(orgId, requestId, rtMap) {
     amount: 6500,
     satEstado: "Vigente",
     emisorNombre: "Volaris SAB de CV",
-    gridFs: { xmlPath: FIXTURE_XML_HOTEL, pdfPath: FIXTURE_PDF, baseName: "uat-vuelo-mty" },
+    files: { xmlPath: FIXTURE_XML_HOTEL, pdfPath: FIXTURE_PDF, baseName: "uat-vuelo-mty" },
   });
   console.log("  ✓ R6 comprobantes: 4 sintéticos (tests/fixtures)");
 }
@@ -356,7 +356,7 @@ async function seedR6bDuplicateReceipts(orgId, requestId, rtMap) {
     validation: "Pendiente",
     satEstado: "Vigente",
     emisorNombre: emisor,
-    gridFs: {
+    files: {
       xmlPath: FIXTURE_XML_RESTAURANT,
       pdfPath: FIXTURE_PDF,
       baseName: "uat-dup-comida-1",
@@ -367,7 +367,7 @@ async function seedR6bDuplicateReceipts(orgId, requestId, rtMap) {
     validation: "Pendiente",
     satEstado: "Vigente",
     emisorNombre: emisor,
-    gridFs: {
+    files: {
       xmlPath: FIXTURE_XML_RESTAURANT,
       pdfPath: FIXTURE_PDF,
       baseName: "uat-dup-comida-2",
@@ -420,7 +420,7 @@ function mapRegistroToCfdiCreate(reg, orgId, receiptId, satEstado) {
 }
 
 /**
- * Crea comprobante + CFDI desde XML real en prisma/fixtures/usability-cfdi/ y adjunta GridFS.
+ * Crea comprobante + CFDI desde XML real en prisma/fixtures/usability-cfdi/ y adjunta archivos en S3.
  */
 async function createReceiptFromUsabilityXml(
   orgId,
@@ -467,7 +467,7 @@ async function createReceiptFromUsabilityXml(
   });
 
   const pdfPath = resolveUsabilityPdfPath(xmlFileName);
-  await attachGridFsToReceipt(orgId, receipt.receiptId, {
+  await attachFilesToReceipt(orgId, receipt.receiptId, {
     xmlPath,
     pdfPath,
     baseName: path.basename(xmlFileName, ".xml"),
@@ -476,38 +476,48 @@ async function createReceiptFromUsabilityXml(
   return receipt;
 }
 
-async function attachGridFsToReceipt(orgId, receiptId, { xmlPath, pdfPath, baseName }) {
+async function attachFilesToReceipt(orgId, receiptId, { xmlPath, pdfPath, baseName }) {
   if (!fs.existsSync(xmlPath) || !fs.existsSync(pdfPath)) {
     console.warn(`  ⚠ Fixtures no encontrados para receipt ${receiptId}; omitiendo archivos.`);
     return;
   }
   try {
-    await connectMongo();
+    const receiptRow = await prisma.receipt.findUnique({
+      where: { receiptId },
+      select: { requestId: true },
+    });
+    const viajeId = receiptRow?.requestId ?? receiptId;
     const xmlBuf = fs.readFileSync(xmlPath);
     const pdfBuf = fs.readFileSync(pdfPath);
     const xmlName = `${baseName}.xml`;
     const pdfName = `${baseName}.pdf`;
-    const xml = await uploadFile(xmlBuf, xmlName, "application/xml", {
-      organizationId: String(orgId),
+    const xml = await upload({
+      body: xmlBuf,
+      organizationId: orgId,
+      viajeId,
+      fileName: xmlName,
+      contentType: "application/xml",
       receiptId,
     });
-    const pdf = await uploadFile(pdfBuf, pdfName, "application/pdf", {
-      organizationId: String(orgId),
+    const pdf = await upload({
+      body: pdfBuf,
+      organizationId: orgId,
+      viajeId,
+      fileName: pdfName,
+      contentType: "application/pdf",
       receiptId,
     });
     await prisma.receipt.update({
       where: { receiptId },
       data: {
-        xmlFileId: xml.fileId,
+        xmlFileKey: xml.key,
         xmlFileName: xmlName,
-        pdfFileId: pdf.fileId,
+        pdfFileKey: pdf.key,
         pdfFileName: pdfName,
       },
     });
   } catch (err) {
-    console.warn(`  ⚠ GridFS no disponible (¿Mongo en docker?): ${err?.message || err}`);
-  } finally {
-    await disconnectMongo().catch(() => {});
+    console.warn(`  ⚠ S3 no disponible (¿LocalStack/credenciales?): ${err?.message || err}`);
   }
 }
 
@@ -576,7 +586,7 @@ async function createReceiptWithCfdi(orgId, requestId, receiptTypeId, opts) {
     amount = 2500, validation = "Pendiente", refund = true,
     satEstado = "Vigente", moneda = "MXN", tipoCambio = 1.0,
     emisorRfc = "AAA010101AAA", emisorNombre = "Hotel Prueba SA",
-    gridFs = null,
+    files = null,
   } = opts;
 
   const uuid = crypto.randomUUID();
@@ -636,8 +646,8 @@ async function createReceiptWithCfdi(orgId, requestId, receiptTypeId, opts) {
     },
   });
 
-  if (gridFs) {
-    await attachGridFsToReceipt(orgId, receipt.receiptId, gridFs);
+  if (files) {
+    await attachFilesToReceipt(orgId, receipt.receiptId, files);
   }
 
   return receipt;

@@ -1,6 +1,5 @@
 import express from "express";
 import { generalRateLimiter } from "../middleware/rateLimiters.js";
-import { sanitizeMongoInputs } from "../middleware/mongoSanitize.js";
 import { upload, handleMulterError } from "../middleware/fileUpload.js";
 import { internationalReceiptUpload } from "../middleware/internationalReceiptMulter.js";
 import {
@@ -14,9 +13,6 @@ import { authenticateToken } from "../middleware/auth.js";
 import { fileValidation, handleMulterErrors } from "../middleware/fileValidation.js";
 
 const router = express.Router();
-
-// Apply sanitization middleware to all routes
-router.use(sanitizeMongoInputs);
 
 // Upload PDF+XML (nacional) o imagen JPG/PNG (internacional: ?isInternational=1)
 router.post(
@@ -35,8 +31,8 @@ router.post(
   uploadReceiptFilesController
 );
 
-// Get receipt file (PDF or XML)
-router.get("/receipt-file/:file_id", generalRateLimiter, getReceiptFileController);
+// Get receipt file (PDF or XML). Wildcard porque el key de S3 contiene "/" (req.params[0]).
+router.get("/receipt-file/*", generalRateLimiter, getReceiptFileController);
 
 // Get receipt files metadata (filenames and object ids)
 router.get("/receipt-files/:receipt_id", getReceiptFilesMetadataController);

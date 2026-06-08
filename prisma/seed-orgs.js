@@ -8,7 +8,6 @@
  *   - 4 departments  (2 per org)
  *   - 20 users       (10 per org, diverse roles)
  *   - 5 suppliers    (proveedores, raw SQL)
- *   - 2 MongoDB org configs (1 per org)
  *
  * Idempotent: safe to re-run; uses upsert / ON CONFLICT / skipDuplicates.
  *
@@ -18,14 +17,12 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { MongoClient } from "mongodb";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 
 dotenv.config();
 
 const prisma = new PrismaClient();
-const MONGO_URL = process.env.MONGO_URI || "mongodb://localhost:27017";
 const SALT_ROUNDS = 10;
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -407,48 +404,6 @@ async function seedSuppliers(orgIds) {
   }
 }
 
-/**
- * Seeds MongoDB configuration documents for each organization.
- * @param {number[]} orgIds Organization IDs returned by seedOrganizations.
- * @returns {Promise<void>}
- */
-async function seedMongoConfig(orgIds) {
-  const client = await MongoClient.connect(MONGO_URL);
-  const db     = client.db("orgConfig");
-  const col    = db.collection("org_settings");
-
-  for (let i = 0; i < ORGS.length; i++) {
-    const { nombre, rfc } = ORGS[i];
-
-    await col.updateOne(
-      { org_id: orgIds[i] },
-      {
-        $setOnInsert: {
-          org_id:   orgIds[i],
-          nombre,
-          rfc,
-          currency: "MXN",
-          timezone: "America/Mexico_City",
-          politicas_viaticos: {
-            max_por_dia:            1500.00,
-            aprobacion_auto_hasta:   500.00,
-            dias_maximos_solicitud:    30,
-          },
-          notificaciones: {
-            email: true,
-            push:  false,
-          },
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        },
-      },
-      { upsert: true }
-    );
-  }
-
-  await client.close();
-}
-
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -477,9 +432,6 @@ async function main() {
   console.warn("Seeding suppliers...");
   await seedSuppliers(orgIds);
 
-  console.warn("Seeding MongoDB org config...");
-  await seedMongoConfig(orgIds);
-
   console.warn("");
   console.warn("Seed complete:");
   console.warn(`  Organizations : 2  (IDs ${orgIds.join(", ")})`);
@@ -487,7 +439,6 @@ async function main() {
   console.warn("  Departments   : 4  (2 per org)");
   console.warn("  Users         : 20 (10 per org, roles: 1 admin · 2 N1 · 2 N2 · 2 contabilidad · 3 solicitante)");
   console.warn("  Suppliers     : 5  (RFCs: XAXX010101000, XEXX010101000)");
-  console.warn("  MongoDB cfg   : 2  (1 per org in orgConfig.org_settings)");
   console.warn("  Workflow rules: 6 por org (importe + skip_if_below pre/post)");
 }
 

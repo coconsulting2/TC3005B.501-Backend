@@ -197,9 +197,9 @@ const AccountsPayable = {
           amount: row.amount,
           validation: row.validation,
           sat_estado: c?.satEstado ?? null,
-          pdf_id: row.pdfFileId,
+          pdf_id: row.pdfFileKey,
           pdf_name: row.pdfFileName,
-          xml_id: row.xmlFileId,
+          xml_id: row.xmlFileKey,
           xml_name: row.xmlFileName,
           // Detalle fiscal esencial (solo lo que el usuario necesita ver)
           cfdi: c ? {

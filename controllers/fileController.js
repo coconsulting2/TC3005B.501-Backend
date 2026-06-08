@@ -1,22 +1,19 @@
 /**
  * @module fileController
- * @description Handles HTTP requests for receipt file uploads and downloads (PDF/XML via MongoDB GridFS).
+ * @description Handles HTTP requests for receipt file uploads and downloads (PDF/XML via AWS S3).
  */
-import { ObjectId } from "mongodb";
-import sanitize from "mongo-sanitize";
+import path from "node:path";
 import { uploadReceiptFiles, getReceiptFile, getReceiptFilesMetadata, CfdiParseError, uploadInternationalReceiptImage } from "../services/receiptFileService.js";
-import { db } from "../services/fileStorage.js";
 import { upload, getPresignedUrl } from "../services/storageService.js";
 
 /**
  * Uploads PDF and XML files for a receipt. Both files are required.
- * Sanitizes all input (receipt ID, filenames) before storage.
  * @param {import('express').Request} req - Express request (params: receipt_id, files: { pdf, xml })
  * @param {import('express').Response} res - Express response
  * @returns {void} 201 JSON with file IDs and names, or 400/500 error
  */
 export const uploadReceiptFilesController = async (req, res) => {
-  const receiptId = parseInt(sanitize(req.params.receipt_id), 10);
+  const receiptId = parseInt(req.params.receipt_id, 10);
 
   const q = String(req.query?.isInternational ?? "").toLowerCase();
   const isInternational = q === "true" || q === "1";
@@ -26,7 +23,6 @@ export const uploadReceiptFilesController = async (req, res) => {
       return res.status(400).json({ error: "receipt_image (JPG o PNG) es requerido" });
     }
     try {
-      req.file.originalname = sanitize(req.file.originalname);
       const result = await uploadInternationalReceiptImage(receiptId, req.file);
       return res.status(201).json({
         message: "International receipt image uploaded successfully",
@@ -52,9 +48,6 @@ export const uploadReceiptFilesController = async (req, res) => {
   try {
     const pdfFile = req.files.pdf[0];
     const xmlFile = req.files.xml[0];
-
-    pdfFile.originalname = sanitize(pdfFile.originalname);
-    xmlFile.originalname = sanitize(xmlFile.originalname);
 
     const result = await uploadReceiptFiles(receiptId, pdfFile, xmlFile);
 
@@ -118,38 +111,42 @@ export const uploadReceiptFilesController = async (req, res) => {
 };
 
 /**
- * Downloads a receipt file (PDF or XML) by its MongoDB ObjectId.
- * Streams the file content directly to the response.
- * @param {import('express').Request} req - Express request (params: file_id)
+ * Downloads a receipt file (PDF or XML) by its S3 object key.
+ * The route is a wildcard (`/receipt-file/*`) because S3 keys contain "/", so the
+ * key arrives in `req.params[0]`. Streams the raw bytes (inline/attachment contract).
+ * @param {import('express').Request} req - Express request (params[0]: S3 key)
  * @param {import('express').Response} res - Express response
  * @returns {void} File stream with appropriate Content-Type, or 400/404/500 error
  */
 export const getReceiptFileController = async (req, res) => {
   try {
-    const fileIdStr = sanitize(req.params.file_id);
+    const key = req.params[0];
 
-    if (!ObjectId.isValid(fileIdStr)) {
-      return res.status(400).json({ error: "Invalid file ID format" });
+    if (!key) {
+      return res.status(400).json({ error: "Invalid file key" });
     }
 
-    const fileId = new ObjectId(fileIdStr);
+    const { body, contentType } = await getReceiptFile(key);
 
-    const file = await db.collection("fs.files").findOne({ _id: fileId });
-    if (!file) {
+    const ct = typeof contentType === "string" && contentType ? contentType : "application/octet-stream";
+    res.set("Content-Type", ct);
+    const isInline = ct === "application/pdf" || ct.startsWith("image/");
+    const disposition = isInline ? "inline" : "attachment";
+    res.set("Content-Disposition", `${disposition}; filename="${path.basename(key)}"`);
+
+    body.on("error", (err) => {
+      console.error("Error streaming file:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Internal server error" });
+      } else {
+        res.destroy(err);
+      }
+    });
+    body.pipe(res);
+  } catch (error) {
+    if (error?.code === "STORAGE_NOT_FOUND") {
       return res.status(404).json({ error: "File not found" });
     }
-
-    const contentType =
-      typeof file.contentType === "string" ? file.contentType : "";
-    res.set("Content-Type", sanitize(contentType || "application/octet-stream"));
-    const isInline =
-      contentType === "application/pdf" || contentType.startsWith("image/");
-    const disposition = isInline ? "inline" : "attachment";
-    res.set("Content-Disposition", `${disposition}; filename="${sanitize(file.filename)}"`);
-
-    const downloadStream = await getReceiptFile(fileId);
-    downloadStream.pipe(res);
-  } catch (error) {
     console.error("Error downloading file:", error);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -162,7 +159,7 @@ export const getReceiptFileController = async (req, res) => {
  * @returns {void} JSON with file metadata or 404/500 error
  */
 export const getReceiptFilesMetadataController = async (req, res) => {
-  const receiptId = parseInt(sanitize(req.params.receipt_id), 10);
+  const receiptId = parseInt(req.params.receipt_id, 10);
 
   try {
     const metadata = await getReceiptFilesMetadata(receiptId);

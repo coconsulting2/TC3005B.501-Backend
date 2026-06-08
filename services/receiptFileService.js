@@ -1,11 +1,10 @@
 /**
  * @module receiptFileService
  * @description Handles receipt file operations: uploading, retrieving, and deleting
- * PDF and XML files in MongoDB GridFS, with metadata stored in PostgreSQL via Prisma.
+ * PDF and XML files in AWS S3 (SSE-S3), with metadata stored in PostgreSQL via Prisma.
  * Validates and parses CFDI XML before storage; UUID duplicado se valida contra cfdi_comprobantes.
  */
-import { ObjectId } from "mongodb";
-import { uploadFile, getFile, bucket } from "./fileStorage.js";
+import { upload, getObjectStream, deleteObject } from "./storageService.js";
 import prisma from "../database/config/prisma.js";
 import { parseCFDI, buildComprobanteRegistroBodyFromXml, CfdiParseError } from "./cfdiParserService.js";
 import CfdiModel from "../models/cfdiModel.js";
@@ -14,9 +13,9 @@ import { assertRequestAllowsReceiptUpload } from "./requestReceiptUploadPolicy.j
 export { CfdiParseError };
 
 /**
- * Uploads a PDF and XML file pair for a receipt to MongoDB GridFS.
+ * Uploads a PDF and XML file pair for a receipt to AWS S3.
  * Validates and parses the CFDI XML before uploading: rejects invalid structure
- * and duplicate UUIDs. On success, stores file IDs en Receipt; el CFDI fiscal completo va por POST /api/comprobantes.
+ * and duplicate UUIDs. On success, stores S3 keys en Receipt; el CFDI fiscal completo va por POST /api/comprobantes.
  *
  * @param {number} receiptId - ID of the receipt to associate files with
  * @param {Express.Multer.File} pdfFile - Multer file object for the PDF
@@ -32,7 +31,7 @@ export { CfdiParseError };
 export async function uploadReceiptFiles(receiptId, pdfFile, xmlFile) {
   const receiptRow = await prisma.receipt.findUnique({
     where: { receiptId: Number(receiptId) },
-    select: { requestId: true },
+    select: { requestId: true, organizationId: true },
   });
   if (!receiptRow?.requestId) {
     const err = new Error("Receipt not found or has no associated request");
@@ -62,33 +61,42 @@ export async function uploadReceiptFiles(receiptId, pdfFile, xmlFile) {
   }
 
   try {
-    const pdfResult = await uploadFile(
-      pdfFile.buffer,
-      pdfFile.originalname,
-      pdfFile.mimetype,
-      { receiptId, fileType: "pdf" }
-    );
+    const pdfResult = await upload({
+      body: pdfFile.buffer,
+      organizationId: receiptRow.organizationId,
+      viajeId: receiptRow.requestId,
+      fileName: pdfFile.originalname,
+      contentType: pdfFile.mimetype,
+      receiptId,
+    });
 
-    const xmlResult = await uploadFile(
-      xmlFile.buffer,
-      xmlFile.originalname,
-      xmlFile.mimetype,
-      { receiptId, fileType: "xml" }
-    );
+    const xmlResult = await upload({
+      body: xmlFile.buffer,
+      organizationId: receiptRow.organizationId,
+      viajeId: receiptRow.requestId,
+      fileName: xmlFile.originalname,
+      contentType: xmlFile.mimetype,
+      receiptId,
+    });
 
     await prisma.receipt.update({
       where: { receiptId: Number(receiptId) },
       data: {
-        pdfFileId: pdfResult.fileId,
-        pdfFileName: pdfResult.fileName,
-        xmlFileId: xmlResult.fileId,
-        xmlFileName: xmlResult.fileName,
+        pdfFileKey: pdfResult.key,
+        pdfFileName: pdfFile.originalname,
+        xmlFileKey: xmlResult.key,
+        xmlFileName: xmlFile.originalname,
       },
     });
 
     // Los datos fiscales completos se persisten en cfdi_comprobantes vía POST /api/comprobantes/:receipt_id
 
-    return { pdf: pdfResult, xml: xmlResult, cfdi: cfdiData, registroSugerido };
+    return {
+      pdf: { fileId: pdfResult.key, fileName: pdfFile.originalname },
+      xml: { fileId: xmlResult.key, fileName: xmlFile.originalname },
+      cfdi: cfdiData,
+      registroSugerido,
+    };
   } catch (error) {
     console.error("Error uploading receipt files:", error);
     throw error;
@@ -97,7 +105,7 @@ export async function uploadReceiptFiles(receiptId, pdfFile, xmlFile) {
 
 /**
  * Sube imagen JPG/PNG como comprobante internacional (sin XML ni CFDI).
- * Guarda el binario en GridFS y actualiza Receipt (pdf_* como archivo principal).
+ * Guarda el binario en S3 y actualiza Receipt (pdf_* como archivo principal).
  *
  * @param {number} receiptId
  * @param {Express.Multer.File} imageFile
@@ -106,7 +114,7 @@ export async function uploadReceiptFiles(receiptId, pdfFile, xmlFile) {
 export async function uploadInternationalReceiptImage(receiptId, imageFile) {
   const receiptRow = await prisma.receipt.findUnique({
     where: { receiptId: Number(receiptId) },
-    select: { requestId: true },
+    select: { requestId: true, organizationId: true },
   });
   if (!receiptRow?.requestId) {
     const err = new Error("Receipt not found or has no associated request");
@@ -115,34 +123,36 @@ export async function uploadInternationalReceiptImage(receiptId, imageFile) {
   }
   await assertRequestAllowsReceiptUpload(receiptRow.requestId);
 
-  const imageResult = await uploadFile(
-    imageFile.buffer,
-    imageFile.originalname,
-    imageFile.mimetype,
-    { receiptId, fileType: "international_receipt" }
-  );
+  const imageResult = await upload({
+    body: imageFile.buffer,
+    organizationId: receiptRow.organizationId,
+    viajeId: receiptRow.requestId,
+    fileName: imageFile.originalname,
+    contentType: imageFile.mimetype,
+    receiptId,
+  });
 
   await prisma.receipt.update({
     where: { receiptId: Number(receiptId) },
     data: {
-      pdfFileId: imageResult.fileId,
-      pdfFileName: imageResult.fileName,
-      xmlFileId: null,
+      pdfFileKey: imageResult.key,
+      pdfFileName: imageFile.originalname,
+      xmlFileKey: null,
       xmlFileName: null,
     },
   });
 
-  return { image: imageResult };
+  return { image: { fileId: imageResult.key, fileName: imageFile.originalname } };
 }
 
 /**
- * Returns a readable download stream for a receipt file stored in GridFS.
- * @param {import('mongodb').ObjectId} fileId - MongoDB ObjectId of the file
- * @returns {Promise<import('stream').Readable>} GridFS download stream
+ * Returns a readable download stream for a receipt file stored in S3.
+ * @param {string} key - S3 object key of the file
+ * @returns {Promise<{ body: import('stream').Readable, contentType: string|undefined, contentLength: number|undefined }>}
  */
-export async function getReceiptFile(fileId) {
+export async function getReceiptFile(key) {
   try {
-    return await getFile(fileId);
+    return await getObjectStream(key);
   } catch (error) {
     console.error("Error getting receipt file:", error);
     throw error;
@@ -150,7 +160,7 @@ export async function getReceiptFile(fileId) {
 }
 
 /**
- * Retrieves GridFS file IDs and names for both PDF and XML files of a receipt.
+ * Retrieves S3 keys and names for both PDF and XML files of a receipt.
  * @param {number} receiptId - ID of the receipt to look up
  * @returns {Promise<{pdf: {fileId: string, fileName: string}, xml: {fileId: string, fileName: string}}>}
  */
@@ -158,9 +168,9 @@ export async function getReceiptFilesMetadata(receiptId) {
   const receipt = await prisma.receipt.findUnique({
     where: { receiptId: Number(receiptId) },
     select: {
-      pdfFileId: true,
+      pdfFileKey: true,
       pdfFileName: true,
-      xmlFileId: true,
+      xmlFileKey: true,
       xmlFileName: true,
     },
   });
@@ -170,39 +180,39 @@ export async function getReceiptFilesMetadata(receiptId) {
   }
 
   return {
-    pdf: { fileId: receipt.pdfFileId, fileName: receipt.pdfFileName },
-    xml: { fileId: receipt.xmlFileId, fileName: receipt.xmlFileName },
+    pdf: { fileId: receipt.pdfFileKey, fileName: receipt.pdfFileName },
+    xml: { fileId: receipt.xmlFileKey, fileName: receipt.xmlFileName },
   };
 }
 
 /**
- * Deletes both PDF and XML files from MongoDB GridFS for a given receipt.
+ * Deletes both PDF and XML files from AWS S3 for a given receipt.
  * @param {number} receiptId - ID of the receipt whose files should be deleted
  * @returns {Promise<boolean>}
  */
 export async function deleteReceiptFiles(receiptId) {
   const receipt = await prisma.receipt.findUnique({
     where: { receiptId: Number(receiptId) },
-    select: { pdfFileId: true, xmlFileId: true },
+    select: { pdfFileKey: true, xmlFileKey: true },
   });
 
   if (!receipt) {
     throw new Error("Receipt not found");
   }
 
-  if (receipt.pdfFileId) {
+  if (receipt.pdfFileKey) {
     try {
-      await bucket.delete(new ObjectId(receipt.pdfFileId));
+      await deleteObject(receipt.pdfFileKey);
     } catch (error) {
-      console.error(`Error deleting PDF file ${receipt.pdfFileId}:`, error);
+      console.error(`Error deleting PDF file ${receipt.pdfFileKey}:`, error);
     }
   }
 
-  if (receipt.xmlFileId) {
+  if (receipt.xmlFileKey) {
     try {
-      await bucket.delete(new ObjectId(receipt.xmlFileId));
+      await deleteObject(receipt.xmlFileKey);
     } catch (error) {
-      console.error(`Error deleting XML file ${receipt.xmlFileId}:`, error);
+      console.error(`Error deleting XML file ${receipt.xmlFileKey}:`, error);
     }
   }
 

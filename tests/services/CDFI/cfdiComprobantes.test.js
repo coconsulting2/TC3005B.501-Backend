@@ -2,7 +2,7 @@
  * @file tests/comprobantes.test.js
  * @description Pruebas de integración: POST /api/comprobantes y PUT validate-receipt (SAT / CPP).
  *
- * Entorno recomendado (misma DB/Mongo/JWT que en desarrollo):
+ * Entorno recomendado (misma DB/JWT que en desarrollo):
  *   bun run docker:test
  * Ver `docker-compose.dev.yml` (servicio `backend`: DATABASE_URL, JWT_SECRET, etc.).
  *
