@@ -26,23 +26,21 @@ beforeEach(() => {
 describe("gastoTramoModel.getResumenTramos", () => {
   test("vincula comprobantes huérfanos cuando hay un solo tramo", async () => {
     mockPrisma.request.findUnique.mockResolvedValue({ requestId: 23 });
-    mockPrisma.routeRequest.findMany
-      .mockResolvedValueOnce([{ route: { routeId: 5, routerIndex: 0 } }])
-      .mockResolvedValueOnce([
-        {
-          route: {
-            routeId: 5,
-            routerIndex: 0,
-            originCountry: { countryName: "MX" },
-            originCity: { cityName: "CDMX" },
-            destinationCountry: { countryName: "MX" },
-            destinationCity: { cityName: "Monterrey" },
-            beginningDate: new Date("2026-06-13"),
-            endingDate: new Date("2026-07-04"),
-            gastoTramos: [],
-          },
+    mockPrisma.routeRequest.findMany.mockResolvedValue([
+      {
+        route: {
+          routeId: 5,
+          routerIndex: 0,
+          originCountry: { countryName: "MX" },
+          originCity: { cityName: "CDMX" },
+          destinationCountry: { countryName: "MX" },
+          destinationCity: { cityName: "Monterrey" },
+          beginningDate: new Date("2026-06-13"),
+          endingDate: new Date("2026-07-04"),
+          gastoTramos: [],
         },
-      ]);
+      },
+    ]);
     mockPrisma.gastoTramo.findMany.mockResolvedValue([]);
     mockPrisma.receipt.findMany
       .mockResolvedValueOnce([{ receiptId: 100 }])
