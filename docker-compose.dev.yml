@@ -6,13 +6,13 @@
 #   bun run docker:dev:clean    # stop AND wipe volumes (full reset)
 #
 # What this does:
-#  - Starts Postgres 16 + Mongo 7 with healthchecks.
+#  - Starts Postgres 16 + LocalStack (S3) with healthchecks.
 #  - One-shot `migrate` service: bun install → prisma generate → db push → seed.
 #    Runs to completion before the backend starts. Re-runs on every `up` but
 #    bun + prisma + the seed are all idempotent.
 #  - Backend service: bind-mounts the host source at /app, runs `node --watch
 #    index.js`. File changes on the host hot-reload the server.
-#  - Named volumes for: pgdata, mongodata, certs (auto-generated HTTPS),
+#  - Named volumes for: pgdata, certs (auto-generated HTTPS),
 #    node_modules_dev (avoids overlaying the host's node_modules).
 name: cocoscheme-dev
 
@@ -35,27 +35,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    networks:
-      - cocoscheme
-
-  mongo:
-    image: mongo:7
-    restart: unless-stopped
-    # GridFS-only — we don't tail mongo logs while developing the API.
-    command: ["mongod", "--quiet", "--logpath", "/dev/null"]
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodata:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    # Drop docker's log collection too so `docker compose logs -f` stays focused
-    # on the backend instead of being drowned in connection-open/close noise.
-    logging:
-      driver: none
     networks:
       - cocoscheme
 
@@ -148,7 +127,6 @@ services:
       NODE_ENV: development
       PORT: "3000"
       DATABASE_URL: postgresql://cocoscheme:cocoscheme_dev@postgres:5432/CocoScheme?schema=public
-      MONGO_URI: mongodb://mongo:27017
       CORS_ORIGIN: http://localhost:4321,https://localhost:4321
       AES_SECRET_KEY: "12345678901234567890123456789012"
       JWT_SECRET: dev_jwt_secret_change_me
@@ -188,8 +166,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      mongo:
-        condition: service_healthy
       migrate:
         condition: service_completed_successfully
       s3-init:
@@ -199,7 +175,6 @@ services:
 
 volumes:
   pgdata:
-  mongodata:
   certs:
   node_modules_dev:
   localstack_data:

@@ -83,16 +83,6 @@ jobs:
           --health-timeout=5s
           --health-retries=10
 
-      mongo:
-        image: mongo:7
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd="mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -116,7 +106,6 @@ jobs:
           PORT=3000
           NODE_ENV=test
           DATABASE_URL=postgresql://test:test@localhost:5432/cocoscheme_test?schema=public
-          MONGO_URI=mongodb://localhost:27017
           AES_SECRET_KEY=12345678901234567890123456789012
           JWT_SECRET=test_jwt_secret_key_for_github_actions
           MAIL_USER=test.mail@outlook.com

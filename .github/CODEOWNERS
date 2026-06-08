@@ -14,7 +14,6 @@
 
 # Database - configuración y migraciones de BD
 /database/          @coconsulting2/Backend
-mongodb_installation.md  @coconsulting2/Backend
 
 # Routes - definición de endpoints
 /routes/            @coconsulting2/Backend

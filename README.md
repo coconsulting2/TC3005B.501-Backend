@@ -89,12 +89,12 @@ The relational store is **PostgreSQL**, accessed through [Prisma](https://www.pr
     bun run empty_db   # schema + reference data only
     ```
 
-### Setup MongoDB
-1. [Download `mongodb`](https://www.mongodb.com/docs/manual/installation/) using your preferred method or package manager.
-2. [Download `mongosh`](https://www.mongodb.com/try/download/shell) if you want to interact with the database directly (recommended).
-3. Test that mongo was installed correctly by running the `mongod` or `mongosh` command. `mongod` will usually return error codes since no connection is currently made to then database.
-4. Verify that mongo is running using ` systemctl status mongod `
-5. If the status appears as inactive, use the command ` systemctl start mongod `
+### File storage (AWS S3)
+Todos los archivos (comprobantes PDF/XML, imágenes internacionales y objetos
+genéricos) se guardan en AWS S3. En local usa LocalStack (incluido en
+`docker-compose.dev.yml`); en producción usa un bucket real (rol IAM en EC2).
+Configura `AWS_REGION` y `AWS_S3_BUCKET` (y `AWS_S3_ENDPOINT` solo para LocalStack).
+
 ### Environment Variables
 
 Copy [`.env.example`](/.env.example) to `.env` and fill in the values:
@@ -103,11 +103,11 @@ Copy [`.env.example`](/.env.example) to `.env` and fill in the values:
 cp .env.example .env
 ```
 
-The required variables are: `PORT`, `NODE_ENV`, `DATABASE_URL`, `MONGO_URI`, `CORS_ORIGIN`, `AES_SECRET_KEY` (exactly 32 characters), `JWT_SECRET`, `MAIL_USER`, `MAIL_PASSWORD`.
+The required variables are: `PORT`, `NODE_ENV`, `DATABASE_URL`, `CORS_ORIGIN`, `AES_SECRET_KEY` (exactly 32 characters), `JWT_SECRET`, `AWS_REGION`, `AWS_S3_BUCKET`, `MAIL_USER`, `MAIL_PASSWORD`.
 
 ### Running
 
-With Postgres and MongoDB running and your `.env` populated:
+With Postgres running and your `.env` populated:
 
 ```sh
 bun run dev    # node --watch index.js
@@ -143,7 +143,7 @@ bun run docker:data:reset         # wipe Postgres + re-seed (keeps containers up
 bun run docker:permissions:sync   # re-apply reference seed only (idempotent) — run after pulling a PR that adds permissions
 ```
 
-`docker-compose.dev.yml` brings up Postgres 16 + Mongo 7 + a one-shot `migrate` service (installs deps, applies the Prisma schema, seeds reference + dummy data) + the backend with the source bind-mounted and `node --watch` running. Edits on the host hot-reload the server inside the container. HTTPS certs are auto-generated into a named volume on first start.
+`docker-compose.dev.yml` brings up Postgres 16 + LocalStack (S3) + a one-shot `migrate` service (installs deps, applies the Prisma schema, seeds reference + dummy data) + the backend with the source bind-mounted and `node --watch` running. Edits on the host hot-reload the server inside the container. HTTPS certs are auto-generated into a named volume on first start.
 
 The migrate service runs **every** `up`: the reference-data seed (roles, request statuses, **permissions**) is idempotent (`upsert` + `createMany({skipDuplicates:true})`) so new permissions added by teammates' PRs land automatically on your machine without a full wipe. Dummy data is gated by a sentinel inside the `node_modules_dev` volume, so it only runs on first boot. See [cocowiki — sistema de permisos](https://github.com/coconsulting2/cocowiki/blob/main/docs/permisos.md) for the workflow of adding new permissions.
 
@@ -178,7 +178,7 @@ MAIL_PASSWORD=...
 
 ```sh
 docker compose down
-docker volume rm cocoscheme_pgdata cocoscheme_mongodata cocoscheme_certs
+docker volume rm cocoscheme_pgdata cocoscheme_certs
 ```
 
 > Wiping the `certs` volume regenerates the CA, so you may need to re-trust the new certificate in your browser/keychain after the next `docker compose up`.

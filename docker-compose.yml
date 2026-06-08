@@ -1,10 +1,12 @@
 # Release stack: pulls the published backend image from GHCR and runs it
-# alongside Postgres + Mongo. End-users grab this file and run:
+# alongside Postgres. End-users grab this file and run:
 #
 #   curl -O https://raw.githubusercontent.com/coconsulting2/TC3005B.501-Backend/main/docker-compose.yml
 #   docker compose up -d
 #
 # Override secrets via a sibling .env file (AES_SECRET_KEY, JWT_SECRET, mail creds).
+# Almacenamiento de archivos: AWS S3 (define AWS_REGION + AWS_S3_BUCKET; en EC2
+# usa un IAM role, fuera de EC2 define AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY).
 name: cocoscheme
 
 services:
@@ -25,36 +27,21 @@ services:
     networks:
       - cocoscheme
 
-  mongo:
-    image: mongo:7
-    command: ["mongod", "--quiet", "--logpath", "/dev/null"]
-    volumes:
-      - mongodata:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ ping: 1 }).ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
-    logging:
-      driver: none
-    networks:
-      - cocoscheme
-
   backend:
     image: ghcr.io/coconsulting2/tc3005b-501-backend:latest
     pull_policy: always
     depends_on:
       postgres:
         condition: service_healthy
-      mongo:
-        condition: service_healthy
     environment:
       NODE_ENV: production
       PORT: "3000"
       DATABASE_URL: postgresql://cocoscheme:cocoscheme_dev@postgres:5432/CocoScheme?schema=public
-      MONGO_URI: mongodb://mongo:27017
       CORS_ORIGIN: http://localhost:4321,https://localhost:4321
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       AES_SECRET_KEY: ${AES_SECRET_KEY:-12345678901234567890123456789012}
       JWT_SECRET: ${JWT_SECRET:-dev_jwt_secret_change_me}
       MAIL_USER: ${MAIL_USER:-test.mail@outlook.com}
@@ -71,7 +58,6 @@ services:
 
 volumes:
   pgdata:
-  mongodata:
   certs:
 
 networks:
